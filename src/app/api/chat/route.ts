@@ -6,16 +6,23 @@ import OpenAI from "openai";
 
 let client: OpenAI | null = null;
 function getClient() {
-  if (!client) client = new OpenAI();
+  if (!client) {
+    client = new OpenAI({
+      baseURL: process.env.OPENAI_BASE_URL,
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
   return client;
 }
+
+const model = process.env.OPENAI_MODEL || "deepseek-v4-pro";
 
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
     const response = await getClient().chat.completions.create({
-      model: "gpt-5.2",
+      model,
       messages: [
         {
           role: "system",
