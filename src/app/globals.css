@@ -548,3 +548,105 @@ html, body {
 
 .dash-section-header h2 { font-size: 20px; }
 .dash-section-header small { color: var(--dash-muted); }
+
+/* ── Generative Chat ────────────────────────────────────────── */
+
+.dash-generative-chat {
+  margin-bottom: 24px;
+}
+
+.dash-chat-history {
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 4px;
+}
+
+.dash-chat-msg {
+  background: var(--dash-panel);
+  border: 1px solid var(--dash-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.dash-chat-msg-user {
+  border-left: 3px solid var(--dash-accent);
+}
+
+.dash-chat-msg-assistant {
+  border-left: 3px solid rgba(168, 121, 255, 0.5);
+}
+
+.dash-chat-msg-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dash-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-chat-text {
+  color: var(--dash-text);
+  line-height: 1.5;
+}
+
+.dash-chat-rendered {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-chat-streaming-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dash-accent);
+  animation: dash-pulse 1s ease-in-out infinite;
+}
+
+@keyframes dash-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.dash-chat-error {
+  background: rgba(255, 87, 87, 0.1);
+  border: 1px solid rgba(255, 87, 87, 0.3);
+  color: #ff7878;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.dash-chat-stop-btn {
+  background: rgba(255, 87, 87, 0.15) !important;
+  color: #ff7878 !important;
+}
+
+.dash-chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dash-chat-clear {
+  background: none;
+  border: none;
+  color: var(--dash-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 8px;
+  text-decoration: underline;
+}
+
+.dash-chat-clear:hover { color: var(--dash-text); }

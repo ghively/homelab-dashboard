@@ -10,11 +10,11 @@ import {
   MetricStrip,
   EntityDrawer,
   SavedViews,
-  AIQueryInput,
   useWorldData,
   useFleetData,
 } from "@/components/dashboard";
-import { WORLDS, type WorldId, QUERY_RECIPES, matchRecipe } from "@/lib/workspace-config";
+import { GenerativeChat } from "@/components/generative-chat";
+import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/adapter-aggregator";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
@@ -32,7 +32,6 @@ export default function Home() {
   } | null>(null);
   const [drawerAdapter, setDrawerAdapter] = useState<string | undefined>();
   const [savedView, setSavedView] = useState("overview");
-  const [aiResult, setAiResult] = useState<{ workspace: string; components: string[] } | null>(null);
 
   if (activeWorld === "home") {
     return (
@@ -66,8 +65,6 @@ export default function Home() {
             setDrawerEntity(entity);
             setDrawerAdapter(adapter);
           }}
-          aiResult={aiResult}
-          onAIResult={setAiResult}
         />
         <EntityDrawer
           open={!!drawerEntity}
@@ -294,27 +291,14 @@ function AIWorkspace({
   activeTag,
   onTagClick,
   onEntityClick,
-  aiResult,
-  onAIResult,
 }: {
   fixtureState: VisualStateValue | null;
   activeTag: string | null;
   onTagClick: (tag: string) => void;
   onEntityClick: (entity: Record<string, unknown>, adapter: string) => void;
-  aiResult: { workspace: string; components: string[] } | null;
-  onAIResult: (r: { workspace: string; components: string[] } | null) => void;
 }) {
   const { data, loading } = useWorldData("ai", fixtureState);
   const worldConfig = WORLDS.find((w) => w.id === "ai")!;
-
-  const handleQuery = (query: string) => {
-    const recipe = matchRecipe(query);
-    if (recipe) {
-      onAIResult({ workspace: recipe.workspace, components: recipe.components });
-    } else {
-      onAIResult(null);
-    }
-  };
 
   return (
     <>
@@ -333,23 +317,7 @@ function AIWorkspace({
         }
       />
 
-      <AIQueryInput onSubmit={handleQuery} result={aiResult} />
-
-      <div className="dash-section-header">
-        <h2>Query Recipes</h2>
-        <small>Click to try a natural-language composition</small>
-      </div>
-      <div className="dash-quick-tags">
-        {QUERY_RECIPES.map((r) => (
-          <button
-            key={r.workspace}
-            className="dash-tag"
-            onClick={() => handleQuery(r.request)}
-          >
-            {r.request}
-          </button>
-        ))}
-      </div>
+      <GenerativeChat />
 
       <QuickTags
         tags={worldConfig.quickTags}
