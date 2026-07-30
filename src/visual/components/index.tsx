@@ -98,21 +98,60 @@ const EdgeSchema = z.object({
 });
 tagSchemaId(EdgeSchema, "Edge");
 
+// ── Phase 5: Surface visual style (closed enums) ──────────────
+
+const SurfaceStyleSchema = z.object({
+  translucency: z.enum(["none", "subtle", "medium", "heavy"]).optional(),
+  blur: z.enum(["none", "sm", "md", "lg"]).optional(),
+  background: z.enum(["flat", "gradient", "image", "mesh"]).optional(),
+  elevation: z.enum(["flat", "raised", "floating"]).optional(),
+  glow: z.enum(["none", "state"]).optional(),
+});
+tagSchemaId(SurfaceStyleSchema, "SurfaceStyle");
+
+type SurfaceStyle = {
+  translucency?: string;
+  blur?: string;
+  background?: string;
+  elevation?: string;
+  glow?: string;
+};
+
+/** Compute CSS classes from the closed-enum surface style options. */
+function surfaceClasses(style: SurfaceStyle): string[] {
+  const cls: string[] = [];
+  if (style.translucency && style.translucency !== "none") cls.push(`cnv-translucent-${style.translucency}`);
+  if (style.blur && style.blur !== "none") cls.push(`cnv-blur-${style.blur}`);
+  if (style.background && style.background !== "flat") cls.push(`cnv-bg-${style.background}`);
+  if (style.elevation && style.elevation !== "flat") cls.push(`cnv-elev-${style.elevation}`);
+  if (style.glow === "state") cls.push("cnv-glow-state");
+  return cls;
+}
+
 // ── Helper components ─────────────────────────────────────────
 
-function Surface({
+/**
+ * Surface — canonical panel wrapper shared by all visual components
+ * and the dashboard page. Exported so dashboard.tsx can reuse it
+ * instead of maintaining a duplicate VisualPanel copy.
+ */
+export function Surface({
   title,
   subtitle,
   state = "healthy",
   children,
+  ...style
 }: {
   title: string;
   subtitle?: string;
   state?: string;
   children: React.ReactNode;
-}) {
+} & SurfaceStyle) {
+  const extra = surfaceClasses(style);
+  const classNames = [`cnv cnv-surface state-${state}`];
+  if (extra.length) classNames.push(...extra);
   return (
-    <section className={`cnv cnv-surface state-${state}`}>
+    <section className={classNames.join(" ")}>
       <header className="cnv-head">
         <div>
           <h3>{title}</h3>
@@ -122,6 +161,30 @@ function Surface({
       </header>
       {children}
     </section>
+  );
+}
+
+/**
+ * MetricStripContent — renders a row of metric cards. Exported so
+ * dashboard.tsx can reuse it instead of maintaining a duplicate.
+ */
+export function MetricStripContent({
+  metrics,
+}: {
+  metrics: Array<{ label: string; value: string | number; unit?: string; trend?: number; state?: string }>;
+}) {
+  return (
+    <div className="cnv-metrics">
+      {metrics.slice(0, 8).map((m, i) => (
+        <article key={i} className={`state-${m.state ?? "healthy"}`}>
+          <small>{m.label}</small>
+          <strong>{m.value}{m.unit}</strong>
+          {m.trend != null && (
+            <span>{m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%</span>
+          )}
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -1025,9 +1088,110 @@ export const Flow = defineComponent({
   },
 });
 
+// ── 26. Surface (glass wrapper — Phase 5 Task 5.3) ────────────
+//
+// A container/wrapper that applies closed-enum visual styling to its
+// children. Use to wrap any panel with translucency, blur, glow, etc.
+// The model composes: root = Surface({...}, [children])
+
+export const SurfaceComponent = defineComponent({
+  name: "Surface",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    children: z.array(z.any()),
+    ...SurfaceStyleSchema.shape,
+  }),
+  description:
+    "Glass / visual-style container that wraps children with translucency, blur, background, elevation, and glow. " +
+    "translucency: none|subtle|medium|heavy — how see-through the panel is. " +
+    "blur: none|sm|md|lg — backdrop blur intensity (frosted glass). " +
+    "background: flat|gradient|image|mesh — panel background style. " +
+    "elevation: flat|raised|floating — shadow depth. " +
+    "glow: none|state — when 'state', the panel glows with its health-state color (e.g. critical=red). " +
+    "Use to give a panel a glass-panel look: Surface({translucency:\"medium\", blur:\"md\"}, [...]).",
+  component: ({ props, renderNode }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; children: unknown[] } & SurfaceStyle>) => {
+    return (
+      <Surface title={props.title ?? ""} subtitle={props.subtitle} state={props.state} {...props}>
+        {Array.isArray(props.children) ? props.children.map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>) : null}
+      </Surface>
+    );
+  },
+});
+
+// ── 27. DashboardGrid (12-column layout — Phase 5 Task 5.4) ───
+//
+// CSS Grid with 12 columns. Children render as grid items; wrap each
+// child in GridItem to control its span. Without GridItem, children
+// default to full width (span 12).
+
+export const DashboardGrid = defineComponent({
+  name: "DashboardGrid",
+  props: z.object({
+    children: z.array(z.any()),
+    gap: z.enum(["none", "sm", "md", "lg"]).optional(),
+    columns: z.number().int().min(1).max(12).optional(),
+  }),
+  description:
+    "12-column responsive grid for multi-column dashboards. " +
+    "Wrap each child in GridItem to set its column span (how many of the 12 columns it occupies). " +
+    "Children not wrapped in GridItem default to full width (12 columns). " +
+    "gap: none|sm|md|lg. columns: override column count (default 12). " +
+    "Collapses to a single column on narrow screens. " +
+    "Example: root = DashboardGrid([GridItem(chart, 8), GridItem(stats, 4)]) makes chart span 2/3 and stats span 1/3.",
+  component: ({ props, renderNode }: ComponentRenderProps<{ children: unknown[]; gap?: string; columns?: number }>) => {
+    const gapMap: Record<string, string> = { none: "0", sm: "8px", md: "16px", lg: "24px" };
+    const gap = gapMap[props.gap ?? "md"] ?? gapMap["md"];
+    const cols = props.columns ?? 12;
+    return (
+      <div
+        className="cnv-grid"
+        style={{
+          ["--gap" as string]: gap,
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        }}
+      >
+        {Array.isArray(props.children) &&
+          props.children.map((child, i) => (
+            <div key={i} className="cnv-col-span-12">
+              {renderNode(child)}
+            </div>
+          ))}
+      </div>
+    );
+  },
+});
+
+// ── 28. GridItem (spanned grid cell — Phase 5 Task 5.4) ───────
+
+export const GridItem = defineComponent({
+  name: "GridItem",
+  props: z.object({
+    children: z.any(),
+    span: z.number().int().min(1).max(12).optional(),
+    rowSpan: z.number().int().min(1).max(6).optional(),
+  }),
+  description:
+    "Wraps a single component in a grid cell with a column span (1–12) and optional rowSpan (1–6). " +
+    "Use inside DashboardGrid: span=6 = half width, span=4 = third, span=3 = quarter, span=8 = two-thirds. " +
+    "Default span is 12 (full width). Only meaningful as a child of DashboardGrid.",
+  component: ({ props, renderNode }: ComponentRenderProps<{ children: unknown; span?: number; rowSpan?: number }>) => {
+    const span = props.span ?? 12;
+    const colClass = `cnv-col-span-${Math.min(12, Math.max(1, span))}`;
+    const rowClass = props.rowSpan ? `cnv-row-span-${Math.min(6, Math.max(1, props.rowSpan))}` : "";
+    return (
+      <div className={`${colClass} ${rowClass}`.trim()}>
+        {renderNode(props.children)}
+      </div>
+    );
+  },
+});
+
 // ── Exports ───────────────────────────────────────────────────
 
 const allComponents = [
+  SurfaceComponent, DashboardGrid, GridItem,
   MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank,
   Timeline, EventStream, LogStream, NodeGraph, Sankey,
   Kanban, VisualTable, ArtworkWall, PlaybackSessions,
@@ -1049,5 +1213,16 @@ export const homelabGroup = {
     "  Event  = {id: string, at: string, title: string, detail?: string, image?: string, state?: VisualState}",
     "  Node   = {id: string, label: string, x?: number, y?: number, state?: VisualState, value?: number}",
     "  Edge   = {source: string, target: string, label?: string, value?: number, state?: VisualState}",
+    "",
+    "Layout & visual styling:",
+    "  DashboardGrid — 12-column CSS Grid. Wrap children in GridItem(span, rowSpan?) to control width.",
+    "    Common spans: 6 = half width, 4 = one third, 3 = one quarter, 8 = two thirds. Default = 12 (full width).",
+    "    Example: root = DashboardGrid([GridItem(diskPanel, 6), GridItem(healthPanel, 6)])",
+    "  Stack — flex container for vertical stacking or simple rows (no explicit column width).",
+    "  Surface — glass wrapper with closed-enum visual controls:",
+    "    translucency: none|subtle|medium|heavy   blur: none|sm|md|lg",
+    "    background: flat|gradient|image|mesh      elevation: flat|raised|floating",
+    "    glow: none|state  (state ties glow to the panel's health color — critical=red)",
+    "    Example: Surface({translucency:\"medium\", blur:\"md\", glow:\"state\"}, [chart1, chart2])",
   ],
 };

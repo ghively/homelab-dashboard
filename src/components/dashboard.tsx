@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/adapter-aggregator";
 import type { VisualStateValue } from "@/adapters/types";
+import { Surface, MetricStripContent } from "@/visual/components";
 
 // ── Dashboard Shell ──────────────────────────────────────────
 
@@ -187,7 +188,10 @@ export function QuickTags({ tags, activeTag, onTagClick }: QuickTagsProps) {
   );
 }
 
-// ── Visual Panel (renders adapter result inline) ─────────────
+// ── Visual Panel / Metric Strip ───────────────────────────────
+// Re-exported from the visual library (Phase 5 Task 5.2 — deleted
+// the duplicate copies that lived here). page.tsx imports these by
+// the same names so no call-site changes are needed.
 
 interface VisualPanelProps {
   title: string;
@@ -198,45 +202,13 @@ interface VisualPanelProps {
 
 export function VisualPanel({ title, subtitle, state = "healthy", children }: VisualPanelProps) {
   return (
-    <section className={`cnv cnv-surface state-${state}`}>
-      <header className="cnv-head">
-        <div>
-          <h3>{title}</h3>
-          {subtitle && <small>{subtitle}</small>}
-        </div>
-        <span className="cnv-badge">{state}</span>
-      </header>
+    <Surface title={title} subtitle={subtitle} state={state}>
       {children}
-    </section>
+    </Surface>
   );
 }
 
-// ── Metric Strip ─────────────────────────────────────────────
-
-interface MetricStripProps {
-  metrics: Array<{ label: string; value: string | number; unit?: string; trend?: number; state?: string }>;
-}
-
-export function MetricStrip({ metrics }: MetricStripProps) {
-  return (
-    <div className="cnv-metrics">
-      {metrics.slice(0, 8).map((m) => (
-        <article key={m.label} className={`state-${m.state ?? "healthy"}`}>
-          <small>{m.label}</small>
-          <strong>
-            {m.value}
-            {m.unit}
-          </strong>
-          {m.trend != null && (
-            <span>
-              {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
-            </span>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
+export { MetricStripContent as MetricStrip };
 
 // ── Entity Detail Drawer ─────────────────────────────────────
 

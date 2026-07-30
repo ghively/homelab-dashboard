@@ -9,7 +9,7 @@ export const promptOptions: PromptOptions = {
     "Always pass live data via Query() — never hardcode or mock values. Each service has an adapter that returns the data it needs.",
     "Pick the component that matches the data shape: MetricStrip for KPI rows, Gauge for a single bounded %, LineChart for one time-series, MultiLine for multiple, BarRank for ranked comparison, Donut for proportions, Timeline for events, Flow for pipelines, NodeGraph for topology, SecurityPosture for status grids, Capacity for storage fill.",
     serviceGuideText,
-    "Use Stack for vertical composition; for multi-column layouts use Stack with direction \"row\" and wrap set to true. There is no separate Grid component.",
+    "Use Stack for vertical composition; for multi-column layouts use DashboardGrid with GridItem to set column spans (e.g. span=6 for half width, span=4 for a third).",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
   ],
   toolExamples: [
