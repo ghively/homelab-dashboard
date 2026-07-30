@@ -5,8 +5,11 @@ import {
   worldSummary,
   ADAPTER_INVENTORY,
 } from "@/lib/adapter-aggregator";
+import { initAdapters } from "@/lib/adapter-runtime";
 import { WORLDS, matchRecipe, type WorldId } from "@/lib/workspace-config";
 import type { VisualStateValue } from "@/adapters/types";
+
+initAdapters();
 
 // GET /api/adapters — list all adapters with world mappings
 // GET /api/adapters?world=media — list adapters for a world
