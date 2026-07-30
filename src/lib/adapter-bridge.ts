@@ -27,18 +27,14 @@ import type {
 
 export interface BridgedAdapter {
   health(): Promise<ContractsFreshnessInfo>;
-  query(params?: { query?: string }): Promise<{
-    data: VisualData;
-    freshness: ContractsFreshnessInfo;
-  }>;
 }
 
-export interface BridgeAdapterOpts {
+export interface BridgeAdapterOpts<T extends BridgedAdapter = BridgedAdapter> {
   name: string;
   description: string;
   category: "ai" | "media" | "ops" | "host" | "home" | "security" | "network" | "knowledge" | "personal";
-  adapter: BridgedAdapter;
-  queryMap: Record<string, (a: BridgedAdapter) => Promise<{ data: VisualData; freshness: ContractsFreshnessInfo }>>;
+  adapter: T;
+  queryMap: Record<string, (a: T) => Promise<{ data: VisualData; freshness: ContractsFreshnessInfo }>>;
   defaultQuery?: string;
 }
 
@@ -75,7 +71,7 @@ function flattenResult(
   return result;
 }
 
-export function bridgeAdapter(opts: BridgeAdapterOpts): DataAdapter {
+export function bridgeAdapter<T extends BridgedAdapter>(opts: BridgeAdapterOpts<T>): DataAdapter {
   const { name, description, category, adapter, queryMap, defaultQuery } = opts;
 
   return {
