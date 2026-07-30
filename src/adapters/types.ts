@@ -110,6 +110,7 @@ export const VisualQueryResultSchema = z.object({
   title: z.string(),
   subtitle: z.string().optional(),
   state: z.enum(["healthy", "warning", "critical", "offline", "stale", "loading", "empty", "denied"]).default("healthy"),
+  source: z.enum(["fixture", "live"]).default("fixture"),
   freshness: FreshnessInfoSchema,
   metrics: z.array(z.object({
     label: z.string(),

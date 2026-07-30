@@ -24,6 +24,9 @@ function EmptyState({ state }: { state: string }) {
   if (state === "healthy" || state === "warning" || state === "critical") return null;
   return <div className="cnv-state"><strong>{state === "loading" ? "Loading visualization" : state === "empty" ? "No matching data" : state === "denied" ? "Permission required" : state === "stale" ? "Data is stale" : "Source unavailable"}</strong></div>;
 }
+function NoData({ label = "No data" }: { label?: string }) {
+  return <div className="cnv-state-nodata"><strong>{label}</strong></div>;
+}
 function Metrics({ data }: { data: VisualData }) {
   return <div className="cnv-metrics">{data.metrics.slice(0, 6).map(m => <article key={m.label}><small>{m.label}</small><strong>{m.value}{m.unit}</strong>{m.trend != null && <span>{m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%</span>}</article>)}</div>;
 }
@@ -37,11 +40,13 @@ function Timeline({ data }: { data: VisualData }) {
   return <div className="cnv-timeline">{data.events.map(e => <article key={e.id}><time>{e.at}</time><i /><div><strong>{e.title}</strong><small>{e.detail}</small></div></article>)}</div>;
 }
 function Chart({ data, multi = false }: { data: VisualData; multi?: boolean }) {
-  const series = data.series.length ? data.series : [{ name: "value", points: [{ x: 0, y: 20 }, { x: 1, y: 44 }, { x: 2, y: 31 }, { x: 3, y: 72 }, { x: 4, y: 58 }, { x: 5, y: 84 }] }];
+  if (!data.series.length) return <NoData label="No time-series data" />;
+  const series = data.series;
   return <svg className="cnv-chart" viewBox="0 0 640 220" role="img">{series.slice(0, multi ? 4 : 1).map((s, si) => { const max = Math.max(...s.points.map(p => p.y), 1); const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" "); return <path key={s.name} d={d} fill="none" stroke={`var(--cnv-series-${si + 1})`} strokeWidth="3" /> })}</svg>;
 }
 function Bars({ data }: { data: VisualData }) {
-  const items = data.items.length ? data.items : data.metrics.map((m, i) => ({ id: String(i), label: m.label, value: typeof m.value == "number" ? m.value : 50 }));
+  if (!data.items.length) return <NoData label="No data to rank" />;
+  const items = data.items;
   const max = Math.max(...items.map(i => Number(i.value) || 0), 1);
   return <div className="cnv-bars">{items.slice(0, 12).map(i => <article key={i.id}><label>{i.label}</label><div><i style={{ width: `${(Number(i.value) || 0) / max * 100}%` }} /></div><b>{i.value}</b></article>)}</div>;
 }
@@ -62,10 +67,13 @@ function Matrix({ data }: { data: VisualData }) {
   return <div className="cnv-matrix">{data.items.map(i => <article key={i.id} data-state={i.state}><i /><strong>{i.label}</strong><small>{i.subtitle}</small></article>)}</div>;
 }
 function Capacity({ data }: { data: VisualData }) {
-  const used = Number(data.metrics[0]?.value) || 72;
+  if (!data.metrics.length) return <NoData label="No capacity data" />;
+  const used = Number(data.metrics[0].value);
+  if (!Number.isFinite(used)) return <NoData label="No capacity data" />;
   return <div className="cnv-capacity"><div style={{ background: `conic-gradient(var(--cnv-series-1) 0 ${used}%, #2b2f3a ${used}%)` }}><strong>{used}%</strong></div><section><Metrics data={data} /><Chart data={data} /></section></div>;
 }
 function Cloud({ data }: { data: VisualData }) {
+  if (!data.items.length && !data.metrics.length) return <NoData label="No data for cloud" />;
   const words = (data.items.length ? data.items.map(i => i.label) : data.metrics.map(m => m.label)).slice(0, 30);
   return <div className="cnv-cloud">{words.map((w, i) => <span key={w} style={{ fontSize: `${12 + (i % 7) * 3}px` }}>{w}</span>)}</div>;
 }
@@ -73,12 +81,14 @@ function Callout({ data }: { data: VisualData }) {
   return <div className="cnv-callout"><strong>{data.summary || data.title || "Attention needed"}</strong><p>{data.subtitle || "Review the supporting context and choose the next action."}</p><Metrics data={data} /></div>;
 }
 function Wave({ data }: { data: VisualData }) {
-  const pts = data.series[0]?.points || Array.from({ length: 48 }, (_, i) => ({ x: i, y: (Math.sin(i * .7) + 1) * 35 + 15 }));
+  const pts = data.series[0]?.points;
+  if (!pts || !pts.length) return <NoData label="No waveform data" />;
   return <div className="cnv-wave">{pts.map((p, i) => <i key={i} style={{ height: `${Math.max(8, p.y)}%` }} />)}</div>;
 }
 
 function MarkdownReader({ data }: { data: VisualData }) {
-  const md = data.markdown || "## Knowledge note\nA polished wiki document with **relationships**, evidence, code, tables, and backlinks.";
+  if (!data.markdown) return <NoData label="No document content" />;
+  const md = data.markdown;
   const lines = md.split("\n");
   return <div className="cnv-knowledge-reader"><aside><strong>On this page</strong>{lines.filter(x => x.startsWith("##")).map(x => <a key={x}>{x.replace(/^#+\s*/, "")}</a>)}</aside><article>{lines.map((x, i) => x.startsWith("##") ? <h2 key={i}>{x.replace(/^#+\s*/, "")}</h2> : x.startsWith("```") ? null : <p key={i}>{x.replace(/\*\*/g, "")}</p>)}</article><aside><strong>Backlinks</strong>{data.items.slice(0, 5).map(i => <a key={i.id}>{i.label}</a>)}</aside></div>;
 }
@@ -92,7 +102,8 @@ function Backlinks({ data }: { data: VisualData }) {
   return <div className="cnv-backlinks">{data.items.slice(0, 8).map(i => <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle || "Links to this concept with supporting context."}</small><span>{Number(i.meta?.evidence ?? 1)} evidence</span></article>)}</div>;
 }
 function SearchResults({ data }: { data: VisualData }) {
-  return <div className="cnv-search-results">{data.items.slice(0, 8).map((i, n) => <article key={i.id}><b>{n + 1}</b><div><strong>{i.label}</strong><small>{i.subtitle}</small></div><span>{Math.max(71, 98 - n * 4)}%</span></article>)}</div>;
+  if (!data.items.length) return <NoData label="No search results" />;
+  return <div className="cnv-search-results">{data.items.slice(0, 8).map((i, n) => <article key={i.id}><b>{n + 1}</b><div><strong>{i.label}</strong><small>{i.subtitle}</small></div><span>{i.value || ""}</span></article>)}</div>;
 }
 function KnowledgeHealthView({ data }: { data: VisualData }) {
   return <div className="cnv-health"><Metrics data={data} /><Matrix data={data} /></div>;
