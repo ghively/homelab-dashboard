@@ -73,6 +73,7 @@ function Capacity({ data }: { data: VisualData }) {
   return <div className="cnv-capacity"><div style={{ background: `conic-gradient(var(--cnv-series-1) 0 ${used}%, #2b2f3a ${used}%)` }}><strong>{used}%</strong></div><section><Metrics data={data} /><Chart data={data} /></section></div>;
 }
 function Cloud({ data }: { data: VisualData }) {
+  if (!data.items.length && !data.metrics.length) return <NoData label="No data for cloud" />;
   const words = (data.items.length ? data.items.map(i => i.label) : data.metrics.map(m => m.label)).slice(0, 30);
   return <div className="cnv-cloud">{words.map((w, i) => <span key={w} style={{ fontSize: `${12 + (i % 7) * 3}px` }}>{w}</span>)}</div>;
 }
@@ -86,7 +87,8 @@ function Wave({ data }: { data: VisualData }) {
 }
 
 function MarkdownReader({ data }: { data: VisualData }) {
-  const md = data.markdown || "## Knowledge note\nA polished wiki document with **relationships**, evidence, code, tables, and backlinks.";
+  if (!data.markdown) return <NoData label="No document content" />;
+  const md = data.markdown;
   const lines = md.split("\n");
   return <div className="cnv-knowledge-reader"><aside><strong>On this page</strong>{lines.filter(x => x.startsWith("##")).map(x => <a key={x}>{x.replace(/^#+\s*/, "")}</a>)}</aside><article>{lines.map((x, i) => x.startsWith("##") ? <h2 key={i}>{x.replace(/^#+\s*/, "")}</h2> : x.startsWith("```") ? null : <p key={i}>{x.replace(/\*\*/g, "")}</p>)}</article><aside><strong>Backlinks</strong>{data.items.slice(0, 5).map(i => <a key={i.id}>{i.label}</a>)}</aside></div>;
 }
@@ -100,7 +102,8 @@ function Backlinks({ data }: { data: VisualData }) {
   return <div className="cnv-backlinks">{data.items.slice(0, 8).map(i => <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle || "Links to this concept with supporting context."}</small><span>{Number(i.meta?.evidence ?? 1)} evidence</span></article>)}</div>;
 }
 function SearchResults({ data }: { data: VisualData }) {
-  return <div className="cnv-search-results">{data.items.slice(0, 8).map((i, n) => <article key={i.id}><b>{n + 1}</b><div><strong>{i.label}</strong><small>{i.subtitle}</small></div><span>{Math.max(71, 98 - n * 4)}%</span></article>)}</div>;
+  if (!data.items.length) return <NoData label="No search results" />;
+  return <div className="cnv-search-results">{data.items.slice(0, 8).map((i, n) => <article key={i.id}><b>{n + 1}</b><div><strong>{i.label}</strong><small>{i.subtitle}</small></div><span>{i.value || ""}</span></article>)}</div>;
 }
 function KnowledgeHealthView({ data }: { data: VisualData }) {
   return <div className="cnv-health"><Metrics data={data} /><Matrix data={data} /></div>;

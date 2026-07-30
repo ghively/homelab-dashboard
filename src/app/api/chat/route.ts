@@ -1,42 +1,50 @@
-import { librarySpec } from "@/lib/library-spec";
-import { promptOptions } from "@/lib/prompt-options";
-import { generateSystemPrompt } from "@openuidev/lang-core";
 import { NextRequest } from "next/server";
-import OpenAI from "openai";
 
-let client: OpenAI | null = null;
-function getClient() {
-  if (!client) {
-    client = new OpenAI({
-      baseURL: process.env.OPENAI_BASE_URL,
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  return client;
-}
-
-const model = process.env.OPENAI_MODEL || "deepseek-v4-pro";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
-    const response = await getClient().chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: generateSystemPrompt({
-            library: librarySpec,
-            promptOptions,
-          }),
-        },
-        ...messages,
-      ],
-      stream: true,
+    const [{ library }, { promptOptions }] = await Promise.all([
+      import("@/lib/library"),
+      import("@/lib/prompt-options"),
+    ]);
+
+    const systemPrompt = library.prompt(promptOptions);
+    const baseURL = process.env.OPENAI_BASE_URL || "http://gh-arm:4000/v1";
+    const apiKey = process.env.OPENAI_API_KEY || "sk-none";
+    const model = process.env.OPENAI_MODEL || "deepseek-v4-flash";
+
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          ...messages,
+        ],
+        stream: true,
+      }),
     });
 
-    return new Response(response.toReadableStream(), {
+    if (!response.ok) {
+      const text = await response.text();
+      return new Response(JSON.stringify({ error: text }), {
+        status: response.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(response.body, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
