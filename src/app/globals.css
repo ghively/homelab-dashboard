@@ -142,6 +142,39 @@ html, body {
   padding: 24px 32px;
 }
 
+/* ── Demo Data Banner ───────────────────────────────────────── */
+.dash-demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 194, 102, 0.08);
+  border: 1px solid rgba(255, 194, 102, 0.3);
+  border-left: 4px solid var(--state-warning);
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 24px;
+}
+
+.dash-demo-banner-icon {
+  font-size: 20px;
+  color: var(--state-warning);
+  line-height: 1;
+}
+
+.dash-demo-banner strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--state-warning);
+  letter-spacing: 0.05em;
+}
+
+.dash-demo-banner small {
+  display: block;
+  font-size: 12px;
+  color: var(--dash-muted);
+}
+
 /* ── Hero Banner ────────────────────────────────────────────── */
 .dash-hero {
   background: linear-gradient(135deg, var(--dash-panel) 0%, var(--dash-panel2) 100%);

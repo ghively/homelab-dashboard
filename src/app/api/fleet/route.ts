@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryWorld, worldSummary } from "@/lib/adapter-aggregator";
+import { initAdapters } from "@/lib/adapter-runtime";
 import { WORLDS } from "@/lib/workspace-config";
 import type { VisualStateValue } from "@/adapters/types";
+
+initAdapters();
 
 // GET /api/fleet — aggregate health across all 8 worlds (for landing page)
 export async function GET(req: NextRequest) {
