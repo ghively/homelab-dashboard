@@ -13,6 +13,7 @@ interface ShellProps {
   onWorldChange: (w: WorldId | "home") => void;
   fixtureState: VisualStateValue | null;
   onFixtureChange: (s: VisualStateValue | null) => void;
+  dataSource?: "fixture" | "live";
 }
 
 export function DashboardShell({
@@ -21,6 +22,7 @@ export function DashboardShell({
   onWorldChange,
   fixtureState,
   onFixtureChange,
+  dataSource,
 }: ShellProps) {
   return (
     <div className="dash-root">
@@ -72,7 +74,15 @@ export function DashboardShell({
           </div>
         </div>
       </aside>
-      <main className="dash-main">{children}</main>
+      <main className="dash-main">
+        {dataSource === "fixture" && (
+          <div className="dash-demo-banner" role="status">
+            <strong>DEMO DATA</strong>
+            <span>Panels are showing fixture data, not live readings from your homelab.</span>
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

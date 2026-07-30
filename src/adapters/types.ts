@@ -170,6 +170,7 @@ export const VisualQueryResultSchema = z.object({
   })).optional(),
   summary: z.string().optional(),
   query: z.string().optional(),
+  source: z.enum(["fixture", "live"]).default("fixture"),
 });
 
 export type VisualQueryResult = z.infer<typeof VisualQueryResultSchema>;

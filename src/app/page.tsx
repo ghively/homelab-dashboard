@@ -33,6 +33,10 @@ export default function Home() {
   const [drawerAdapter, setDrawerAdapter] = useState<string | undefined>();
   const [savedView, setSavedView] = useState("overview");
 
+  // All adapters currently return fixture data (source: "fixture" on the result).
+  // Phase 1 will flip adapters to "live"; until then the DEMO DATA banner is always shown.
+  const dataSource: "fixture" | "live" = "fixture";
+
   if (activeWorld === "home") {
     return (
       <DashboardShell
@@ -40,6 +44,7 @@ export default function Home() {
         onWorldChange={setActiveWorld}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
+        dataSource={dataSource}
       >
         <LandingPage
           fixtureState={fixtureState}
@@ -56,6 +61,7 @@ export default function Home() {
         onWorldChange={setActiveWorld}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
+        dataSource={dataSource}
       >
         <AIWorkspace
           fixtureState={fixtureState}
@@ -82,6 +88,7 @@ export default function Home() {
       onWorldChange={setActiveWorld}
       fixtureState={fixtureState}
       onFixtureChange={setFixtureState}
+      dataSource={dataSource}
     >
       <WorldView
         world={activeWorld}
