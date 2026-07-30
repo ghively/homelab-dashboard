@@ -3,6 +3,12 @@
 import { useState, useRef, useCallback } from "react";
 import { Renderer } from "@openuidev/react-lang";
 import { library } from "@/lib/library";
+import { createToolProvider } from "@/lib/tools";
+
+// Module-scope toolProvider — built once, shared by every Renderer instance.
+// A new object per render would thrash the query manager (it keys memoization
+// on provider identity). Null here would make Query() bail silently.
+const toolProvider = createToolProvider();
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -173,6 +179,7 @@ export function GenerativeChat() {
                   <Renderer
                     response={msg.content}
                     library={library}
+                    toolProvider={toolProvider}
                     isStreaming={false}
                   />
                 </div>
@@ -193,6 +200,7 @@ export function GenerativeChat() {
                 <Renderer
                   response={chat.streamedResponse}
                   library={library}
+                  toolProvider={toolProvider}
                   isStreaming={true}
                 />
               </div>
