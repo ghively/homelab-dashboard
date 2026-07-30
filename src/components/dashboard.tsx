@@ -14,6 +14,7 @@ interface ShellProps {
   fixtureState: VisualStateValue | null;
   onFixtureChange: (s: VisualStateValue | null) => void;
   dataSource?: "fixture" | "live";
+  liveAdapters?: string[];
 }
 
 export function DashboardShell({
@@ -23,6 +24,7 @@ export function DashboardShell({
   fixtureState,
   onFixtureChange,
   dataSource,
+  liveAdapters,
 }: ShellProps) {
   return (
     <div className="dash-root">
@@ -75,7 +77,12 @@ export function DashboardShell({
         </div>
       </aside>
       <main className="dash-main">
-        {dataSource === "fixture" && (
+        {liveAdapters && liveAdapters.length > 0 ? (
+          <div className="dash-demo-banner dash-demo-banner--mixed" role="status">
+            <strong>LIVE + DEMO</strong>
+            <span>{liveAdapters.length} adapter{liveAdapters.length === 1 ? "" : "s"} live ({liveAdapters.join(", ")}) — remaining panels show fixture data.</span>
+          </div>
+        ) : dataSource === "fixture" && (
           <div className="dash-demo-banner" role="status">
             <strong>DEMO DATA</strong>
             <span>Panels are showing fixture data, not live readings from your homelab.</span>
@@ -411,6 +418,7 @@ interface FleetData {
     total: number;
     worldCount: number;
   };
+  liveAdapters?: string[];
 }
 
 export function useFleetData(fixtureState: VisualStateValue | null) {

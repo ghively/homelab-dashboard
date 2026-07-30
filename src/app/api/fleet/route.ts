@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryWorld, worldSummary } from "@/lib/adapter-aggregator";
+import { initAdapters, isLive } from "@/lib/adapter-runtime";
+import { ADAPTER_INVENTORY } from "@/lib/adapter-aggregator";
 import { WORLDS } from "@/lib/workspace-config";
 import type { VisualStateValue } from "@/adapters/types";
+
+initAdapters();
 
 // GET /api/fleet — aggregate health across all 8 worlds (for landing page)
 export async function GET(req: NextRequest) {
@@ -32,6 +36,8 @@ export async function GET(req: NextRequest) {
     "healthy" as VisualStateValue,
   );
 
+  const liveAdapters = ADAPTER_INVENTORY.filter((a) => isLive(a.name)).map((a) => a.name);
+
   return NextResponse.json({
     worlds,
     overall: {
@@ -40,5 +46,6 @@ export async function GET(req: NextRequest) {
       total: overallTotal,
       worldCount: worlds.length,
     },
+    liveAdapters,
   });
 }
