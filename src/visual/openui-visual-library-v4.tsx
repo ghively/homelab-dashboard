@@ -24,6 +24,9 @@ function EmptyState({ state }: { state: string }) {
   if (state === "healthy" || state === "warning" || state === "critical") return null;
   return <div className="cnv-state"><strong>{state === "loading" ? "Loading visualization" : state === "empty" ? "No matching data" : state === "denied" ? "Permission required" : state === "stale" ? "Data is stale" : "Source unavailable"}</strong></div>;
 }
+function NoData() {
+  return <div className="cnv-nodata"><span>No data</span></div>;
+}
 function Metrics({ data }: { data: VisualData }) {
   return <div className="cnv-metrics">{data.metrics.slice(0, 6).map(m => <article key={m.label}><small>{m.label}</small><strong>{m.value}{m.unit}</strong>{m.trend != null && <span>{m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%</span>}</article>)}</div>;
 }
@@ -37,13 +40,16 @@ function Timeline({ data }: { data: VisualData }) {
   return <div className="cnv-timeline">{data.events.map(e => <article key={e.id}><time>{e.at}</time><i /><div><strong>{e.title}</strong><small>{e.detail}</small></div></article>)}</div>;
 }
 function Chart({ data, multi = false }: { data: VisualData; multi?: boolean }) {
-  const series = data.series.length ? data.series : [{ name: "value", points: [{ x: 0, y: 20 }, { x: 1, y: 44 }, { x: 2, y: 31 }, { x: 3, y: 72 }, { x: 4, y: 58 }, { x: 5, y: 84 }] }];
+  if (!data.series.length) return <NoData />;
+  const series = data.series;
   return <svg className="cnv-chart" viewBox="0 0 640 220" role="img">{series.slice(0, multi ? 4 : 1).map((s, si) => { const max = Math.max(...s.points.map(p => p.y), 1); const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" "); return <path key={s.name} d={d} fill="none" stroke={`var(--cnv-series-${si + 1})`} strokeWidth="3" /> })}</svg>;
 }
 function Bars({ data }: { data: VisualData }) {
-  const items = data.items.length ? data.items : data.metrics.map((m, i) => ({ id: String(i), label: m.label, value: typeof m.value == "number" ? m.value : 50 }));
-  const max = Math.max(...items.map(i => Number(i.value) || 0), 1);
-  return <div className="cnv-bars">{items.slice(0, 12).map(i => <article key={i.id}><label>{i.label}</label><div><i style={{ width: `${(Number(i.value) || 0) / max * 100}%` }} /></div><b>{i.value}</b></article>)}</div>;
+  const items = data.items.length ? data.items : data.metrics.map((m, i) => ({ id: String(i), label: m.label, value: m.value }));
+  const numericItems = items.filter(i => typeof i.value === "number" && !Number.isNaN(i.value));
+  if (!numericItems.length) return <NoData />;
+  const max = Math.max(...numericItems.map(i => Number(i.value)), 1);
+  return <div className="cnv-bars">{numericItems.slice(0, 12).map(i => <article key={i.id}><label>{i.label}</label><div><i style={{ width: `${(Number(i.value) || 0) / max * 100}%` }} /></div><b>{i.value}</b></article>)}</div>;
 }
 function Network({ data }: { data: VisualData }) {
   return <svg className="cnv-network" viewBox="0 0 800 430" role="img">{data.edges.map((e, i) => { const a = data.nodes.find(n => n.id === e.source), b = data.nodes.find(n => n.id === e.target); return a && b ? <line key={i} x1={a.x || 0} y1={a.y || 0} x2={b.x || 0} y2={b.y || 0} /> : null })}{data.nodes.map(n => <g key={n.id} transform={`translate(${n.x || 0} ${n.y || 0})`}><circle r="34" /><text textAnchor="middle" y="5">{n.label}</text></g>)}</svg>;
@@ -62,7 +68,9 @@ function Matrix({ data }: { data: VisualData }) {
   return <div className="cnv-matrix">{data.items.map(i => <article key={i.id} data-state={i.state}><i /><strong>{i.label}</strong><small>{i.subtitle}</small></article>)}</div>;
 }
 function Capacity({ data }: { data: VisualData }) {
-  const used = Number(data.metrics[0]?.value) || 72;
+  const usedRaw = Number(data.metrics[0]?.value);
+  const used = !data.metrics.length || Number.isNaN(usedRaw) ? null : usedRaw;
+  if (used === null) return <NoData />;
   return <div className="cnv-capacity"><div style={{ background: `conic-gradient(var(--cnv-series-1) 0 ${used}%, #2b2f3a ${used}%)` }}><strong>{used}%</strong></div><section><Metrics data={data} /><Chart data={data} /></section></div>;
 }
 function Cloud({ data }: { data: VisualData }) {
@@ -73,7 +81,8 @@ function Callout({ data }: { data: VisualData }) {
   return <div className="cnv-callout"><strong>{data.summary || data.title || "Attention needed"}</strong><p>{data.subtitle || "Review the supporting context and choose the next action."}</p><Metrics data={data} /></div>;
 }
 function Wave({ data }: { data: VisualData }) {
-  const pts = data.series[0]?.points || Array.from({ length: 48 }, (_, i) => ({ x: i, y: (Math.sin(i * .7) + 1) * 35 + 15 }));
+  const pts = data.series[0]?.points;
+  if (!pts || !pts.length) return <NoData />;
   return <div className="cnv-wave">{pts.map((p, i) => <i key={i} style={{ height: `${Math.max(8, p.y)}%` }} />)}</div>;
 }
 

@@ -34,6 +34,7 @@ export function createFixture(params: {
     title: params.title,
     subtitle: params.subtitle,
     summary: params.summary,
+    source: "fixture",
   };
 }
 
