@@ -4,6 +4,7 @@
 
 import type { VisualQueryResult, VisualStateValue } from "@/adapters/types";
 import { getFixtureForState } from "@/adapters/fixtures";
+import { getAdapter } from "@/lib/adapter-runtime";
 import { WORLDS, type WorldId } from "./workspace-config";
 
 export interface AdapterEntry {
@@ -387,13 +388,45 @@ function enrichFixture(
 }
 
 // Query a single adapter by name in a given state.
+// Routing rules (Phase 1b):
+//   1. Live adapter registered + succeeds → return live result, source: "live".
+//   2. No adapter registered (service unconfigured) → fixture, source: "fixture".
+//   3. Live adapter THROWS → return a minimal offline result, source: "live".
+//      NEVER silently fall back to a healthy fixture. A configured service that
+//      cannot be reached must show offline — this is the entire point of Phase 0.
 export async function queryAdapter(
   adapterName: string,
   state: VisualStateValue = "healthy",
 ): Promise<VisualQueryResult | null> {
   const entry = ADAPTER_INVENTORY.find((a) => a.name === adapterName);
   if (!entry) return null;
-  return worldSpecificFixture(adapterName, entry.world, state);
+
+  const liveAdapter = getAdapter(adapterName);
+  if (liveAdapter) {
+    try {
+      const result = await liveAdapter.query({});
+      return { ...result, source: "live" };
+    } catch (err) {
+      return {
+        title: adapterName,
+        subtitle: "Live adapter failed — showing offline",
+        state: "offline",
+        source: "live",
+        freshness: {
+          adapter: adapterName,
+          source: `live:${adapterName}`,
+          queriedAt: new Date().toISOString(),
+          stalenessSeconds: 0,
+          cacheHit: false,
+        },
+        metrics: [{ label: "Status", value: "OFFLINE", state: "offline" }],
+        summary: `Live adapter error: ${String(err)}`,
+      };
+    }
+  }
+
+  // No live adapter registered — service is unconfigured, fall back to fixture.
+  return { ...worldSpecificFixture(adapterName, entry.world, state), source: "fixture" };
 }
 
 // Query all adapters for a world.
