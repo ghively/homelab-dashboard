@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: [
+    "@openuidev/react-ui",
+    "@openuidev/react-lang",
+    "@openuidev/lang-core",
+  ],
   turbopack: {
     root: __dirname,
   },
