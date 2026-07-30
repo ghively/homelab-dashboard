@@ -162,6 +162,13 @@ html, body {
 .dash-demo-banner span {
   color: var(--dash-muted);
 }
+.dash-demo-banner--mixed {
+  background: rgba(102, 255, 194, 0.08);
+  border-color: rgba(102, 255, 194, 0.3);
+}
+.dash-demo-banner--mixed strong {
+  color: var(--state-healthy, #4ade80);
+}
 
 /* ── Hero Banner ────────────────────────────────────────────── */
 .dash-hero {

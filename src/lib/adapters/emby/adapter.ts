@@ -65,6 +65,8 @@ export class EmbyAdapter {
 
   /**
    * Generic fetch with error handling.
+   * Emby wraps list endpoints in { Items: [...] }; unwrap when present
+   * so callers receiving T = SomeItem[] get the array directly.
    */
   private async fetch<T>(endpoint: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
@@ -73,7 +75,16 @@ export class EmbyAdapter {
       if (!res.ok) {
         throw new Error(`Emby API error: ${res.status} ${res.statusText}`);
       }
-      return (await res.json()) as T;
+      const json = await res.json();
+      if (
+        json &&
+        typeof json === "object" &&
+        !Array.isArray(json) &&
+        Array.isArray((json as { Items?: unknown }).Items)
+      ) {
+        return (json as { Items: T }).Items;
+      }
+      return json as T;
     } catch (err) {
       throw new Error(`Emby fetch failed: ${err}`);
     }

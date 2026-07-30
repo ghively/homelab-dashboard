@@ -33,9 +33,10 @@ export default function Home() {
   const [drawerAdapter, setDrawerAdapter] = useState<string | undefined>();
   const [savedView, setSavedView] = useState("overview");
 
-  // All adapters currently return fixture data (source: "fixture" on the result).
-  // Phase 1 will flip adapters to "live"; until then the DEMO DATA banner is always shown.
-  const dataSource: "fixture" | "live" = "fixture";
+  // dataSource is now computed from the fleet API: when any adapter is
+  // registered as live, the banner switches to LIVE + DEMO mode.
+  const fleetData = useFleetData(fixtureState);
+  const liveAdapters = fleetData.data?.liveAdapters;
 
   if (activeWorld === "home") {
     return (
@@ -44,7 +45,7 @@ export default function Home() {
         onWorldChange={setActiveWorld}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
-        dataSource={dataSource}
+        liveAdapters={liveAdapters}
       >
         <LandingPage
           fixtureState={fixtureState}
@@ -61,7 +62,7 @@ export default function Home() {
         onWorldChange={setActiveWorld}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
-        dataSource={dataSource}
+        liveAdapters={liveAdapters}
       >
         <AIWorkspace
           fixtureState={fixtureState}
@@ -88,7 +89,7 @@ export default function Home() {
       onWorldChange={setActiveWorld}
       fixtureState={fixtureState}
       onFixtureChange={setFixtureState}
-      dataSource={dataSource}
+      liveAdapters={liveAdapters}
     >
       <WorldView
         world={activeWorld}
