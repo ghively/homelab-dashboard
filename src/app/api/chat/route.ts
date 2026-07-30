@@ -7,12 +7,12 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
-    const [{ library }, { promptOptions }] = await Promise.all([
-      import("@/lib/library"),
+    const [{ promptLibrary }, { promptOptions }] = await Promise.all([
+      import("@/lib/prompt-library"),
       import("@/lib/prompt-options"),
     ]);
 
-    const systemPrompt = library.prompt(promptOptions);
+    const systemPrompt = promptLibrary.prompt(promptOptions);
     const baseURL = process.env.OPENAI_BASE_URL || "http://gh-arm:4000/v1";
     const apiKey = process.env.OPENAI_API_KEY || "sk-none";
     const model = process.env.OPENAI_MODEL || "deepseek-v4-flash";
