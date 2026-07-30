@@ -1,6 +1,5 @@
-import { librarySpec } from "@/lib/library-spec";
+import { buildSystemPrompt } from "@/lib/prompt-library";
 import { promptOptions } from "@/lib/prompt-options";
-import { generateSystemPrompt } from "@openuidev/lang-core";
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
@@ -21,15 +20,14 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
+    const systemPrompt = buildSystemPrompt(promptOptions);
+
     const response = await getClient().chat.completions.create({
       model,
       messages: [
         {
           role: "system",
-          content: generateSystemPrompt({
-            library: librarySpec,
-            promptOptions,
-          }),
+          content: systemPrompt,
         },
         ...messages,
       ],
