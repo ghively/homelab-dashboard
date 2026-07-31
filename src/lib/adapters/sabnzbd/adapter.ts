@@ -168,7 +168,6 @@ export class SabnzbdAdapter {
           },
         ],
         events: [],
-        updatedAt: now,
       };
 
       return {
@@ -249,7 +248,6 @@ export class SabnzbdAdapter {
             detail: s.status,
             state: s.status === "Completed" || s.status === "Verified" ? "healthy" : "critical",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -323,7 +321,6 @@ export class SabnzbdAdapter {
         metrics,
         items: [],
         summary: `Uptime: ${status.uptime || "Unknown"}`,
-        updatedAt: now,
       };
 
       return {
@@ -375,7 +372,6 @@ export class SabnzbdAdapter {
             state: warnings.warnings.length > 0 ? "critical" : "healthy",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -431,7 +427,6 @@ export class SabnzbdAdapter {
           },
         ],
         items: [],
-        updatedAt: now,
       };
 
       return {
@@ -463,7 +458,6 @@ export class SabnzbdAdapter {
         state: "offline",
         items: [],
         metrics: [],
-        updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),

@@ -1,6 +1,7 @@
 import { openuiPromptOptions } from "@openuidev/react-ui/genui-lib/prompt-options";
 import type { PromptOptions } from "@openuidev/react-lang";
 import { serviceGuideText } from "@/visual/manifest-map";
+import { toolSpecs } from "@/lib/tools";
 
 export const promptOptions: PromptOptions = {
   ...openuiPromptOptions,
@@ -11,7 +12,10 @@ export const promptOptions: PromptOptions = {
     serviceGuideText,
     "Use Stack for vertical composition; for multi-column layouts use DashboardGrid with GridItem to set column spans (e.g. span=6 for half width, span=4 for a third).",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
+    "Auto-refresh: for live status panels (health, queue depth, active sessions) pass a 30–60 second interval as Query()'s fourth arg, e.g. health = Query(\"emby\", {}, {...}, 30). For historical data or one-time lookups, omit the interval.",
+    "Use FilterDropdown to let the user narrow data — give it a unique name, a default value, and an options list. Bind it to a Query by referencing $<filterName> in the Query args so changing the dropdown re-fetches automatically.",
   ],
+  tools: toolSpecs,
   toolExamples: [
     `Example — CI pipeline health:
 

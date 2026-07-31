@@ -68,4 +68,6 @@ export const serviceGuideText = `Service domain → recommended component:
   knowledge → MarkdownReader or KnowledgeGraph
 When a service has a single bounded % (disk, CPU, memory), use Gauge.
 When a service has multiple KPIs, use MetricStrip.
-When showing a pipeline/sequence, use Flow.`;
+When showing a pipeline/sequence, use Flow.
+When correlating two numeric variables (latency vs load), use Scatter.
+When bucketing a value across two categorical axes (errors by service×hour), use Heatmap.`;

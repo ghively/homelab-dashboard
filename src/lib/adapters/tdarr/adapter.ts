@@ -165,7 +165,6 @@ export class TdarrAdapter {
         ],
         items: [],
         summary: status.uptime ? `Uptime: ${status.uptime}` : undefined,
-        updatedAt: now,
       };
 
       return {
@@ -257,7 +256,6 @@ export class TdarrAdapter {
             detail: j.status,
             state: j.status === "processing" ? "loading" : j.status === "completed" ? "healthy" : j.status === "failed" ? "critical" : "warning",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -330,7 +328,6 @@ export class TdarrAdapter {
             unit: "GB",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -410,7 +407,6 @@ export class TdarrAdapter {
             unit: "jobs",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -481,7 +477,6 @@ export class TdarrAdapter {
             detail: j.error_message || "Unknown error",
             state: "critical",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -513,7 +508,6 @@ export class TdarrAdapter {
         state: "offline",
         items: [],
         metrics: [],
-        updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),

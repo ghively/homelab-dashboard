@@ -9,7 +9,7 @@
  * same schemas and attach real React renderers.
  */
 import { z } from "zod";
-import { defineComponent, tagSchemaId } from "@openuidev/lang-core";
+import { defineComponent, tagSchemaId, markReactive } from "@openuidev/lang-core";
 
 // ── Shared schemas (tagged so signatures stay short) ──────────
 
@@ -212,6 +212,7 @@ export const NodeGraphSchema = defineComponent({
   description:
     "Network topology / dependency graph (service connections, infrastructure topology). " +
     "Nodes need {id, label, x?, y?} (coordinates in a ~800×430 space). Edges need {source, target, label?, value?}. " +
+    "Nodes are clickable — clicking a node drills into a detail view for that node. " +
     "For sequential pipeline/flow use Flow. For proportional flow use Sankey.",
   component: null as never,
 });
@@ -229,10 +230,12 @@ export const SankeySchema = defineComponent({
 
 export const KanbanSchema = defineComponent({
   name: "Kanban",
-  props: z.object({ ...baseFields, items: z.array(ItemSchema) }),
+  props: z.object({ ...baseFields, items: z.array(ItemSchema), children: z.array(z.any()).optional() }),
   description:
     "Board with columns grouped by item.group (CI stages, deployment statuses, task states). " +
     "Each Item needs {id, label, subtitle?, group}. Items are auto-grouped by their group field. " +
+    "Cards are clickable — clicking drills into a detail view for that item. " +
+    "Optionally accepts children (nested components rendered below the board). " +
     "Use VisualTable for flat tabular data. Use RoomBoard for physical topology.",
   component: null as never,
 });
@@ -242,7 +245,8 @@ export const VisualTableSchema = defineComponent({
   props: z.object({ ...baseFields, items: z.array(ItemSchema) }),
   description:
     "Tabular list of records (containers, devices, adapters, configs). " +
-    "Each Item shows {label, subtitle, value, state}. Rows are read-only. " +
+    "Each Item shows {label, subtitle, value, state}. Rows are clickable — clicking a row " +
+    "drills into a detail view for that entity. " +
     "Use LogStream for raw logs. Use BarRank for ranked numeric comparison. " +
     "Use DetailPanel for a single entity's key-value details.",
   component: null as never,
@@ -324,10 +328,11 @@ export const BacklinksSchema = defineComponent({
 
 export const DetailPanelSchema = defineComponent({
   name: "DetailPanel",
-  props: z.object({ ...baseFields, metrics: z.array(MetricSchema), summary: z.string().optional() }),
+  props: z.object({ ...baseFields, metrics: z.array(MetricSchema), summary: z.string().optional(), children: z.array(z.any()).optional() }),
   description:
     "Single-entity detail view showing labeled key-value pairs (one device, one container, one service). " +
     "Metrics render as label/value rows. summary renders as a callout paragraph. " +
+    "Optionally accepts children (nested components rendered below the metrics, e.g. a chart or table). " +
     "Use MetricStrip for dashboard KPI rows. Use DetailPanel when drilling into one entity.",
   component: null as never,
 });
@@ -361,6 +366,51 @@ export const EmptyStateSchema = defineComponent({
   component: null as never,
 });
 
+export const ScatterSchema = defineComponent({
+  name: "Scatter",
+  props: z.object({
+    ...baseFields,
+    points: z.array(z.object({
+      x: z.number(),
+      y: z.number(),
+      label: z.string().optional(),
+      size: z.number().optional(),
+      state: VisualStateSchema.optional(),
+    })),
+    xAxisLabel: z.string().optional(),
+    yAxisLabel: z.string().optional(),
+  }),
+  description:
+    "Scatter plot showing correlation between two numeric variables (latency vs throughput, request count vs error rate, cost vs tokens). " +
+    "Each point is {x, y, label?, size?, state?}. size scales the dot radius (bubble effect). " +
+    "Choose over LineChart when individual observations matter more than a trend line. " +
+    "Choose Heatmap when both axes are categorical bins rather than continuous numbers.",
+  component: null as never,
+});
+
+export const HeatmapSchema = defineComponent({
+  name: "Heatmap",
+  props: z.object({
+    ...baseFields,
+    rows: z.array(z.string()),
+    cols: z.array(z.string()),
+    cells: z.array(z.object({
+      row: z.number().int(),
+      col: z.number().int(),
+      value: z.number(),
+      state: VisualStateSchema.optional(),
+    })),
+    valueLabel: z.string().optional(),
+  }),
+  description:
+    "Grid heatmap showing intensity of a value across two categorical axes (request latency by hour×day, error rate by service×endpoint, CI failure by runner×stage). " +
+    "rows[] and cols[] are the axis labels. cells[] has {row (index), col (index), value, state?}. " +
+    "Cell color intensity is driven by value (higher = more saturated) unless state overrides. " +
+    "Choose over Scatter when both axes are categories/bins, not continuous numbers. " +
+    "Choose over Matrix (SecurityPosture) when the cell encodes a numeric magnitude, not just on/off state.",
+  component: null as never,
+});
+
 export const RoomBoardSchema = defineComponent({
   name: "RoomBoard",
   props: z.object({ ...baseFields, items: z.array(ItemSchema) }),
@@ -382,14 +432,41 @@ export const FlowSchema = defineComponent({
   component: null as never,
 });
 
+// ── Phase 4: Interactivity schemas ───────────────────────────
+
+// FilterDropdown value is reactive so $<name> bindings in Query args re-fetch
+// when the selection changes. markReactive is the lang-core equivalent of
+// react-lang's reactive() for the server-side (prompt) path.
+const FilterValueSchema = z.string().optional();
+markReactive(FilterValueSchema);
+
+export const FilterDropdownSchema = defineComponent({
+  name: "FilterDropdown",
+  props: z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    value: FilterValueSchema,
+    options: z.array(z.object({ value: z.string(), label: z.string() })),
+  }),
+  description:
+    "Interactive dropdown filter for narrowing live data. " +
+    "Give each FilterDropdown a unique name (the reactive state key), an optional label, a default value, and an options list of {value, label}. " +
+    "To make a Query re-fetch when the selection changes, reference $<filterName> inside the Query args, e.g. " +
+    "data = Query(\"emby\", {library: $libFilter}, {...}) where libFilter = FilterDropdown(\"libFilter\", {value: \"movies\", options: [...]}). " +
+    "Use multiple FilterDropdowns with distinct names for independent filters.",
+  component: null as never,
+});
+
 // ── Exports ───────────────────────────────────────────────────
 
 export const homelabSchemaComponents = [
-  MetricStripSchema, GaugeSchema, DonutSchema, LineChartSchema, MultiLineSchema, BarRankSchema,
+  MetricStripSchema, GaugeSchema, DonutSchema, LineChartSchema, MultiLineSchema,
+  ScatterSchema, BarRankSchema, HeatmapSchema,
   TimelineSchema, EventStreamSchema, LogStreamSchema, NodeGraphSchema, SankeySchema,
   KanbanSchema, VisualTableSchema, ArtworkWallSchema, PlaybackSessionsSchema,
   CapacitySchema, SecurityPostureSchema, MarkdownReaderSchema, KnowledgeGraphSchema,
   BacklinksSchema, DetailPanelSchema, CalloutSchema, EmptyStateSchema, RoomBoardSchema, FlowSchema,
+  FilterDropdownSchema,
 ];
 
 export const homelabGroup = {

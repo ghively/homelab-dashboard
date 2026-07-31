@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Renderer } from "@openuidev/react-lang";
 import { library } from "@/lib/library";
+import { toolProvider } from "@/lib/tools";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ export function GenerativeChat() {
                     response={msg.content}
                     library={library}
                     isStreaming={false}
+                    toolProvider={toolProvider}
                   />
                 </div>
               ) : (
@@ -194,6 +196,7 @@ export function GenerativeChat() {
                   response={chat.streamedResponse}
                   library={library}
                   isStreaming={true}
+                  toolProvider={toolProvider}
                 />
               </div>
             </div>

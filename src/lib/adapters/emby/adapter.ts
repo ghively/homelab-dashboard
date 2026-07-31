@@ -148,7 +148,6 @@ export class EmbyAdapter {
             unit: "★",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -204,7 +203,6 @@ export class EmbyAdapter {
         subtitle: `${items.length} items in progress`,
         state: "healthy",
         items: visualItems,
-        updatedAt: now,
       };
 
       return {
@@ -273,7 +271,6 @@ export class EmbyAdapter {
             detail: `${s.Client} on ${s.DeviceName}`,
             state: "healthy",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -327,7 +324,6 @@ export class EmbyAdapter {
         metrics,
         items,
         summary: `${libraries.length} libraries across ${libraries.reduce((sum, l) => sum + (l.ChildCount || 0), 0)} total items`,
-        updatedAt: now,
       };
 
       return {
@@ -389,7 +385,6 @@ export class EmbyAdapter {
             unit: "episodes",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -439,7 +434,6 @@ export class EmbyAdapter {
         subtitle: `${items.length} albums`,
         state: "healthy",
         items: visualItems,
-        updatedAt: now,
       };
 
       return {
@@ -471,7 +465,6 @@ export class EmbyAdapter {
         state: "offline",
         items: [],
         metrics: [],
-        updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
