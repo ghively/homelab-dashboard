@@ -191,57 +191,6 @@ export function QuickTags({ tags, activeTag, onTagClick }: QuickTagsProps) {
   );
 }
 
-// ── Visual Panel (renders adapter result inline) ─────────────
-
-interface VisualPanelProps {
-  title: string;
-  subtitle?: string;
-  state?: VisualStateValue;
-  children: ReactNode;
-}
-
-export function VisualPanel({ title, subtitle, state = "healthy", children }: VisualPanelProps) {
-  return (
-    <section className={`cnv cnv-surface state-${state}`}>
-      <header className="cnv-head">
-        <div>
-          <h3>{title}</h3>
-          {subtitle && <small>{subtitle}</small>}
-        </div>
-        <span className="cnv-badge">{state}</span>
-      </header>
-      {children}
-    </section>
-  );
-}
-
-// ── Metric Strip ─────────────────────────────────────────────
-
-interface MetricStripProps {
-  metrics: Array<{ label: string; value: string | number; unit?: string; trend?: number; state?: string }>;
-}
-
-export function MetricStrip({ metrics }: MetricStripProps) {
-  return (
-    <div className="cnv-metrics">
-      {metrics.slice(0, 8).map((m) => (
-        <article key={m.label} className={`state-${m.state ?? "healthy"}`}>
-          <small>{m.label}</small>
-          <strong>
-            {m.value}
-            {m.unit}
-          </strong>
-          {m.trend != null && (
-            <span>
-              {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
-            </span>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
-
 // ── Entity Detail Drawer ─────────────────────────────────────
 
 interface EntityDrawerProps {

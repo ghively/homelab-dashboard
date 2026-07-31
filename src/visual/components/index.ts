@@ -2,7 +2,7 @@
 
 import type { ComponentGroup } from "@openuidev/react-lang";
 import type { DefinedComponent } from "@openuidev/lang-core";
-import { MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban, VisualTable, ArtworkWall, PlaybackSessions, Capacity, SecurityPosture, Heatmap, MarkdownReader, KnowledgeGraph, Backlinks, DetailPanel, Callout, EmptyState, FilterDropdown, Section } from "./definitions";
+import { MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban, VisualTable, ArtworkWall, PlaybackSessions, Capacity, SecurityPosture, Heatmap, MarkdownReader, KnowledgeGraph, Backlinks, DetailPanel, Callout, EmptyState, FilterDropdown, Section, DashboardGrid } from "./definitions";
 import { homelabGroupNotes } from "./group-notes";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,7 +11,7 @@ export const homelabComponents: DefinedComponent<any, any>[] = [
   Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban,
   VisualTable, ArtworkWall, PlaybackSessions, Capacity, SecurityPosture,
   Heatmap, MarkdownReader, KnowledgeGraph, Backlinks, DetailPanel, Callout, EmptyState,
-  FilterDropdown, Section,
+  FilterDropdown, Section, DashboardGrid,
 ];
 
 export const homelabGroup: ComponentGroup = {
@@ -20,5 +20,5 @@ export const homelabGroup: ComponentGroup = {
   notes: homelabGroupNotes,
 };
 
-export { MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban, VisualTable, ArtworkWall, PlaybackSessions, Capacity, SecurityPosture, Heatmap, MarkdownReader, KnowledgeGraph, Backlinks, DetailPanel, Callout, EmptyState, FilterDropdown, Section };
+export { MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban, VisualTable, ArtworkWall, PlaybackSessions, Capacity, SecurityPosture, Heatmap, MarkdownReader, KnowledgeGraph, Backlinks, DetailPanel, Callout, EmptyState, FilterDropdown, Section, DashboardGrid };
 export { VisualStateSchema, MetricSchema, ItemSchema, SeriesSchema, NodeSchema, EdgeSchema, EventSchema } from "./schemas";

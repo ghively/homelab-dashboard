@@ -13,7 +13,8 @@ export const promptOptions: PromptOptions = {
     "For numeric summaries (CPU, memory, counts, pass/fail) use MetricStrip — it renders compact KPI rows.",
     "Auto-refresh: for live status panels (active streams, queue depth, alerts, CPU/memory) pass a 30–60 second refreshInterval as the 4th Query() argument so the panel re-fetches. For historical or static data (library size over time, spend by month, past events) OMIT the interval — it should not poll.",
     buildDomainMapRules(),
-    "Use Stack for vertical composition; for multi-column layouts use Stack with direction \"row\" and wrap set to true. There is no separate Grid component.",
+    "Use Stack for vertical composition; for multi-column layouts use DashboardGrid with span props on each child panel (span: 6 = half width, span: 4 = third, span: 3 = quarter). DashboardGrid uses a 12-column CSS Grid — set each child's span (1-12) to control its width and rowSpan (1-3) for height.",
+    "Visual styling — every panel accepts an optional surfaceStyle object with closed-enum visual controls: {translucency: subtle|medium|strong, blur: sm|md|lg, background: gradient|accent, elevation: sm|md|lg, glow: state|accent}. For glass panels use translucency + blur together (e.g. surfaceStyle: {translucency: medium, blur: md}). glow: state colors the glow by the panel's state — use it for critical/warning panels. Never pass raw className or style.",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
     "Interactivity — filters: use FilterDropdown to let the user narrow results. Set name to a $variable (e.g. \"range\"), then pass {$range} in the Query() args of the panels it controls. Selecting an option re-fetches those queries automatically — no extra wiring.",
     "Interactivity — drill-down: rows in VisualTable, Kanban, items in ArtworkWall, and nodes in NodeGraph are clickable. Clicking sends a follow-up message (e.g. \"Show details for X\"); respond with a DetailPanel for that entity. Do not pre-render detail views the user hasn't requested.",
@@ -72,5 +73,15 @@ poolData = Query("synology-dsm", {view: "pools"}, {state: "healthy", items: []},
 rightCol = Section("Media", null, null, [mediaStrip])
 mediaStrip = MetricStrip(mediaData)
 mediaData = Query("emby", {}, {state: "healthy", metrics: []}, 60)`,
+    `Example — Glass-panel dashboard with grid layout (disk spanning half width):
+
+root = DashboardGrid([header, diskPanel, poolPanel, alertPanel])
+header = CardHeader("Storage Health", "Glass dashboard overview")
+diskPanel = Gauge(diskData, {translucency: medium, blur: md, glow: state}, 6)
+diskData = Query("synology-dsm", {}, {title: "Disk Usage", value: 0, max: 100, thresholds: {warning: 75, critical: 90}, state: "healthy"}, 60)
+poolPanel = VisualTable(poolData, {translucency: subtle, blur: sm}, 6)
+poolData = Query("synology-dsm", {view: "pools"}, {state: "healthy", items: []}, 60)
+alertPanel = EventStream(alertData, {translucency: medium, blur: md, elevation: lg}, 12)
+alertData = Query("wazuh-manager", {}, {state: "healthy", events: []}, 30)`,
   ],
 };

@@ -1,2 +1,645 @@
-:root{--cnv-bg:#0b0d12;--cnv-panel:#171a23;--cnv-panel2:#20242e;--cnv-line:#343846;--cnv-text:#f2f4fa;--cnv-muted:#9299a9;--cnv-series-1:#27d7f2;--cnv-series-2:#a879ff;--cnv-series-3:#29e39b;--cnv-series-4:#ffc266}.cnv{color:var(--cnv-text);font:14px Inter,system-ui,sans-serif}.cnv-surface{background:var(--cnv-panel);border:1px solid var(--cnv-line);border-radius:14px;padding:16px;overflow:hidden}.cnv-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}.cnv-head h3{margin:0}.cnv-head small,.cnv small{color:var(--cnv-muted)}.cnv-badge{border:1px solid var(--cnv-line);border-radius:999px;padding:5px 8px;color:var(--cnv-muted);font-size:11px}.cnv-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.cnv-metrics article,.cnv-table article,.cnv-board section{border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:11px;padding:11px}.cnv-metrics strong{display:block;font-size:24px}.cnv-metrics span{color:#29e39b;font-size:11px}.cnv-posters,.cnv-albums{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:11px}.cnv-art{aspect-ratio:2/3;border-radius:9px;background:linear-gradient(145deg,#4c3275,#153d49);display:flex;align-items:end;padding:9px}.cnv-albums .cnv-art{aspect-ratio:1}.cnv-posters article,.cnv-albums article{position:relative}.cnv-posters article>strong,.cnv-albums article>strong,.cnv-posters article>small,.cnv-albums article>small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cnv-posters article>i{position:absolute;left:0;bottom:37px;height:3px;background:var(--cnv-series-3)}.cnv-playback{display:grid;gap:9px}.cnv-playback article{display:grid;grid-template-columns:70px 1fr auto;gap:11px;align-items:center;border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:11px;padding:9px}.cnv-playback .cnv-art{width:70px;height:70px;aspect-ratio:1}.cnv-playback strong,.cnv-playback small{display:block}.cnv-progress{height:4px;background:#303441;border-radius:4px;margin-top:8px;overflow:hidden}.cnv-progress i{display:block;height:100%;background:var(--cnv-series-3)}.cnv-timeline article{display:grid;grid-template-columns:80px 14px 1fr;gap:10px;min-height:58px}.cnv-timeline time{color:var(--cnv-series-1);font-size:11px}.cnv-timeline article>i{width:12px;height:12px;border-radius:50%;border:3px solid var(--cnv-series-2)}.cnv-timeline strong,.cnv-timeline small{display:block}.cnv-chart,.cnv-network{width:100%;height:auto}.cnv-network line{stroke:#555b6b;stroke-width:2}.cnv-network circle{fill:var(--cnv-panel2);stroke:var(--cnv-series-2);stroke-width:3}.cnv-network text{fill:var(--cnv-text);font-size:12px}.cnv-bars{display:grid;gap:8px}.cnv-bars article{display:grid;grid-template-columns:130px 1fr auto;gap:8px}.cnv-bars article>div{height:10px;border-radius:6px;background:#2c303b;overflow:hidden}.cnv-bars article i{display:block;height:100%;background:linear-gradient(90deg,var(--cnv-series-2),var(--cnv-series-1))}.cnv-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.cnv-board h4{margin:0 0 8px;color:var(--cnv-muted)}.cnv-board article{border-top:1px solid var(--cnv-line);padding:9px 0}.cnv-board strong,.cnv-board small{display:block}.cnv-table{display:grid}.cnv-table article{display:grid;grid-template-columns:1.3fr 1fr auto auto;gap:8px;border-radius:0;border-width:1px 0 0}.cnv-flow{display:flex;align-items:center;gap:8px}.cnv-flow article{flex:1;border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:10px;padding:10px}.cnv-flow>i{width:50px;height:9px;background:linear-gradient(90deg,var(--cnv-series-2),var(--cnv-series-1));border-radius:50%}.cnv-matrix{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}.cnv-matrix article{border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:10px;padding:10px;text-align:center}.cnv-matrix article>i{display:block;width:9px;height:9px;border-radius:50%;background:#29e39b;margin:0 auto 8px}.cnv-matrix strong,.cnv-matrix small{display:block}.cnv-capacity{display:grid;grid-template-columns:190px 1fr;gap:18px}.cnv-capacity>div{aspect-ratio:1;border-radius:50%;display:grid;place-items:center}.cnv-capacity>div:after{content:"";position:absolute}.cnv-capacity>div strong{background:var(--cnv-panel);border-radius:50%;width:70%;aspect-ratio:1;display:grid;place-items:center;font-size:28px}.cnv-wave{height:220px;display:flex;gap:3px;align-items:center}.cnv-wave i{flex:1;background:linear-gradient(var(--cnv-series-1),var(--cnv-series-2));border-radius:4px}.cnv-cloud{min-height:230px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}.cnv-cloud span{color:var(--cnv-series-1);padding:4px}.cnv-callout{border:1px solid #564a31;background:rgba(255,194,102,.07);border-radius:12px;padding:18px}.cnv-callout>strong{font-size:22px}.cnv-callout>p{color:var(--cnv-muted)}.cnv-state{min-height:260px;display:grid;place-items:center;border:1px dashed var(--cnv-line);border-radius:12px;color:var(--cnv-muted)}@media(max-width:650px){.cnv-capacity{grid-template-columns:1fr}.cnv-flow{flex-direction:column}.cnv-flow>i{width:9px;height:35px}.cnv-table article{grid-template-columns:1fr auto}.cnv-table article>*:nth-child(2),.cnv-table article>*:nth-child(4){display:none}}
-.cnv-knowledge-reader{display:grid;grid-template-columns:170px minmax(0,1fr) 190px;gap:18px}.cnv-knowledge-reader>aside{border-right:1px solid var(--cnv-line);padding-right:12px}.cnv-knowledge-reader>aside:last-child{border:0;border-left:1px solid var(--cnv-line);padding:0 0 0 12px}.cnv-knowledge-reader aside strong,.cnv-knowledge-reader aside a{display:block}.cnv-knowledge-reader aside a{color:var(--cnv-muted);padding:5px 0;font-size:12px}.cnv-knowledge-reader article{line-height:1.7}.cnv-knowledge-reader article h2{font-size:24px}.cnv-doc-tree{display:grid;gap:5px}.cnv-doc-tree article{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:9px;border:1px solid transparent;border-radius:9px}.cnv-doc-tree article.active{border-color:var(--cnv-series-2);background:rgba(168,121,255,.1)}.cnv-doc-tree strong,.cnv-doc-tree small{display:block}.cnv-knowledge-graph{display:grid;gap:10px}.cnv-path-strip{display:flex;align-items:center;gap:6px;overflow:auto}.cnv-path-strip span{border:1px solid var(--cnv-line);background:var(--cnv-panel2);padding:7px 9px;border-radius:8px;white-space:nowrap}.cnv-path-strip b{color:var(--cnv-series-1)}.cnv-backlinks,.cnv-search-results{display:grid;gap:7px}.cnv-backlinks article,.cnv-search-results article{border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:10px;padding:10px}.cnv-backlinks strong,.cnv-backlinks small{display:block}.cnv-backlinks span{color:var(--cnv-series-1);font-size:11px}.cnv-search-results article{display:grid;grid-template-columns:auto 1fr auto;gap:9px}.cnv-search-results small,.cnv-search-results strong{display:block}.cnv-evidence-canvas{display:grid;gap:14px}.cnv-evidence-canvas>section{border-left:3px solid var(--cnv-series-2);padding:8px 15px;background:rgba(168,121,255,.06);border-radius:0 10px 10px 0}.cnv-evidence-canvas h3{font-size:24px;margin:6px 0}.cnv-diff{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cnv-diff section{border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:10px;padding:12px}.cnv-diff section:first-child p{color:#ff9aac}.cnv-diff section:last-child p{color:#7de9b8}@media(max-width:780px){.cnv-knowledge-reader{grid-template-columns:1fr}.cnv-knowledge-reader>aside{border:0!important;padding:0!important}.cnv-diff{grid-template-columns:1fr}}.cnv-nodata{display:flex;align-items:center;justify-content:center;min-height:80px;border:1px dashed var(--cnv-line);border-radius:10px;color:var(--cnv-muted);font-size:12px;letter-spacing:.03em}
+/* ════════════════════════════════════════════════════════════════════
+   Cyber-Noir Visual Library — v4
+   Glassmorphism + 12-col grid + motion layer (Phase 5)
+
+   Design tokens use oklch() with an alpha channel for translucent surfaces.
+   Every visual property the model can set flows through a closed enum
+   (translucency / blur / background / elevation / glow) — no raw CSS escapes.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens ──────────────────────────────────────────────────── */
+:root {
+  /* Base palette */
+  --cnv-bg: #0b0d12;
+  --cnv-panel: #171a23;
+  --cnv-panel2: #20242e;
+  --cnv-line: #343846;
+  --cnv-text: #f2f4fa;
+  --cnv-muted: #9299a9;
+
+  /* Series colors */
+  --cnv-series-1: #27d7f2;
+  --cnv-series-2: #a879ff;
+  --cnv-series-3: #29e39b;
+  --cnv-series-4: #ffc266;
+
+  /* State colors */
+  --cnv-healthy: #29e39b;
+  --cnv-warning: #ffc266;
+  --cnv-critical: #ff6b6b;
+  --cnv-offline: #9299a9;
+
+  /* Translucent panel layers — oklch with alpha */
+  --cnv-glass-tint: oklch(0.22 0.02 260 / 0.55);
+  --cnv-glass-tint-strong: oklch(0.22 0.02 260 / 0.78);
+  --cnv-glass-border: oklch(0.45 0.02 260 / 0.35);
+
+  /* Gradient backgrounds (closed-enum "background: gradient") */
+  --cnv-grad-surface: linear-gradient(145deg, oklch(0.24 0.03 265 / 0.6), oklch(0.18 0.02 255 / 0.6));
+  --cnv-grad-accent: linear-gradient(145deg, oklch(0.35 0.08 200 / 0.5), oklch(0.28 0.06 280 / 0.5));
+}
+
+/* ── Root container ─────────────────────────────────────────────────── */
+.cnv {
+  color: var(--cnv-text);
+  font: 14px Inter, system-ui, sans-serif;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Surface — the glass panel wrapper
+   ════════════════════════════════════════════════════════════════════ */
+.cnv-surface {
+  background: var(--cnv-panel);
+  border: 1px solid var(--cnv-line);
+  border-radius: 14px;
+  padding: 16px;
+  overflow: hidden;
+  /* Phase 5.5: motion on state changes */
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+
+/* ── Translucency (closed-enum: subtle | medium | strong) ───────────── */
+.cnv-surface.tr-subtle {
+  background: var(--cnv-glass-tint);
+  border-color: var(--cnv-glass-border);
+}
+.cnv-surface.tr-medium {
+  background: oklch(0.2 0.02 260 / 0.45);
+  border-color: var(--cnv-glass-border);
+}
+.cnv-surface.tr-strong {
+  background: oklch(0.16 0.02 260 / 0.3);
+  border-color: oklch(0.5 0.03 260 / 0.25);
+}
+
+/* ── Backdrop blur (closed-enum: none | sm | md | lg) ───────────────── */
+.cnv-surface.bl-sm { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.cnv-surface.bl-md { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.cnv-surface.bl-lg { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+
+/* ── Background (closed-enum: solid | gradient) ─────────────────────── */
+.cnv-surface.bg-gradient {
+  background: var(--cnv-grad-surface);
+  border-color: var(--cnv-glass-border);
+}
+.cnv-surface.bg-accent {
+  background: var(--cnv-grad-accent);
+  border-color: oklch(0.5 0.05 240 / 0.3);
+}
+
+/* ── Elevation / box-shadow (closed-enum: none | sm | md | lg) ───────── */
+.cnv-surface.el-sm { box-shadow: 0 2px 8px oklch(0 0 0 / 0.3); }
+.cnv-surface.el-md { box-shadow: 0 6px 24px oklch(0 0 0 / 0.4); }
+.cnv-surface.el-lg { box-shadow: 0 12px 48px oklch(0 0 0 / 0.5); }
+
+/* ── Glow (closed-enum: none | state | accent) ──────────────────────── */
+/* When glow: "state", the box-shadow uses the panel's state color */
+.cnv-surface.gl-state.state-healthy { box-shadow: 0 0 20px oklch(0.72 0.17 155 / 0.25); }
+.cnv-surface.gl-state.state-warning { box-shadow: 0 0 20px oklch(0.82 0.15 75 / 0.3); }
+.cnv-surface.gl-state.state-critical { box-shadow: 0 0 24px oklch(0.65 0.22 25 / 0.4); }
+.cnv-surface.gl-state.state-offline { box-shadow: 0 0 16px oklch(0.6 0.02 260 / 0.2); }
+.cnv-surface.gl-accent { box-shadow: 0 0 24px oklch(0.75 0.13 220 / 0.2); }
+
+/* ── Surface header ─────────────────────────────────────────────────── */
+.cnv-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.cnv-head h3 { margin: 0; }
+.cnv-head small,
+.cnv small { color: var(--cnv-muted); }
+
+.cnv-badge {
+  border: 1px solid var(--cnv-line);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--cnv-muted);
+  font-size: 11px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DashboardGrid — 12-column responsive grid (Phase 5.4)
+   ════════════════════════════════════════════════════════════════════ */
+.cnv-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+/* Column spans (closed-enum span: 1–12) */
+.cnv-grid .col-1 { grid-column: span 1; }
+.cnv-grid .col-2 { grid-column: span 2; }
+.cnv-grid .col-3 { grid-column: span 3; }
+.cnv-grid .col-4 { grid-column: span 4; }
+.cnv-grid .col-5 { grid-column: span 5; }
+.cnv-grid .col-6 { grid-column: span 6; }
+.cnv-grid .col-7 { grid-column: span 7; }
+.cnv-grid .col-8 { grid-column: span 8; }
+.cnv-grid .col-9 { grid-column: span 9; }
+.cnv-grid .col-10 { grid-column: span 10; }
+.cnv-grid .col-11 { grid-column: span 11; }
+.cnv-grid .col-12 { grid-column: span 12; }
+
+/* Row spans */
+.cnv-grid .row-2 { grid-row: span 2; }
+.cnv-grid .row-3 { grid-row: span 3; }
+
+/* Responsive: collapse to fewer columns on narrow screens */
+@media (max-width: 1024px) {
+  .cnv-grid { grid-template-columns: repeat(6, 1fr); }
+  .cnv-grid .col-7, .cnv-grid .col-8, .cnv-grid .col-9 { grid-column: span 6; }
+  .cnv-grid .col-10, .cnv-grid .col-11, .cnv-grid .col-12 { grid-column: span 6; }
+}
+@media (max-width: 640px) {
+  .cnv-grid { grid-template-columns: 1fr; }
+  .cnv-grid [class*="col-"] { grid-column: span 1; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Motion (Phase 5.5)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Entrance animation as panels stream in */
+@keyframes cnv-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cnv-surface {
+  animation: cnv-enter 0.35s ease-out;
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .cnv-surface {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Component styles (un-minified from original v4)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Metrics row ────────────────────────────────────────────────────── */
+.cnv-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+.cnv-metrics article,
+.cnv-table article,
+.cnv-board section {
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  border-radius: 11px;
+  padding: 11px;
+}
+.cnv-metrics strong { display: block; font-size: 24px; }
+.cnv-metrics span { color: #29e39b; font-size: 11px; }
+
+/* ── Posters / albums ───────────────────────────────────────────────── */
+.cnv-posters,
+.cnv-albums {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 11px;
+}
+.cnv-art {
+  aspect-ratio: 2/3;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #4c3275, #153d49);
+  display: flex;
+  align-items: end;
+  padding: 9px;
+}
+.cnv-albums .cnv-art { aspect-ratio: 1; }
+.cnv-posters article,
+.cnv-albums article { position: relative; }
+.cnv-posters article > strong,
+.cnv-albums article > strong,
+.cnv-posters article > small,
+.cnv-albums article > small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cnv-posters article > i {
+  position: absolute;
+  left: 0;
+  bottom: 37px;
+  height: 3px;
+  background: var(--cnv-series-3);
+}
+
+/* ── Playback sessions ──────────────────────────────────────────────── */
+.cnv-playback { display: grid; gap: 9px; }
+.cnv-playback article {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  gap: 11px;
+  align-items: center;
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  border-radius: 11px;
+  padding: 9px;
+}
+.cnv-playback .cnv-art { width: 70px; height: 70px; aspect-ratio: 1; }
+.cnv-playback strong,
+.cnv-playback small { display: block; }
+.cnv-progress { height: 4px; background: #303441; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+.cnv-progress i { display: block; height: 100%; background: var(--cnv-series-3); }
+
+/* ── Timeline / event stream ────────────────────────────────────────── */
+.cnv-timeline article {
+  display: grid;
+  grid-template-columns: 80px 14px 1fr;
+  gap: 10px;
+  min-height: 58px;
+}
+.cnv-timeline time { color: var(--cnv-series-1); font-size: 11px; }
+.cnv-timeline article > i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 3px solid var(--cnv-series-2);
+}
+.cnv-timeline strong,
+.cnv-timeline small { display: block; }
+
+/* Event stream variant — tighter, severity-colored */
+.cnv-stream article {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+}
+.cnv-stream article.evt-warning { border-left: 3px solid var(--cnv-warning); }
+.cnv-stream article.evt-critical { border-left: 3px solid var(--cnv-critical); }
+.cnv-stream article.evt-offline { border-left: 3px solid var(--cnv-offline); }
+
+/* ── Charts / network ───────────────────────────────────────────────── */
+.cnv-chart,
+.cnv-network { width: 100%; height: auto; }
+.cnv-network line { stroke: #555b6b; stroke-width: 2; }
+.cnv-network circle { fill: var(--cnv-panel2); stroke: var(--cnv-series-2); stroke-width: 3; }
+.cnv-network text { fill: var(--cnv-text); font-size: 12px; }
+.cnv-node-clickable { cursor: pointer; transition: filter 0.2s ease; }
+.cnv-node-clickable:hover { filter: brightness(1.3); }
+
+/* ── Bars ───────────────────────────────────────────────────────────── */
+.cnv-bars { display: grid; gap: 8px; }
+.cnv-bars article {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 8px;
+}
+.cnv-bars article > div {
+  height: 10px;
+  border-radius: 6px;
+  background: #2c303b;
+  overflow: hidden;
+}
+.cnv-bars article i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cnv-series-2), var(--cnv-series-1));
+}
+
+/* ── Board (kanban) ─────────────────────────────────────────────────── */
+.cnv-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 9px;
+}
+.cnv-board h4 { margin: 0 0 8px; color: var(--cnv-muted); }
+.cnv-board article { border-top: 1px solid var(--cnv-line); padding: 9px 0; }
+.cnv-board strong,
+.cnv-board small { display: block; }
+
+/* ── Table ──────────────────────────────────────────────────────────── */
+.cnv-table { display: grid; }
+.cnv-table article {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr auto auto;
+  gap: 8px;
+  border-radius: 0;
+  border-width: 1px 0 0;
+}
+
+/* Clickable rows — drill-down affordance */
+.cnv-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.cnv-row-clickable:hover {
+  background: oklch(0.28 0.03 260 / 0.5);
+}
+
+/* ── Flow (sankey / pipeline) ───────────────────────────────────────── */
+.cnv-flow { display: flex; align-items: center; gap: 8px; }
+.cnv-flow article {
+  flex: 1;
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  border-radius: 10px;
+  padding: 10px;
+}
+.cnv-flow > i {
+  width: 50px;
+  height: 9px;
+  background: linear-gradient(90deg, var(--cnv-series-2), var(--cnv-series-1));
+  border-radius: 50%;
+}
+
+/* ── Matrix / heatmap ───────────────────────────────────────────────── */
+.cnv-matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.cnv-matrix article {
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  border-radius: 10px;
+  padding: 10px;
+  text-align: center;
+}
+.cnv-matrix article > i {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #29e39b;
+  margin: 0 auto 8px;
+}
+.cnv-matrix strong,
+.cnv-matrix small { display: block; }
+
+/* State coloring for matrix cells */
+.cnv-matrix article[data-state="warning"] > i { background: var(--cnv-warning); }
+.cnv-matrix article[data-state="critical"] > i { background: var(--cnv-critical); }
+.cnv-matrix article[data-state="offline"] > i { background: var(--cnv-offline); }
+
+/* ── Capacity / donut ───────────────────────────────────────────────── */
+.cnv-capacity {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 18px;
+}
+.cnv-capacity > div {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.cnv-capacity > div:after { content: ""; position: absolute; }
+.cnv-capacity > div strong {
+  background: var(--cnv-panel);
+  border-radius: 50%;
+  width: 70%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+}
+
+/* Donut with legend */
+.cnv-donut {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+.cnv-donut > div {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.cnv-donut > div strong {
+  background: var(--cnv-panel);
+  border-radius: 50%;
+  width: 60%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+.cnv-donut ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.cnv-donut li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cnv-donut li i { width: 12px; height: 12px; border-radius: 3px; }
+
+/* ── Wave / cloud ───────────────────────────────────────────────────── */
+.cnv-wave { height: 220px; display: flex; gap: 3px; align-items: center; }
+.cnv-wave i {
+  flex: 1;
+  background: linear-gradient(var(--cnv-series-1), var(--cnv-series-2));
+  border-radius: 4px;
+}
+.cnv-cloud {
+  min-height: 230px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+.cnv-cloud span { color: var(--cnv-series-1); padding: 4px; }
+
+/* ── Callout ────────────────────────────────────────────────────────── */
+.cnv-callout {
+  border: 1px solid #564a31;
+  background: rgba(255, 194, 102, 0.07);
+  border-radius: 12px;
+  padding: 18px;
+}
+.cnv-callout > strong { font-size: 22px; }
+.cnv-callout > p { color: var(--cnv-muted); }
+
+/* ── Health (security posture composite) ────────────────────────────── */
+.cnv-health { display: grid; gap: 12px; }
+
+/* ── Section (grouping container) ───────────────────────────────────── */
+.cnv-section { display: grid; gap: 12px; }
+
+/* ── Filter dropdown ────────────────────────────────────────────────── */
+.cnv-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cnv-filter label { color: var(--cnv-muted); font-size: 13px; white-space: nowrap; }
+.cnv-filter select {
+  background: var(--cnv-panel2);
+  color: var(--cnv-text);
+  border: 1px solid var(--cnv-line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ── Log stream ─────────────────────────────────────────────────────── */
+.cnv-logs {
+  background: var(--cnv-panel2);
+  border: 1px solid var(--cnv-line);
+  border-radius: 8px;
+  padding: 12px;
+  font: 12px ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--cnv-muted);
+  overflow-x: auto;
+  max-height: 400px;
+  line-height: 1.6;
+}
+
+/* ── State / no-data placeholders ───────────────────────────────────── */
+.cnv-state {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--cnv-line);
+  border-radius: 12px;
+  color: var(--cnv-muted);
+}
+.cnv-nodata {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  border: 1px dashed var(--cnv-line);
+  border-radius: 10px;
+  color: var(--cnv-muted);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Knowledge reader ───────────────────────────────────────────────── */
+.cnv-knowledge-reader {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 190px;
+  gap: 18px;
+}
+.cnv-knowledge-reader > aside {
+  border-right: 1px solid var(--cnv-line);
+  padding-right: 12px;
+}
+.cnv-knowledge-reader > aside:last-child {
+  border: 0;
+  border-left: 1px solid var(--cnv-line);
+  padding: 0 0 0 12px;
+}
+.cnv-knowledge-reader aside strong,
+.cnv-knowledge-reader aside a { display: block; }
+.cnv-knowledge-reader aside a {
+  color: var(--cnv-muted);
+  padding: 5px 0;
+  font-size: 12px;
+}
+.cnv-knowledge-reader article { line-height: 1.7; }
+.cnv-knowledge-reader article h2 { font-size: 24px; }
+
+/* ── Document tree ──────────────────────────────────────────────────── */
+.cnv-doc-tree { display: grid; gap: 5px; }
+.cnv-doc-tree article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+.cnv-doc-tree article.active {
+  border-color: var(--cnv-series-2);
+  background: rgba(168, 121, 255, 0.1);
+}
+.cnv-doc-tree strong,
+.cnv-doc-tree small { display: block; }
+
+/* ── Knowledge graph ────────────────────────────────────────────────── */
+.cnv-knowledge-graph { display: grid; gap: 10px; }
+.cnv-path-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: auto;
+}
+.cnv-path-strip span {
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  padding: 7px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.cnv-path-strip b { color: var(--cnv-series-1); }
+
+/* ── Backlinks / search results ─────────────────────────────────────── */
+.cnv-backlinks,
+.cnv-search-results { display: grid; gap: 7px; }
+.cnv-backlinks article,
+.cnv-search-results article {
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  border-radius: 10px;
+  padding: 10px;
+}
+.cnv-backlinks strong,
+.cnv-backlinks small { display: block; }
+.cnv-backlinks span { color: var(--cnv-series-1); font-size: 11px; }
+.cnv-search-results article {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 9px;
+}
+.cnv-search-results small,
+.cnv-search-results strong { display: block; }
+
+/* ── Evidence canvas ────────────────────────────────────────────────── */
+.cnv-evidence-canvas { display: grid; gap: 14px; }
+.cnv-evidence-canvas > section {
+  border-left: 3px solid var(--cnv-series-2);
+  padding: 8px 15px;
+  background: rgba(168, 121, 255, 0.06);
+  border-radius: 0 10px 10px 0;
+}
+.cnv-evidence-canvas h3 { font-size: 24px; margin: 6px 0; }
+
+/* ── Document diff ──────────────────────────────────────────────────── */
+.cnv-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.cnv-diff section {
+  border: 1px solid var(--cnv-line);
+  background: var(--cnv-panel2);
+  border-radius: 10px;
+  padding: 12px;
+}
+.cnv-diff section:first-child p { color: #ff9aac; }
+.cnv-diff section:last-child p { color: #7de9b8; }
+
+/* ════════════════════════════════════════════════════════════════════
+   Responsive breakpoints
+   ════════════════════════════════════════════════════════════════════ */
+@media (max-width: 780px) {
+  .cnv-knowledge-reader { grid-template-columns: 1fr; }
+  .cnv-knowledge-reader > aside { border: 0 !important; padding: 0 !important; }
+  .cnv-diff { grid-template-columns: 1fr; }
+  .cnv-donut { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 650px) {
+  .cnv-capacity { grid-template-columns: 1fr; }
+  .cnv-flow { flex-direction: column; }
+  .cnv-flow > i { width: 9px; height: 35px; }
+  .cnv-table article { grid-template-columns: 1fr auto; }
+  .cnv-table article > *:nth-child(2),
+  .cnv-table article > *:nth-child(4) { display: none; }
+}
