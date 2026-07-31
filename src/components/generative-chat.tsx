@@ -181,6 +181,7 @@ export function GenerativeChat() {
                     library={library}
                     toolProvider={toolProvider}
                     isStreaming={false}
+                    onAction={(event) => chat.sendMessage(event.humanFriendlyMessage)}
                   />
                 </div>
               ) : (
