@@ -17,20 +17,20 @@ export const promptOptions: PromptOptions = {
   ],
   tools: toolSpecs,
   toolExamples: [
-    `Example — CI pipeline health:
+    `Example — Docker fleet health:
 
 root = Stack([header, pipeline, jobs])
-header = CardHeader("Pipeline Health", "GitLab CI overview")
+header = CardHeader("Fleet Health", "Container overview")
 pipeline = Flow(flowData)
-flowData = Query("gitlab", {}, {title: "Pipeline", state: "healthy", nodes: [{id: "build", label: "Build", value: "5m"}, {id: "test", label: "Test", value: "3m"}, {id: "deploy", label: "Deploy", value: "1m"}]}, 30)
+flowData = Query("docker", {}, {title: "Containers", state: "healthy", nodes: [{id: "running", label: "Running", value: 119}, {id: "stopped", label: "Stopped", value: 6}, {id: "unhealthy", label: "Unhealthy", value: 2}]}, 30)
 jobs = VisualTable(jobData)
-jobData = Query("gitlab", {view: "jobs"}, {title: "Recent Jobs", state: "healthy", items: [{id: "j1", label: "build-api", subtitle: "passed", state: "healthy", value: "5m"}, {id: "j2", label: "lint", subtitle: "passed", state: "healthy", value: "1m"}]}, 30)`,
+jobData = Query("docker", {}, {title: "Containers", state: "healthy", items: [{id: "c1", label: "searxng", subtitle: "gh-vps", state: "healthy", value: "running"}, {id: "c2", label: "valkey", subtitle: "gh-vps", state: "healthy", value: "running"}]}, 30)`,
     `Example — Storage capacity:
 
 root = Stack([header, disk])
 header = CardHeader("Storage", "Disk allocation across bays")
 disk = Capacity(diskData)
-diskData = Query("synology", {}, {title: "Storage", state: "healthy", metrics: [{label: "Used", value: 72, unit: "%"}, {label: "Total", value: "48TB"}, {label: "Free", value: "13TB"}]}, 60)`,
+diskData = Query("synology-dsm", {}, {title: "Storage", state: "healthy", metrics: [{label: "Used", value: 72, unit: "%"}, {label: "Total", value: "48TB"}, {label: "Free", value: "13TB"}]}, 60)`,
     `Example — AI model activity:
 
 root = Stack([header, cards])
