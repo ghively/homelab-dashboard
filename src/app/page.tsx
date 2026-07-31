@@ -6,13 +6,12 @@ import {
   Hero,
   WorldCard,
   QuickTags,
-  VisualPanel,
-  MetricStrip,
   EntityDrawer,
   SavedViews,
   useWorldData,
   useFleetData,
 } from "@/components/dashboard";
+import { Surface, MetricsView } from "@/visual/components/views";
 import { GenerativeChat } from "@/components/generative-chat";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/adapter-aggregator";
@@ -371,8 +370,8 @@ function AdapterResultCard({
   const hasNodes = result.nodes && result.nodes.length > 0;
 
   return (
-    <VisualPanel title={result.title} subtitle={result.subtitle} state={result.state}>
-      {hasMetrics && <MetricStrip metrics={result.metrics!} />}
+    <Surface title={result.title} subtitle={result.subtitle} state={result.state}>
+      {hasMetrics && <MetricsView metrics={result.metrics!} />}
 
       {hasItems && (
         <div className="dash-adapter-items" style={{ marginTop: hasMetrics ? 12 : 0 }}>
@@ -427,7 +426,7 @@ function AdapterResultCard({
           <small>No data to display</small>
         </div>
       )}
-    </VisualPanel>
+    </Surface>
   );
 }
 

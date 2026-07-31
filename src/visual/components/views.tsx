@@ -1,20 +1,25 @@
 "use client";
 
 import React from "react";
+import { type SurfaceStyle, type GridSpan, surfaceClass } from "./surface-style";
 
 export function Surface({
   title,
   subtitle,
   children,
   state = "healthy",
+  surfaceStyle,
+  gridSpan,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   state?: string;
+  surfaceStyle?: SurfaceStyle;
+  gridSpan?: GridSpan;
 }) {
   return (
-    <section className={`cnv cnv-surface state-${state}`}>
+    <section className={surfaceClass(state, surfaceStyle, gridSpan)}>
       <header className="cnv-head">
         <div>
           <h3>{title}</h3>

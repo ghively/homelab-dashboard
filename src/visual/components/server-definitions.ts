@@ -17,6 +17,8 @@ import {
   EdgeSchema,
   EventSchema,
 } from "@/visual/components/schemas";
+import { SurfaceStyleSchema } from "@/visual/components/surface-style";
+import { GridSpanSchema } from "@/visual/components/surface-style";
 
 // Re-export so this file is the single server-side import surface.
 export {
@@ -33,6 +35,9 @@ const baseSchemaFields = {
   title: z.string().optional(),
   subtitle: z.string().optional(),
   state: VisualStateSchema.optional(),
+  surfaceStyle: SurfaceStyleSchema.optional(),
+  span: GridSpanSchema.shape.span.unwrap(),
+  rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
 };
 
 // ── Leaf components extracted as named consts so their .ref can be used ─────
@@ -318,7 +323,39 @@ const EmptyStateSchema = defineComponent({
   description:
     "Explicit placeholder panel shown when no data is available or no component matches the request. " +
     "Use sparingly — prefer a real component with its own no-data state. state drives the message.",
-  props: z.object({ title: z.string().optional(), state: VisualStateSchema.optional(), summary: z.string().optional() }),
+  props: z.object({ title: z.string().optional(), state: VisualStateSchema.optional(), summary: z.string().optional(), surfaceStyle: SurfaceStyleSchema.optional(), span: GridSpanSchema.shape.span.unwrap(), rowSpan: GridSpanSchema.shape.rowSpan.unwrap() }),
+  component: null,
+});
+
+// ── DashboardGrid — 12-column responsive grid (Phase 5.4) ───────────────────
+export const DashboardGridSchema = defineComponent({
+  name: "DashboardGrid",
+  description:
+    "12-column responsive grid for multi-panel dashboard layouts. " +
+    "Each child panel's span prop (1-12) sets its column width; rowSpan (1-3) sets its height. " +
+    "For example, span: 6 makes a panel take half the width; span: 4 takes a third. " +
+    "For simple vertical stacking use Stack. For grouped regions use Section. " +
+    "children accepts display components: MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, " +
+    "Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban, VisualTable, ArtworkWall, " +
+    "PlaybackSessions, Capacity, SecurityPosture, Heatmap, DetailPanel, Callout, EmptyState, Section.",
+  props: z.object({
+    ...baseSchemaFields,
+    children: z.array(z.union([
+      MetricStripSchema.ref,
+      GaugeSchema.ref,
+      DonutSchema.ref,
+      LineChartSchema.ref,
+      MultiLineSchema.ref,
+      BarRankSchema.ref,
+      VisualTableSchema.ref,
+      ArtworkWallSchema.ref,
+      CapacitySchema.ref,
+      DetailPanelSchema.ref,
+      CalloutSchema.ref,
+      EmptyStateSchema.ref,
+      SectionSchema.ref,
+    ])),
+  }),
   component: null,
 });
 
@@ -328,5 +365,5 @@ export const serverComponents = [
   VisualTableSchema, ArtworkWallSchema, PlaybackSessionsSchema, CapacitySchema, SecurityPostureSchema,
   HeatmapSchema, MarkdownReaderSchema, KnowledgeGraphSchema, BacklinksSchema, DetailPanelSchema,
   CalloutSchema, EmptyStateSchema,
-  FilterDropdownSchema, SectionSchema,
+  FilterDropdownSchema, SectionSchema, DashboardGridSchema,
 ];

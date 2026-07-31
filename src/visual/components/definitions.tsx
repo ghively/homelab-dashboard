@@ -25,6 +25,7 @@ import {
   EdgeSchema,
   EventSchema,
 } from "./schemas";
+import { SurfaceStyleSchema, GridSpanSchema } from "./surface-style";
 
 // ── MetricStrip — compact KPI row (formerly metric-strip, hero, sparkline) ────
 export const MetricStrip = defineComponent({
@@ -37,14 +38,17 @@ export const MetricStrip = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     metrics: z.array(MetricSchema),
   }),
   component: ({ props }) => {
     if (props.state && props.state !== "healthy" && props.state !== "warning" && props.state !== "critical") {
-      return <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state}><StateView state={props.state} /></Surface>;
+      return <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><StateView state={props.state} /></Surface>;
     }
-    if (!props.metrics?.length) return <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state ?? "healthy"}><NoData label="No metrics" /></Surface>;
-    return <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state}><MetricsView metrics={props.metrics} /></Surface>;
+    if (!props.metrics?.length) return <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No metrics" /></Surface>;
+    return <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><MetricsView metrics={props.metrics} /></Surface>;
   },
 });
 
@@ -63,9 +67,12 @@ export const Gauge = defineComponent({
     unit: z.string().optional(),
     thresholds: z.object({ warning: z.number(), critical: z.number() }).optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
   }),
   component: ({ props }) => {
-    if (Number.isNaN(props.value)) return <Surface title={props.title ?? "Gauge"} state="healthy"><NoData label="No value" /></Surface>;
+    if (Number.isNaN(props.value)) return <Surface title={props.title ?? "Gauge"} state="healthy" surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No value" /></Surface>;
     const max = props.max ?? 100;
     const pct = Math.max(0, Math.min(100, (props.value / max) * 100));
     const colorVar = props.thresholds && props.value >= props.thresholds.critical
@@ -74,7 +81,7 @@ export const Gauge = defineComponent({
         ? "var(--cnv-warning, #ffc266)"
         : "var(--cnv-series-1, #27d7f2)";
     return (
-      <Surface title={props.title ?? "Gauge"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Gauge"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-capacity">
           <div style={{ background: `conic-gradient(${colorVar} 0 ${pct}%, #2b2f3a ${pct}%)` }}>
             <strong>{props.value}{props.unit ?? "%"}</strong>
@@ -95,11 +102,14 @@ export const Donut = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
     const numeric = (props.items ?? []).filter((i) => typeof i.value === "number" && !Number.isNaN(i.value));
-    if (!numeric.length) return <Surface title={props.title ?? "Donut"} state={props.state ?? "healthy"}><NoData label="No shares" /></Surface>;
+    if (!numeric.length) return <Surface title={props.title ?? "Donut"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No shares" /></Surface>;
     const total = numeric.reduce((s, i) => s + Number(i.value), 0) || 1;
     let acc = 0;
     const segs = numeric.slice(0, 8).map((i, idx) => {
@@ -109,7 +119,7 @@ export const Donut = defineComponent({
     });
     const grad = segs.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(", ");
     return (
-      <Surface title={props.title ?? "Donut"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Donut"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-donut">
           <div style={{ background: `conic-gradient(${grad})` }}><strong>{total}</strong></div>
           <ul>{segs.map((s) => <li key={s.label}><i style={{ background: s.color }} />{s.label}</li>)}</ul>
@@ -130,15 +140,18 @@ export const LineChart = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     series: z.array(SeriesSchema),
   }),
   component: ({ props }) => {
     const s = props.series?.[0];
-    if (!s || !s.points?.length) return <Surface title={props.title ?? "Chart"} state={props.state ?? "healthy"}><NoData label="No series data" /></Surface>;
+    if (!s || !s.points?.length) return <Surface title={props.title ?? "Chart"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No series data" /></Surface>;
     const max = Math.max(...s.points.map((p) => p.y), 1);
     const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" ");
     return (
-      <Surface title={props.title ?? "Chart"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Chart"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <svg className="cnv-chart" viewBox="0 0 640 220" role="img"><path d={d} fill="none" stroke="var(--cnv-series-1)" strokeWidth="3" /></svg>
       </Surface>
     );
@@ -155,13 +168,16 @@ export const MultiLine = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     series: z.array(SeriesSchema),
   }),
   component: ({ props }) => {
-    if (!props.series?.length || !props.series.some((s) => s.points?.length)) return <Surface title={props.title ?? "Chart"} state={props.state ?? "healthy"}><NoData label="No series data" /></Surface>;
+    if (!props.series?.length || !props.series.some((s) => s.points?.length)) return <Surface title={props.title ?? "Chart"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No series data" /></Surface>;
     const series = props.series.filter((s) => s.points?.length).slice(0, 4);
     return (
-      <Surface title={props.title ?? "Chart"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Chart"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <svg className="cnv-chart" viewBox="0 0 640 220" role="img">
           {series.map((s, si) => {
             const max = Math.max(...s.points.map((p) => p.y), 1);
@@ -184,16 +200,19 @@ export const BarRank = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
     metrics: z.array(MetricSchema).optional(),
   }),
   component: ({ props }) => {
     const src = (props.items?.length ? props.items : (props.metrics ?? []).map((m, i) => ({ id: String(i), label: m.label, value: m.value })));
     const numeric = src.filter((i) => typeof i.value === "number" && !Number.isNaN(i.value));
-    if (!numeric.length) return <Surface title={props.title ?? "Bars"} state={props.state ?? "healthy"}><NoData label="No comparable values" /></Surface>;
+    if (!numeric.length) return <Surface title={props.title ?? "Bars"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No comparable values" /></Surface>;
     const max = Math.max(...numeric.map((i) => Number(i.value)), 1);
     return (
-      <Surface title={props.title ?? "Bars"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Bars"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-bars">
           {numeric.slice(0, 12).map((i) => (
             <article key={i.id}><label>{i.label}</label><div><i style={{ width: `${(Number(i.value) || 0) / max * 100}%` }} /></div><b>{i.value}</b></article>
@@ -215,12 +234,15 @@ export const Timeline = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     events: z.array(EventSchema),
   }),
   component: ({ props }) => {
-    if (!props.events?.length) return <Surface title={props.title ?? "Timeline"} state={props.state ?? "healthy"}><NoData label="No events" /></Surface>;
+    if (!props.events?.length) return <Surface title={props.title ?? "Timeline"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No events" /></Surface>;
     return (
-      <Surface title={props.title ?? "Timeline"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Timeline"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-timeline">
           {props.events.map((e) => (
             <article key={e.id}><time>{e.at}</time><i /><div><strong>{e.title}</strong><small>{e.detail}</small></div></article>
@@ -241,12 +263,15 @@ export const EventStream = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     events: z.array(EventSchema),
   }),
   component: ({ props }) => {
-    if (!props.events?.length) return <Surface title={props.title ?? "Event Stream"} state={props.state ?? "healthy"}><NoData label="No events" /></Surface>;
+    if (!props.events?.length) return <Surface title={props.title ?? "Event Stream"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No events" /></Surface>;
     return (
-      <Surface title={props.title ?? "Event Stream"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Event Stream"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-timeline cnv-stream">
           {props.events.slice(0, 30).map((e) => (
             <article key={e.id} className={`evt-${e.state ?? "healthy"}`}><time>{e.at}</time><div><strong>{e.title}</strong><small>{e.detail}</small></div></article>
@@ -267,12 +292,15 @@ export const LogStream = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Logs"} state={props.state ?? "healthy"}><NoData label="No log lines" /></Surface>;
+    if (!props.items?.length) return <Surface title={props.title ?? "Logs"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No log lines" /></Surface>;
     return (
-      <Surface title={props.title ?? "Logs"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Logs"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <pre className="cnv-logs">{props.items.slice(0, 50).map((i) => i.label).join("\n")}</pre>
       </Surface>
     );
@@ -289,14 +317,17 @@ export const NodeGraph = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     nodes: z.array(NodeSchema),
     edges: z.array(EdgeSchema),
   }),
   component: ({ props }) => {
     const triggerAction = useTriggerAction();
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Graph"} state={props.state ?? "healthy"}><NoData label="No nodes" /></Surface>;
+    if (!props.nodes?.length) return <Surface title={props.title ?? "Graph"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No nodes" /></Surface>;
     return (
-      <Surface title={props.title ?? "Graph"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Graph"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <svg className="cnv-network" viewBox="0 0 800 430" role="img">
           {props.edges.map((e, i) => {
             const a = props.nodes.find((n) => n.id === e.source), b = props.nodes.find((n) => n.id === e.target);
@@ -324,12 +355,15 @@ export const Sankey = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     nodes: z.array(NodeSchema),
   }),
   component: ({ props }) => {
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Flow"} state={props.state ?? "healthy"}><NoData label="No stages" /></Surface>;
+    if (!props.nodes?.length) return <Surface title={props.title ?? "Flow"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No stages" /></Surface>;
     return (
-      <Surface title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-flow">
           {props.nodes.slice(0, 8).map((n, i) => (
             <React.Fragment key={n.id}>
@@ -354,13 +388,16 @@ export const DetailPanel = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
     children: z.array(MetricStrip.ref).optional(),
   }),
   component: ({ props, renderNode }) => {
-    if (!props.items?.length && !props.children?.length) return <Surface title={props.title ?? "Details"} state={props.state ?? "healthy"}><NoData label="No details" /></Surface>;
+    if (!props.items?.length && !props.children?.length) return <Surface title={props.title ?? "Details"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No details" /></Surface>;
     return (
-      <Surface title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-table">
           {(props.items ?? []).map((i) => (
             <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small><span>{i.state || "healthy"}</span><b>{i.value}</b></article>
@@ -383,15 +420,18 @@ export const Kanban = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
     children: z.array(DetailPanel.ref).optional(),
   }),
   component: ({ props, renderNode }) => {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length && !props.children?.length) return <Surface title={props.title ?? "Board"} state={props.state ?? "healthy"}><NoData label="No items" /></Surface>;
+    if (!props.items?.length && !props.children?.length) return <Surface title={props.title ?? "Board"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No items" /></Surface>;
     const groups = [...new Set((props.items ?? []).map((i) => i.group || "Active"))];
     return (
-      <Surface title={props.title ?? "Board"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Board"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-board">
           {groups.map((g) => (
             <section key={g}>
@@ -420,13 +460,16 @@ export const VisualTable = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface title={props.title ?? "Table"} state={props.state ?? "healthy"}><NoData label="No rows" /></Surface>;
+    if (!props.items?.length) return <Surface title={props.title ?? "Table"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No rows" /></Surface>;
     return (
-      <Surface title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-table">
           {props.items.map((i) => (
             <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}${i.subtitle ? ` (${i.subtitle})` : ""}`)}>
@@ -449,13 +492,16 @@ export const ArtworkWall = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface title={props.title ?? "Artwork"} state={props.state ?? "healthy"}><NoData label="No items" /></Surface>;
+    if (!props.items?.length) return <Surface title={props.title ?? "Artwork"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No items" /></Surface>;
     return (
-      <Surface title={props.title ?? "Artwork"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Artwork"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-posters">
           {props.items.slice(0, 18).map((i) => (
             <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}${i.subtitle ? ` (${i.subtitle})` : ""}`)}>
@@ -481,12 +527,15 @@ export const PlaybackSessions = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Sessions"} state={props.state ?? "healthy"}><NoData label="No active sessions" /></Surface>;
+    if (!props.items?.length) return <Surface title={props.title ?? "Sessions"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No active sessions" /></Surface>;
     return (
-      <Surface title={props.title ?? "Sessions"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Sessions"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-playback">
           {props.items.slice(0, 8).map((i) => (
             <article key={i.id}>
@@ -516,15 +565,18 @@ export const Capacity = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     metrics: z.array(MetricSchema),
     series: z.array(SeriesSchema).optional(),
   }),
   component: ({ props }) => {
     const usedRaw = Number(props.metrics?.[0]?.value);
     const used = !props.metrics?.length || Number.isNaN(usedRaw) ? null : usedRaw;
-    if (used === null) return <Surface title={props.title ?? "Capacity"} state={props.state ?? "healthy"}><NoData label="No capacity metric" /></Surface>;
+    if (used === null) return <Surface title={props.title ?? "Capacity"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No capacity metric" /></Surface>;
     return (
-      <Surface title={props.title ?? "Capacity"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Capacity"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-capacity">
           <div style={{ background: `conic-gradient(var(--cnv-series-1) 0 ${used}%, #2b2f3a ${used}%)` }}><strong>{used}%</strong></div>
           <section>
@@ -555,13 +607,16 @@ export const SecurityPosture = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     metrics: z.array(MetricSchema),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
-    if (!props.metrics?.length && !props.items?.length) return <Surface title={props.title ?? "Security"} state={props.state ?? "healthy"}><NoData label="No security data" /></Surface>;
+    if (!props.metrics?.length && !props.items?.length) return <Surface title={props.title ?? "Security"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No security data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Security"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Security"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-health">
           {props.metrics?.length ? <MetricsView metrics={props.metrics} /> : null}
           {props.items?.length ? (
@@ -587,12 +642,15 @@ export const Heatmap = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Heatmap"} state={props.state ?? "healthy"}><NoData label="No cells" /></Surface>;
+    if (!props.items?.length) return <Surface title={props.title ?? "Heatmap"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No cells" /></Surface>;
     return (
-      <Surface title={props.title ?? "Heatmap"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Heatmap"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-matrix">
           {props.items.map((i) => (
             <article key={i.id} data-state={i.state}><i /><strong>{i.label}</strong><small>{i.subtitle}</small></article>
@@ -613,6 +671,9 @@ export const MarkdownReader = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     markdown: z.string(),
     items: z.array(ItemSchema).optional(),
   }),
@@ -620,7 +681,7 @@ export const MarkdownReader = defineComponent({
     const md = props.markdown || "";
     const lines = md.split("\n");
     return (
-      <Surface title={props.title ?? "Document"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Document"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-knowledge-reader">
           <aside>
             <strong>On this page</strong>
@@ -650,14 +711,17 @@ export const KnowledgeGraph = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     nodes: z.array(NodeSchema),
     edges: z.array(EdgeSchema),
     path: z.boolean().optional(),
   }),
   component: ({ props }) => {
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Knowledge Graph"} state={props.state ?? "healthy"}><NoData label="No concepts" /></Surface>;
+    if (!props.nodes?.length) return <Surface title={props.title ?? "Knowledge Graph"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No concepts" /></Surface>;
     return (
-      <Surface title={props.title ?? "Knowledge Graph"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Knowledge Graph"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-knowledge-graph">
           <svg className="cnv-network" viewBox="0 0 800 430" role="img">
             {props.edges.map((e, i) => {
@@ -691,12 +755,15 @@ export const Backlinks = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Backlinks"} state={props.state ?? "healthy"}><NoData label="No backlinks" /></Surface>;
+    if (!props.items?.length) return <Surface title={props.title ?? "Backlinks"} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}><NoData label="No backlinks" /></Surface>;
     return (
-      <Surface title={props.title ?? "Backlinks"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Backlinks"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-backlinks">
           {props.items.slice(0, 8).map((i) => (
             <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle || "Links to this concept with supporting context."}</small><span>{Number(i.meta?.evidence ?? 1)} evidence</span></article>
@@ -718,11 +785,14 @@ export const Callout = defineComponent({
     subtitle: z.string().optional(),
     summary: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     metrics: z.array(MetricSchema).optional(),
   }),
   component: ({ props }) => {
     return (
-      <Surface title={props.title ?? "Attention"} subtitle={props.subtitle} state={props.state ?? "warning"}>
+      <Surface title={props.title ?? "Attention"} subtitle={props.subtitle} state={props.state ?? "warning"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-callout">
           <strong>{props.summary || props.title || "Attention needed"}</strong>
           <p>{props.subtitle || "Review the supporting context and choose the next action."}</p>
@@ -742,11 +812,14 @@ export const EmptyState = defineComponent({
   props: z.object({
     title: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     summary: z.string().optional(),
   }),
   component: ({ props }) => {
     return (
-      <Surface title={props.title ?? "Empty"} state={props.state ?? "empty"}>
+      <Surface title={props.title ?? "Empty"} state={props.state ?? "empty"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-state"><strong>{props.summary || "No matching data"}</strong></div>
       </Surface>
     );
@@ -798,6 +871,9 @@ export const Section = defineComponent({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
     children: z.array(z.union([
       MetricStrip.ref,
       Gauge.ref,
@@ -813,9 +889,67 @@ export const Section = defineComponent({
   }),
   component: ({ props, renderNode }) => {
     return (
-      <Surface title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
+      <Surface title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
         <div className="cnv-section">{renderNode(props.children)}</div>
       </Surface>
     );
+  },
+});
+
+// ── DashboardGrid — 12-column responsive grid layout (Phase 5.4) ───────────
+// Unlike Stack (flex), DashboardGrid uses CSS Grid with 12 columns.
+// Each child's span prop (1-12) controls its column width; rowSpan (1-3) controls height.
+// Use this for multi-column dashboard layouts where panels need precise width control.
+export const DashboardGrid = defineComponent({
+  name: "DashboardGrid",
+  description:
+    "12-column responsive grid for multi-panel dashboard layouts. " +
+    "Each child panel's span prop (1-12) sets its column width; rowSpan (1-3) sets its height. " +
+    "For example, span: 6 makes a panel take half the width; span: 4 takes a third. " +
+    "For simple vertical stacking use Stack. For grouped regions use Section. " +
+    "children accepts display components: MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, " +
+    "Timeline, EventStream, LogStream, NodeGraph, Sankey, Kanban, VisualTable, ArtworkWall, " +
+    "PlaybackSessions, Capacity, SecurityPosture, Heatmap, DetailPanel, Callout, EmptyState, Section.",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: GridSpanSchema.shape.span.unwrap(),
+    rowSpan: GridSpanSchema.shape.rowSpan.unwrap(),
+    children: z.array(z.union([
+      MetricStrip.ref,
+      Gauge.ref,
+      Donut.ref,
+      LineChart.ref,
+      MultiLine.ref,
+      BarRank.ref,
+      Timeline.ref,
+      EventStream.ref,
+      LogStream.ref,
+      NodeGraph.ref,
+      Sankey.ref,
+      Kanban.ref,
+      VisualTable.ref,
+      ArtworkWall.ref,
+      PlaybackSessions.ref,
+      Capacity.ref,
+      SecurityPosture.ref,
+      Heatmap.ref,
+      DetailPanel.ref,
+      Callout.ref,
+      EmptyState.ref,
+      Section.ref,
+    ])),
+  }),
+  component: ({ props, renderNode }) => {
+    if (props.title || props.subtitle) {
+      return (
+        <Surface title={props.title ?? "Dashboard"} subtitle={props.subtitle} state={props.state ?? "healthy"} surfaceStyle={props.surfaceStyle} gridSpan={props.span ? { span: props.span, rowSpan: props.rowSpan } : undefined}>
+          <div className="cnv-grid">{renderNode(props.children)}</div>
+        </Surface>
+      );
+    }
+    return <div className="cnv-grid">{renderNode(props.children)}</div>;
   },
 });
