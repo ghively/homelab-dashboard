@@ -1,20 +1,24 @@
 /**
- * Measure the system prompt size for the homelab library.
+ * Measure the generated system prompt for the homelab component library.
  *
- * Usage: npx tsx scripts/measure-prompt.ts
+ * Usage:  npx tsx scripts/measure-prompt.ts
  *
- * Hard gate: under 30,000 estimated tokens (chars / 4).
+ * Hard gate: estimated tokens (chars / 4) must be UNDER 30,000.
+ * If over, schemas are too wide — narrow them before proceeding.
  */
-import { promptLibrary } from "../src/lib/prompt-library";
-import { promptOptions } from "../src/lib/prompt-options";
+import { promptLibrary } from "@/lib/prompt-library";
+import { promptOptions } from "@/lib/prompt-options";
 
 const prompt = promptLibrary.prompt(promptOptions);
-const chars = prompt.length;
-const estimatedTokens = Math.round(chars / 4);
+const charCount = prompt.length;
+const tokenEstimate = Math.round(charCount / 4);
 
-console.log(`System prompt:`);
-console.log(`  Characters:       ${chars.toLocaleString()}`);
-console.log(`  Estimated tokens: ${estimatedTokens.toLocaleString()} (chars / 4)`);
-console.log(`  Hard gate (30k):  ${estimatedTokens < 30000 ? "PASS ✓" : "FAIL ✗ — trim schemas or reduce tool count"}`);
-console.log();
-console.log(`For reference, the old 905-component prompt was ~350,000 tokens.`);
+console.log(`System prompt: ${charCount.toLocaleString()} chars`);
+console.log(`Estimated tokens: ${tokenEstimate.toLocaleString()} (chars / 4)`);
+
+if (tokenEstimate < 30000) {
+  console.log(`\nPASS — under 30,000 tokens (budget used: ${((tokenEstimate / 30000) * 100).toFixed(1)}%)`);
+} else {
+  console.log(`\nFAIL — OVER 30,000 tokens by ${(tokenEstimate - 30000).toLocaleString()}. Schemas need narrowing.`);
+  process.exit(1);
+}
