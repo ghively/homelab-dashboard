@@ -14,6 +14,8 @@ export const promptOptions: PromptOptions = {
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
     "Auto-refresh: for live status panels (health, queue depth, active sessions) pass a 30–60 second interval as Query()'s fourth arg, e.g. health = Query(\"emby\", {}, {...}, 30). For historical data or one-time lookups, omit the interval.",
     "Use FilterDropdown to let the user narrow data — give it a unique name, a default value, and an options list. Bind it to a Query by referencing $<filterName> in the Query args so changing the dropdown re-fetches automatically.",
+    "Drill-down: VisualTable, NodeGraph, ArtworkWall, and Kanban are inherently interactive — clicking a row/node/card sends a follow-up message that drills into that entity. No extra wiring is needed; just populate the component with items/nodes. The model receives the drill request and generates a DetailPanel for the clicked entity.",
+    "Nesting: Section, DetailPanel, and Kanban accept a children array of other components, rendered inside the container. Use nesting to compose rich layouts: Section(\"Storage Detail\", [DetailPanel(metrics), LineChart(history)]) or DetailPanel with an embedded chart. Keep nesting shallow (1–2 levels) and purposeful.",
   ],
   tools: toolSpecs,
   toolExamples: [

@@ -928,3 +928,70 @@
     transition: none;
   }
 }
+
+/* ================================================================
+ * Phase 4: Interactivity — filters, drill-down, nesting
+ * ================================================================ */
+
+/* FilterDropdown */
+.cnv-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.cnv-filter-label {
+  font-size: 12px;
+  color: var(--cnv-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cnv-filter-select {
+  background: var(--cnv-panel2);
+  color: var(--cnv-text);
+  border: 1px solid var(--cnv-line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.cnv-filter-select:hover {
+  border-color: var(--cnv-series-1);
+}
+
+.cnv-filter-select:focus {
+  outline: none;
+  border-color: var(--cnv-series-1);
+}
+
+/* Drill-down: clickable rows/nodes/cards */
+.cnv-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cnv-row-clickable:hover {
+  background: var(--cnv-panel2);
+  border-color: var(--cnv-series-1);
+}
+
+.cnv-node-clickable {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.cnv-node-clickable:hover {
+  opacity: 0.8;
+}
+
+/* Nesting: container for nested children inside Section/DetailPanel/Kanban */
+.cnv-nested {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
