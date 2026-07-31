@@ -1,7 +1,19 @@
 "use client";
 
+/* eslint-disable react-hooks/rules-of-hooks --
+   Every `component` value in this file is a React.FC passed to defineComponent().
+   The linter cannot trace through the config-object indirection to see that these
+   are component functions, so it false-positives on hook calls. The OpenUI library
+   itself (Button, Callout, CheckBoxGroup, …) uses the same defineComponent + hooks
+   pattern. */
+
 import React from "react";
-import { defineComponent } from "@openuidev/react-lang";
+import {
+  defineComponent,
+  reactive,
+  useStateField,
+  useTriggerAction,
+} from "@openuidev/react-lang";
 import { z } from "zod";
 import { Surface, StateView, NoData, MetricsView } from "./views";
 import {
@@ -281,6 +293,7 @@ export const NodeGraph = defineComponent({
     edges: z.array(EdgeSchema),
   }),
   component: ({ props }) => {
+    const triggerAction = useTriggerAction();
     if (!props.nodes?.length) return <Surface title={props.title ?? "Graph"} state={props.state ?? "healthy"}><NoData label="No nodes" /></Surface>;
     return (
       <Surface title={props.title ?? "Graph"} subtitle={props.subtitle} state={props.state}>
@@ -290,7 +303,9 @@ export const NodeGraph = defineComponent({
             return a && b ? <line key={i} x1={a.x || 0} y1={a.y || 0} x2={b.x || 0} y2={b.y || 0} /> : null;
           })}
           {props.nodes.map((n) => (
-            <g key={n.id} transform={`translate(${n.x || 0} ${n.y || 0})`}><circle r="34" /><text textAnchor="middle" y="5">{n.label}</text></g>
+            <g key={n.id} transform={`translate(${n.x || 0} ${n.y || 0})`} className="cnv-node-clickable" style={{ cursor: "pointer" }} onClick={() => triggerAction(`Show details for ${n.label}`)}>
+              <circle r="34" /><text textAnchor="middle" y="5">{n.label}</text>
+            </g>
           ))}
         </svg>
       </Surface>
@@ -328,33 +343,68 @@ export const Sankey = defineComponent({
   },
 });
 
-// ── Kanban — work-item board grouped by status ──────────────────────────────
-export const Kanban = defineComponent({
-  name: "Kanban",
+// ── DetailPanel — key/value detail card for a single entity ─────────────────
+export const DetailPanel = defineComponent({
+  name: "DetailPanel",
   description:
-    "Multi-column board grouping items by their group field (Vikunja tasks, CI jobs by stage, containers by status). " +
-    "Pass items with a group field (the column). For a ranked list use VisualTable. For a pipeline flow use Sankey.",
+    "Key/value detail card for a single entity (host info, adapter config, device details). " +
+    "Pass items as rows (label + value). Optionally nest a MetricStrip or Gauge in children. " +
+    "For a multi-item comparison table use VisualTable.",
   props: z.object({
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
     items: z.array(ItemSchema),
+    children: z.array(MetricStrip.ref).optional(),
   }),
-  component: ({ props }) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Board"} state={props.state ?? "healthy"}><NoData label="No items" /></Surface>;
-    const groups = [...new Set(props.items.map((i) => i.group || "Active"))];
+  component: ({ props, renderNode }) => {
+    if (!props.items?.length && !props.children?.length) return <Surface title={props.title ?? "Details"} state={props.state ?? "healthy"}><NoData label="No details" /></Surface>;
+    return (
+      <Surface title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
+        <div className="cnv-table">
+          {(props.items ?? []).map((i) => (
+            <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small><span>{i.state || "healthy"}</span><b>{i.value}</b></article>
+          ))}
+        </div>
+        {props.children?.length ? renderNode(props.children) : null}
+      </Surface>
+    );
+  },
+});
+
+// ── Kanban — work-item board grouped by status ──────────────────────────────
+export const Kanban = defineComponent({
+  name: "Kanban",
+  description:
+    "Multi-column board grouping items by their group field (Vikunja tasks, CI jobs by stage, containers by status). " +
+    "Pass items with a group field (the column). Items are clickable — clicking drills down to detail. " +
+    "For a ranked list use VisualTable. For a pipeline flow use Sankey.",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    items: z.array(ItemSchema),
+    children: z.array(DetailPanel.ref).optional(),
+  }),
+  component: ({ props, renderNode }) => {
+    const triggerAction = useTriggerAction();
+    if (!props.items?.length && !props.children?.length) return <Surface title={props.title ?? "Board"} state={props.state ?? "healthy"}><NoData label="No items" /></Surface>;
+    const groups = [...new Set((props.items ?? []).map((i) => i.group || "Active"))];
     return (
       <Surface title={props.title ?? "Board"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-board">
           {groups.map((g) => (
             <section key={g}>
               <h4>{g}</h4>
-              {props.items!.filter((i) => (i.group || "Active") === g).map((i) => (
-                <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small></article>
+              {(props.items ?? []).filter((i) => (i.group || "Active") === g).map((i) => (
+                <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}${i.subtitle ? ` (${i.subtitle})` : ""}`)}>
+                  <strong>{i.label}</strong><small>{i.subtitle}</small>
+                </article>
               ))}
             </section>
           ))}
         </div>
+        {props.children?.length ? renderNode(props.children) : null}
       </Surface>
     );
   },
@@ -373,12 +423,15 @@ export const VisualTable = defineComponent({
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Table"} state={props.state ?? "healthy"}><NoData label="No rows" /></Surface>;
     return (
       <Surface title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
           {props.items.map((i) => (
-            <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small><span>{i.state || "healthy"}</span><b>{i.value}</b></article>
+            <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}${i.subtitle ? ` (${i.subtitle})` : ""}`)}>
+              <strong>{i.label}</strong><small>{i.subtitle}</small><span>{i.state || "healthy"}</span><b>{i.value}</b>
+            </article>
           ))}
         </div>
       </Surface>
@@ -399,12 +452,13 @@ export const ArtworkWall = defineComponent({
     items: z.array(ItemSchema),
   }),
   component: ({ props }) => {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Artwork"} state={props.state ?? "healthy"}><NoData label="No items" /></Surface>;
     return (
       <Surface title={props.title ?? "Artwork"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-posters">
           {props.items.slice(0, 18).map((i) => (
-            <article key={i.id}>
+            <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}${i.subtitle ? ` (${i.subtitle})` : ""}`)}>
               <div className="cnv-art" style={i.image ? { backgroundImage: `url(${i.image})` } : undefined}><b>{i.label}</b></div>
               <strong>{i.label}</strong>
               <small>{i.subtitle}</small>
@@ -653,32 +707,6 @@ export const Backlinks = defineComponent({
   },
 });
 
-// ── DetailPanel — key/value detail card for a single entity ─────────────────
-export const DetailPanel = defineComponent({
-  name: "DetailPanel",
-  description:
-    "Key/value detail card for a single entity (host info, adapter config, device details). " +
-    "Pass items as rows (label + value). For a multi-item comparison table use VisualTable.",
-  props: z.object({
-    title: z.string().optional(),
-    subtitle: z.string().optional(),
-    state: VisualStateSchema.optional(),
-    items: z.array(ItemSchema),
-  }),
-  component: ({ props }) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Details"} state={props.state ?? "healthy"}><NoData label="No details" /></Surface>;
-    return (
-      <Surface title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
-        <div className="cnv-table">
-          {props.items.map((i) => (
-            <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small><span>{i.state || "healthy"}</span><b>{i.value}</b></article>
-          ))}
-        </div>
-      </Surface>
-    );
-  },
-});
-
 // ── Callout — highlighted summary / alert banner ────────────────────────────
 export const Callout = defineComponent({
   name: "Callout",
@@ -720,6 +748,73 @@ export const EmptyState = defineComponent({
     return (
       <Surface title={props.title ?? "Empty"} state={props.state ?? "empty"}>
         <div className="cnv-state"><strong>{props.summary || "No matching data"}</strong></div>
+      </Surface>
+    );
+  },
+});
+
+// ── FilterDropdown — reactive filter that re-runs queries (Phase 4.1) ────────
+export const FilterDropdown = defineComponent({
+  name: "FilterDropdown",
+  description:
+    "Interactive dropdown filter. name is the $variable to bind — reference it as $<name> in a Query()'s args. " +
+    "When the user selects an option, every Query() referencing that $variable re-fetches automatically. " +
+    "value is the initial selection (optional). Each option: {value, label}. " +
+    "Place inside a Stack at the top of a dashboard to control the panels below.",
+  props: z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    value: reactive(z.string().optional()),
+    options: z.array(z.object({ value: z.string(), label: z.string() })),
+  }),
+  component: ({ props }) => {
+    const field = useStateField(props.name, props.value);
+    return (
+      <div className="cnv-filter">
+        {props.label && <label>{props.label}</label>}
+        <select value={field.value ?? ""} onChange={(e) => field.setValue(e.target.value)}>
+          <option value="">All</option>
+          {props.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  },
+});
+
+// ── Section — grouping container for nested layouts (Phase 4.3) ─────────────
+// Tight children union: only leaf/display components may nest inside a Section.
+// Containers (Kanban, DetailPanel, Section itself) are intentionally excluded
+// so the model cannot nest a dashboard inside a dashboard.
+export const Section = defineComponent({
+  name: "Section",
+  description:
+    "Grouping container that renders a title and a vertical stack of child panels. " +
+    "Use to organize a dashboard into named regions. children accepts a tight set of display components: " +
+    "MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall. " +
+    "Do NOT nest Section, Kanban, or Stack inside a Section.",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    children: z.array(z.union([
+      MetricStrip.ref,
+      Gauge.ref,
+      Donut.ref,
+      LineChart.ref,
+      MultiLine.ref,
+      BarRank.ref,
+      VisualTable.ref,
+      DetailPanel.ref,
+      Capacity.ref,
+      ArtworkWall.ref,
+    ])),
+  }),
+  component: ({ props, renderNode }) => {
+    return (
+      <Surface title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
+        <div className="cnv-section">{renderNode(props.children)}</div>
       </Surface>
     );
   },

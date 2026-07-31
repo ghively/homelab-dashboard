@@ -15,6 +15,9 @@ export const promptOptions: PromptOptions = {
     buildDomainMapRules(),
     "Use Stack for vertical composition; for multi-column layouts use Stack with direction \"row\" and wrap set to true. There is no separate Grid component.",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
+    "Interactivity — filters: use FilterDropdown to let the user narrow results. Set name to a $variable (e.g. \"range\"), then pass {$range} in the Query() args of the panels it controls. Selecting an option re-fetches those queries automatically — no extra wiring.",
+    "Interactivity — drill-down: rows in VisualTable, Kanban, items in ArtworkWall, and nodes in NodeGraph are clickable. Clicking sends a follow-up message (e.g. \"Show details for X\"); respond with a DetailPanel for that entity. Do not pre-render detail views the user hasn't requested.",
+    "Interactivity — nesting: Section groups child panels under a title. Its children are a tight union of display components (MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall) — do not nest Section, Kanban, or Stack inside a Section. DetailPanel and Kanban accept a children of MetricStrip or DetailPanel respectively for inline KPI summaries.",
   ],
   toolExamples: [
     `Example — Ops health (monitoring overview):
@@ -47,5 +50,27 @@ ollamaData = Query("ollama", {}, {state: "healthy", metrics: []}, 30)
 comfyCard = Card([comfyTitle, EventStream(comfyData)])
 comfyTitle = TextContent("ComfyUI", "small-heavy")
 comfyData = Query("comfyui", {}, {state: "healthy", events: []}, 30)`,
+    `Example — Dashboard with a reactive time-range filter:
+
+root = Stack([header, rangeFilter, panels])
+header = CardHeader("Media Activity", "Filtered by time range")
+rangeFilter = FilterDropdown("range", "Time range", "7d", [{value: "24h", label: "Last 24 hours"}, {value: "7d", label: "Last 7 days"}, {value: "30d", label: "Last 30 days"}])
+panels = Stack([sessions, recent], "row", "l", "stretch", "between", true)
+sessions = PlaybackSessions(sessData)
+sessData = Query("emby", {$range: "range"}, {state: "healthy", items: []}, 30)
+recent = ArtworkWall(recentData)
+recentData = Query("emby", {view: "recent-movies", $range: "range"}, {state: "healthy", items: []})`,
+    `Example — Nested layout with a Section:
+
+root = Stack([header, leftCol, rightCol], "row", "l", "stretch", "between", true)
+header = CardHeader("Fleet Overview", "Grouped by host")
+leftCol = Section("Storage", null, null, [diskGauge, poolTable])
+diskGauge = Gauge(diskData)
+diskData = Query("synology-dsm", {}, {title: "Disk Usage", value: 0, max: 100, thresholds: {warning: 75, critical: 90}}, 60)
+poolTable = VisualTable(poolData)
+poolData = Query("synology-dsm", {view: "pools"}, {state: "healthy", items: []}, 60)
+rightCol = Section("Media", null, null, [mediaStrip])
+mediaStrip = MetricStrip(mediaData)
+mediaData = Query("emby", {}, {state: "healthy", metrics: []}, 60)`,
   ],
 };
