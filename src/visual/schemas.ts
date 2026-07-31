@@ -457,6 +457,23 @@ export const FilterDropdownSchema = defineComponent({
   component: null as never,
 });
 
+// ── Section: generic nesting container (Phase 4 Task 4.3) ─────
+
+export const SectionSchema = defineComponent({
+  name: "Section",
+  props: z.object({
+    ...baseFields,
+    children: z.array(z.any()),
+  }),
+  description:
+    "Generic titled container for grouping nested components. " +
+    "Renders a surface with an optional title/subtitle, then all children below. " +
+    "Use for logical grouping when no specialised container fits: " +
+    'Section("Drives", [Gauge(...), Gauge(...)]). ' +
+    "Prefer DashboardGrid or Stack for pure layout; use Section when you need a titled wrapper around arbitrary children.",
+  component: null as never,
+});
+
 // ── Exports ───────────────────────────────────────────────────
 
 export const homelabSchemaComponents = [
@@ -466,7 +483,7 @@ export const homelabSchemaComponents = [
   KanbanSchema, VisualTableSchema, ArtworkWallSchema, PlaybackSessionsSchema,
   CapacitySchema, SecurityPostureSchema, MarkdownReaderSchema, KnowledgeGraphSchema,
   BacklinksSchema, DetailPanelSchema, CalloutSchema, EmptyStateSchema, RoomBoardSchema, FlowSchema,
-  FilterDropdownSchema,
+  FilterDropdownSchema, SectionSchema,
 ];
 
 export const homelabGroup = {
@@ -481,5 +498,14 @@ export const homelabGroup = {
     "  Event  = {id: string, at: string, title: string, detail?: string, image?: string, state?: VisualState}",
     "  Node   = {id: string, label: string, x?: number, y?: number, state?: VisualState, value?: number}",
     "  Edge   = {source: string, target: string, label?: string, value?: number, state?: VisualState}",
+    "",
+    "Interactivity — filters, drill-down, nesting:",
+    "  FilterDropdown — reactive dropdown; bind to a Query by referencing $<filterName> in the Query args so changing the dropdown re-fetches automatically.",
+    "    Example: timeRange = FilterDropdown(\"timeRange\", {value: \"24h\", options: [{value:\"1h\",label:\"1 hour\"},{value:\"24h\",label:\"24 hours\"}]})",
+    "    Then in the Query: data = Query(\"emby\", {range: $timeRange}, {...}, 60)",
+    "  Drill-down: VisualTable, NodeGraph, ArtworkWall, and Kanban are clickable — clicking a row/node/card sends a follow-up message that drills into that entity. No extra wiring needed; just populate the component with items/nodes.",
+    "  Nesting: Section, DetailPanel, and Kanban accept a children prop (array of other components) rendered inside them.",
+    "    Example: root = Section(\"Storage Detail\", [DetailPanel(diskMetrics), LineChart(diskHistory)])",
+    "    Keep nesting shallow (1–2 levels) and purposeful — a detail panel with an embedded chart, a section grouping related gauges.",
   ],
 };

@@ -23,7 +23,6 @@ import {
   reactive,
   useStateField,
   useTriggerAction,
-  useRenderNode,
   type ComponentRenderProps,
 } from "@openuidev/react-lang";
 import "../cyber-noir-visual-components-v4.css";
@@ -1436,8 +1435,14 @@ export const homelabGroup = {
     "    background: flat|gradient|image|mesh      elevation: flat|raised|floating",
     "    glow: none|state  (state ties glow to the panel's health color — critical=red)",
     "    Example: Surface({translucency:\"medium\", blur:\"md\", glow:\"state\"}, [chart1, chart2])",
-    "  Section — titled wrapper for grouping arbitrary children: Section(\"Drives\", [g1, g2]).",
-    "  DetailPanel / Kanban also accept children for nesting panels inside them.",
-    "  FilterDropdown — reactive dropdown; bind to a Query with $<filterName> in Query args to re-fetch on change.",
+    "",
+    "Interactivity — filters, drill-down, nesting:",
+    "  FilterDropdown — reactive dropdown; bind to a Query by referencing $<filterName> in the Query args so changing the dropdown re-fetches automatically.",
+    "    Example: timeRange = FilterDropdown(\"timeRange\", {value: \"24h\", options: [{value:\"1h\",label:\"1 hour\"},{value:\"24h\",label:\"24 hours\"}]})",
+    "    Then in the Query: data = Query(\"emby\", {range: $timeRange}, {...}, 60)",
+    "  Drill-down: VisualTable, NodeGraph, ArtworkWall, and Kanban are clickable — clicking a row/node/card sends a follow-up message that drills into that entity. No extra wiring needed; just populate the component with items/nodes.",
+    "  Nesting: Section, DetailPanel, and Kanban accept a children prop (array of other components) rendered inside them.",
+    "    Example: root = Section(\"Storage Detail\", [DetailPanel(diskMetrics), LineChart(diskHistory)])",
+    "    Keep nesting shallow (1–2 levels) and purposeful — a detail panel with an embedded chart, a section grouping related gauges.",
   ],
 };
