@@ -288,50 +288,6 @@ export function SavedViews({ views, activeView, onViewChange }: SavedViewsProps)
   );
 }
 
-// ── AI Query Input ───────────────────────────────────────────
-
-interface AIQueryInputProps {
-  onSubmit: (query: string) => void;
-  result: { workspace: string; components: string[] } | null;
-}
-
-export function AIQueryInput({ onSubmit, result }: AIQueryInputProps) {
-  const [text, setText] = useState("");
-  return (
-    <div className="dash-ai-query">
-      <div className="dash-ai-input-wrap">
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Ask in natural language: 'Show me how gh-vps connects to caddy'"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && text.trim()) {
-              onSubmit(text.trim());
-              setText("");
-            }
-          }}
-        />
-        <button onClick={() => text.trim() && (onSubmit(text.trim()), setText(""))}>
-          Compose →
-        </button>
-      </div>
-      {result && (
-        <div className="dash-ai-result">
-          <strong>Workspace: {result.workspace}</strong>
-          <div className="dash-ai-components">
-            {result.components.map((c) => (
-              <span key={c} className="dash-ai-component-tag">
-                {c}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Hook: fetch world data ───────────────────────────────────
 
 interface WorldData {
