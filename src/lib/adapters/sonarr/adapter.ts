@@ -157,7 +157,6 @@ export class SonarrAdapter {
             unit: "shows",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -211,7 +210,6 @@ export class SonarrAdapter {
           { label: "Total Records", value: response.totalRecords, unit: "episodes" },
         ],
         summary: `${wanted.length} episodes missing across monitored series`,
-        updatedAt: now,
       };
 
       return {
@@ -288,7 +286,6 @@ export class SonarrAdapter {
             detail: q.status,
             state: q.status === "downloading" ? "loading" : q.status === "completed" ? "healthy" : "warning",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -361,7 +358,6 @@ export class SonarrAdapter {
           detail: c.title,
           state: c.hasFile ? "healthy" : "warning",
         })),
-        updatedAt: now,
       };
 
       return {
@@ -415,7 +411,6 @@ export class SonarrAdapter {
         state: diskspace.some((d) => d.freeSpace / d.totalSpace < 0.1) ? "critical" : "healthy",
         metrics,
         items,
-        updatedAt: now,
       };
 
       return {
@@ -447,7 +442,6 @@ export class SonarrAdapter {
         state: "offline",
         items: [],
         metrics: [],
-        updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),

@@ -106,15 +106,13 @@ export type Event = z.infer<typeof EventSchema>;
 
 /**
  * VisualData is the unified shape all adapters produce.
- * Every component in the manifest consumes this schema.
+ * Narrowed: dead fields (html, query, selectedId, updatedAt, density) removed —
+ * no renderer ever read them. Adapters no longer set updatedAt.
  */
 export const VisualDataSchema = z.object({
   title: z.string().optional(),
   subtitle: z.string().optional(),
   state: VisualStateSchema.default("healthy"),
-  density: z.enum(["compact", "comfortable", "immersive"]).default(
-    "comfortable"
-  ),
   metrics: z.array(MetricSchema).default([]),
   items: z.array(ItemSchema).default([]),
   series: z.array(SeriesSchema).default([]),
@@ -122,11 +120,7 @@ export const VisualDataSchema = z.object({
   edges: z.array(EdgeSchema).default([]),
   events: z.array(EventSchema).default([]),
   summary: z.string().optional(),
-  updatedAt: z.string().optional(),
   markdown: z.string().optional(),
-  html: z.string().optional(),
-  selectedId: z.string().optional(),
-  query: z.string().optional(),
 });
 export type VisualData = z.infer<typeof VisualDataSchema>;
 

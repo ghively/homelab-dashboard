@@ -795,6 +795,64 @@
 }
 
 /* ================================================================
+ * PHASE 2a — Scatter axis labels & Heatmap grid
+ * ================================================================ */
+
+.cnv-grid,
+.cnv-chart line[stroke="var(--cnv-grid)"] {
+  stroke: var(--cnv-grid, #2b2f3a);
+}
+
+.cnv-chart .cnv-axis-label {
+  fill: var(--cnv-muted, #6b7280);
+  font-size: 11px;
+}
+
+.cnv-heatmap {
+  overflow-x: auto;
+}
+
+.cnv-heatmap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cnv-heatmap th,
+.cnv-heatmap td {
+  padding: 4px 8px;
+  text-align: center;
+  border: 1px solid var(--cnv-panel2, #2b2f3a);
+}
+
+.cnv-heatmap thead th,
+.cnv-heatmap tbody th[scope="row"] {
+  color: var(--cnv-muted, #6b7280);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cnv-heatmap td {
+  font-variant-numeric: tabular-nums;
+}
+
+.cnv-heatmap-empty {
+  opacity: 0.2;
+}
+
+.cnv-heat-lo {
+  background: color-mix(in srgb, var(--cnv-series-1, #4cc1ff) 25%, transparent);
+}
+
+.cnv-heat-md {
+  background: color-mix(in srgb, var(--cnv-series-1, #4cc1ff) 55%, transparent);
+}
+
+.cnv-heat-hi {
+  background: color-mix(in srgb, var(--cnv-series-1, #4cc1ff) 85%, transparent);
+}
+
+/* ================================================================
  * PHASE 5 — DashboardGrid 12-column layout (Task 5.4)
  * ================================================================ */
 

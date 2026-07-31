@@ -20,6 +20,10 @@ import { z } from "zod";
 import {
   defineComponent,
   tagSchemaId,
+  reactive,
+  useStateField,
+  useTriggerAction,
+  useRenderNode,
   type ComponentRenderProps,
 } from "@openuidev/react-lang";
 import "../cyber-noir-visual-components-v4.css";
@@ -380,7 +384,56 @@ export const MultiLine = defineComponent({
   },
 });
 
-// ── 6. BarRank ────────────────────────────────────────────────
+// ── 6. Scatter ────────────────────────────────────────────────
+
+export const Scatter = defineComponent({
+  name: "Scatter",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    points: z.array(z.object({
+      x: z.number(),
+      y: z.number(),
+      label: z.string().optional(),
+      size: z.number().optional(),
+      state: VisualStateSchema.optional(),
+    })),
+    xAxisLabel: z.string().optional(),
+    yAxisLabel: z.string().optional(),
+  }),
+  description:
+    "Scatter plot showing correlation between two numeric variables (latency vs throughput, request count vs error rate, cost vs tokens). " +
+    "Each point is {x, y, label?, size?, state?}. size scales the dot radius (bubble effect). " +
+    "Choose over LineChart when individual observations matter more than a trend line. " +
+    "Choose Heatmap when both axes are categorical bins rather than continuous numbers.",
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; points: { x: number; y: number; label?: string; size?: number; state?: string }[]; xAxisLabel?: string; yAxisLabel?: string }>) => {
+    if (!props.points?.length) return <Surface title={props.title ?? "Scatter"} state={props.state}><NoData label="No scatter data" /></Surface>;
+    const xs = props.points.map((p) => p.x);
+    const ys = props.points.map((p) => p.y);
+    const xMin = Math.min(...xs), xMax = Math.max(...xs, xMin + 1);
+    const yMin = Math.min(...ys), yMax = Math.max(...ys, yMin + 1);
+    const W = 640, H = 220, PAD = 40;
+    const sx = (x: number) => PAD + ((x - xMin) / (xMax - xMin)) * (W - PAD * 2);
+    const sy = (y: number) => H - PAD - ((y - yMin) / (yMax - yMin)) * (H - PAD * 2);
+    return (
+      <Surface title={props.title ?? "Scatter"} subtitle={props.subtitle} state={props.state}>
+        <svg className="cnv-chart" viewBox={`0 0 ${W} ${H}`} role="img">
+          <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--cnv-grid)" strokeWidth="1" />
+          <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="var(--cnv-grid)" strokeWidth="1" />
+          {props.points.slice(0, 200).map((p, i) => {
+            const r = p.size != null ? Math.max(2, Math.min(16, p.size)) : 4;
+            return <circle key={i} cx={sx(p.x)} cy={sy(p.y)} r={r} className={`state-${p.state ?? "healthy"}`} fill={`var(--cnv-series-${(i % 4) + 1})`} fillOpacity="0.6" />;
+          })}
+          {props.xAxisLabel && <text x={W / 2} y={H - 8} textAnchor="middle" className="cnv-axis-label">{props.xAxisLabel}</text>}
+          {props.yAxisLabel && <text x={12} y={H / 2} textAnchor="middle" transform={`rotate(-90 12 ${H / 2})`} className="cnv-axis-label">{props.yAxisLabel}</text>}
+        </svg>
+      </Surface>
+    );
+  },
+});
+
+// ── 7. BarRank ────────────────────────────────────────────────
 
 export const BarRank = defineComponent({
   name: "BarRank",
@@ -414,7 +467,68 @@ export const BarRank = defineComponent({
   },
 });
 
-// ── 7. Timeline ───────────────────────────────────────────────
+// ── 7. Heatmap ────────────────────────────────────────────────
+
+export const Heatmap = defineComponent({
+  name: "Heatmap",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    rows: z.array(z.string()),
+    cols: z.array(z.string()),
+    cells: z.array(z.object({
+      row: z.number().int(),
+      col: z.number().int(),
+      value: z.number(),
+      state: VisualStateSchema.optional(),
+    })),
+    valueLabel: z.string().optional(),
+  }),
+  description:
+    "Grid heatmap showing intensity of a value across two categorical axes (request latency by hour×day, error rate by service×endpoint, CI failure by runner×stage). " +
+    "rows[] and cols[] are the axis labels. cells[] has {row (index), col (index), value, state?}. " +
+    "Cell color intensity is driven by value (higher = more saturated) unless state overrides. " +
+    "Choose over Scatter when both axes are categories/bins, not continuous numbers. " +
+    "Choose over Matrix (SecurityPosture) when the cell encodes a numeric magnitude, not just on/off state.",
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; rows: string[]; cols: string[]; cells: { row: number; col: number; value: number; state?: string }[]; valueLabel?: string }>) => {
+    if (!props.cells?.length || !props.rows?.length || !props.cols?.length) return <Surface title={props.title ?? "Heatmap"} state={props.state}><NoData label="No heatmap data" /></Surface>;
+    const values = props.cells.map((c) => c.value);
+    const vMax = Math.max(...values.map(Math.abs), 1);
+    const cellLookup = new Map<string, typeof props.cells[number]>();
+    props.cells.forEach((c) => cellLookup.set(`${c.row}:${c.col}`, c));
+    return (
+      <Surface title={props.title ?? "Heatmap"} subtitle={props.subtitle} state={props.state}>
+        <div className="cnv-heatmap">
+          <table>
+            <thead>
+              <tr>
+                <th>{props.valueLabel ?? ""}</th>
+                {props.cols.map((c, i) => <th key={i}>{c}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {props.rows.map((rowLabel, r) => (
+                <tr key={r}>
+                  <th scope="row">{rowLabel}</th>
+                  {props.cols.map((_, c) => {
+                    const cell = cellLookup.get(`${r}:${c}`);
+                    if (!cell) return <td key={c} className="cnv-heatmap-empty" />;
+                    const intensity = Math.abs(cell.value) / vMax;
+                    const cls = cell.state ? `state-${cell.state}` : `cnv-heat-${intensity > 0.66 ? "hi" : intensity > 0.33 ? "md" : "lo"}`;
+                    return <td key={c} className={cls} title={`${cell.value}`}>{cell.value}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Surface>
+    );
+  },
+});
+
+// ── 8. Timeline ───────────────────────────────────────────────
 
 export const Timeline = defineComponent({
   name: "Timeline",
@@ -531,8 +645,10 @@ export const NodeGraph = defineComponent({
   description:
     "Network topology / dependency graph (service connections, infrastructure topology). " +
     "Nodes need {id, label, x?, y?} (coordinates in a ~800×430 space). Edges need {source, target, label?, value?}. " +
+    "Nodes are clickable — clicking a node drills into a detail view for that node. " +
     "For sequential pipeline/flow use Flow. For proportional flow use Sankey.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] }>) => {
+    const triggerAction = useTriggerAction();
     if (!props.nodes?.length) return <Surface title={props.title ?? "Node Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
     return (
       <Surface title={props.title ?? "Network"} subtitle={props.subtitle} state={props.state}>
@@ -543,7 +659,7 @@ export const NodeGraph = defineComponent({
             return a && b ? <line key={i} x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
           })}
           {props.nodes.map((n) => (
-            <g key={n.id} transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}>
+            <g key={n.id} transform={`translate(${n.x ?? 0} ${n.y ?? 0})`} className="cnv-node-clickable" onClick={() => triggerAction(`Show details for ${n.label}`)}>
               <circle r="34" />
               <text textAnchor="middle" y="5">{n.label}</text>
             </g>
@@ -596,12 +712,16 @@ export const Kanban = defineComponent({
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
     items: z.array(ItemSchema),
+    children: z.array(z.any()).optional(),
   }),
   description:
     "Board with columns grouped by item.group (CI stages, deployment statuses, task states). " +
     "Each Item needs {id, label, subtitle?, group}. Items are auto-grouped by their group field. " +
+    "Cards are clickable — clicking drills into a detail view for that item. " +
+    "Optionally accepts children (nested components rendered below the board). " +
     "Use VisualTable for flat tabular data. Use RoomBoard for physical topology.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
+  component: ({ props, renderNode }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; children?: unknown[] }>) => {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Board"} state={props.state}><NoData label="No items" /></Surface>;
     const groups = [...new Set(props.items.map((i) => i.group || "Active"))];
     return (
@@ -611,11 +731,19 @@ export const Kanban = defineComponent({
             <section key={g}>
               <h4>{g}</h4>
               {props.items.filter((i) => (i.group || "Active") === g).map((i) => (
-                <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small></article>
+                <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}`)}>
+                  <strong>{i.label}</strong>
+                  <small>{i.subtitle}</small>
+                </article>
               ))}
             </section>
           ))}
         </div>
+        {props.children && props.children.length > 0 && (
+          <div className="cnv-nested">
+            {props.children.map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>)}
+          </div>
+        )}
       </Surface>
     );
   },
@@ -633,16 +761,18 @@ export const VisualTable = defineComponent({
   }),
   description:
     "Tabular list of records (containers, devices, adapters, configs). " +
-    "Each Item shows {label, subtitle, value, state}. Rows are read-only. " +
+    "Each Item shows {label, subtitle, value, state}. Rows are clickable — clicking a row " +
+    "drills into a detail view for that entity. " +
     "Use LogStream for raw logs. Use BarRank for ranked numeric comparison. " +
     "Use DetailPanel for a single entity's key-value details.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Table"} state={props.state}><NoData label="No rows" /></Surface>;
     return (
       <Surface title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
           {props.items.map((i) => (
-            <article key={i.id}>
+            <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}`)}>
               <strong>{i.label}</strong>
               <small>{i.subtitle}</small>
               <span>{i.state ?? "healthy"}</span>
@@ -670,14 +800,16 @@ export const ArtworkWall = defineComponent({
     "Grid of poster/cover art (movie library, album wall, image gallery). " +
     "Each Item needs {id, label, subtitle?, image? (URL), progress?}. " +
     "Set square=true for album covers / square thumbnails. " +
+    "Items are clickable — clicking drills into details for that title. " +
     "Use PlaybackSessions for currently-playing media with stream details.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean }>) => {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Gallery"} state={props.state}><NoData label="No items" /></Surface>;
     return (
       <Surface title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
         <div className={props.square ? "cnv-albums" : "cnv-posters"}>
           {props.items.slice(0, 18).map((i) => (
-            <article key={i.id}>
+            <article key={i.id} className="cnv-row-clickable" onClick={() => triggerAction(`Show details for ${i.label}`)}>
               <div className="cnv-art" style={i.image ? { backgroundImage: `url(${i.image})` } : undefined}>
                 <b>{i.label}</b>
               </div>
@@ -944,13 +1076,15 @@ export const DetailPanel = defineComponent({
     state: VisualStateSchema.optional(),
     metrics: z.array(MetricSchema),
     summary: z.string().optional(),
+    children: z.array(z.any()).optional(),
   }),
   description:
     "Single-entity detail view showing labeled key-value pairs (one device, one container, one service). " +
     "Metrics render as label/value rows. summary renders as a callout paragraph. " +
+    "Optionally accepts children (nested components rendered below the metrics, e.g. a chart or table). " +
     "Use MetricStrip for dashboard KPI rows. Use DetailPanel when drilling into one entity.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; summary?: string }>) => {
-    if (!props.metrics?.length && !props.summary) return <Surface title={props.title ?? "Details"} state={props.state}><NoData label="No detail data" /></Surface>;
+  component: ({ props, renderNode }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; summary?: string; children?: unknown[] }>) => {
+    if (!props.metrics?.length && !props.summary && !props.children?.length) return <Surface title={props.title ?? "Details"} state={props.state}><NoData label="No detail data" /></Surface>;
     return (
       <Surface title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
         {props.summary && (
@@ -961,6 +1095,11 @@ export const DetailPanel = defineComponent({
             {props.metrics.map((m, i) => (
               <article key={i}><small>{m.label}</small><strong>{m.value}{m.unit}</strong></article>
             ))}
+          </div>
+        )}
+        {props.children && props.children.length > 0 && (
+          <div className="cnv-nested">
+            {props.children.map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>)}
           </div>
         )}
       </Surface>
@@ -1188,15 +1327,88 @@ export const GridItem = defineComponent({
   },
 });
 
+// ── 29. FilterDropdown (Phase 4 Task 4.1) ─────────────────────
+//
+// Interactive dropdown whose value is a reactive state field. When a
+// $variable bound to this field appears in a Query's args, the query
+// re-fetches automatically when the selection changes.
+
+export const FilterDropdown = defineComponent({
+  name: "FilterDropdown",
+  props: z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    value: reactive(z.string().optional()),
+    options: z.array(z.object({ value: z.string(), label: z.string() })),
+  }),
+  description:
+    "Interactive dropdown filter for narrowing live data. " +
+    "Give each FilterDropdown a unique name (the reactive state key), an optional label, a default value, and an options list of {value, label}. " +
+    "To make a Query re-fetch when the selection changes, reference $<filterName> inside the Query args, e.g. " +
+    "data = Query(\"emby\", {library: $libFilter}, {...}) where libFilter = FilterDropdown(\"libFilter\", {value: \"movies\", options: [...]}). " +
+    "Use multiple FilterDropdowns with distinct names for independent filters.",
+  component: ({ props }: ComponentRenderProps<{ name: string; label?: string; value?: unknown; options: { value: string; label: string }[] }>) => {
+    // reactive() wraps value as a StateField; useStateField resolves the
+    // current binding (from a $variable) or falls back to props.value.
+    const defaultValue = typeof props.value === "string" ? props.value : undefined;
+    const field = useStateField<string>(props.name, defaultValue);
+    const current = (field.value as string) ?? "";
+    return (
+      <div className="cnv-filter">
+        {props.label && <label className="cnv-filter-label">{props.label}</label>}
+        <select
+          className="cnv-filter-select"
+          value={current}
+          onChange={(e) => field.setValue(e.target.value)}
+        >
+          {props.options?.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  },
+});
+
 // ── Exports ───────────────────────────────────────────────────
+
+// Section — generic container that renders nested children inside a titled surface.
+// Useful for grouping related panels: Section("Drives", [Gauge(...), Gauge(...)])
+export const Section = defineComponent({
+  name: "Section",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    children: z.array(z.any()),
+  }),
+  description:
+    "Generic titled container for grouping nested components. " +
+    "Renders a surface with an optional title/subtitle, then all children below. " +
+    "Use for logical grouping when no specialised container fits: " +
+    "Section(\"Drives\", [Gauge(...), Gauge(...)]). " +
+    "Prefer DashboardGrid or Stack for layout; use Section only when you need a titled wrapper around arbitrary children.",
+  component: ({ props, renderNode }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; children: unknown[] }>) => {
+    return (
+      <Surface title={props.title ?? ""} subtitle={props.subtitle} state={props.state}>
+        <div className="cnv-nested">
+          {Array.isArray(props.children)
+            ? props.children.map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>)
+            : null}
+        </div>
+      </Surface>
+    );
+  },
+});
 
 const allComponents = [
   SurfaceComponent, DashboardGrid, GridItem,
-  MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank,
+  MetricStrip, Gauge, Donut, LineChart, MultiLine, Scatter, BarRank, Heatmap,
   Timeline, EventStream, LogStream, NodeGraph, Sankey,
   Kanban, VisualTable, ArtworkWall, PlaybackSessions,
   Capacity, SecurityPosture, MarkdownReader, KnowledgeGraph,
   Backlinks, DetailPanel, Callout, EmptyState, RoomBoard, Flow,
+  FilterDropdown, Section,
 ];
 
 export const homelabComponents = allComponents;
@@ -1224,5 +1436,8 @@ export const homelabGroup = {
     "    background: flat|gradient|image|mesh      elevation: flat|raised|floating",
     "    glow: none|state  (state ties glow to the panel's health color — critical=red)",
     "    Example: Surface({translucency:\"medium\", blur:\"md\", glow:\"state\"}, [chart1, chart2])",
+    "  Section — titled wrapper for grouping arbitrary children: Section(\"Drives\", [g1, g2]).",
+    "  DetailPanel / Kanban also accept children for nesting panels inside them.",
+    "  FilterDropdown — reactive dropdown; bind to a Query with $<filterName> in Query args to re-fetch on change.",
   ],
 };

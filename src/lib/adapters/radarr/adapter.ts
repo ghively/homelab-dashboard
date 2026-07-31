@@ -156,7 +156,6 @@ export class RadarrAdapter {
             unit: "movies",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -210,7 +209,6 @@ export class RadarrAdapter {
           { label: "Total Records", value: response.totalRecords, unit: "movies" },
         ],
         summary: `${wanted.length} movies missing across monitored library`,
-        updatedAt: now,
       };
 
       return {
@@ -287,7 +285,6 @@ export class RadarrAdapter {
             detail: q.status,
             state: q.status === "downloading" ? "loading" : q.status === "completed" ? "healthy" : "warning",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -362,7 +359,6 @@ export class RadarrAdapter {
           detail: c.status,
           state: c.hasFile ? "healthy" : "warning",
         })),
-        updatedAt: now,
       };
 
       return {
@@ -416,7 +412,6 @@ export class RadarrAdapter {
         state: diskspace.some((d) => d.freeSpace / d.totalSpace < 0.1) ? "critical" : "healthy",
         metrics,
         items,
-        updatedAt: now,
       };
 
       return {
@@ -448,7 +443,6 @@ export class RadarrAdapter {
         state: "offline",
         items: [],
         metrics: [],
-        updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),

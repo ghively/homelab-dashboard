@@ -159,7 +159,6 @@ export class RommAdapter {
             unit: "ROMs",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -237,7 +236,6 @@ export class RommAdapter {
             unit: "GB",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -289,7 +287,6 @@ export class RommAdapter {
         ],
         items: [],
         summary: status.last_scan ? `Last scan: ${new Date(status.last_scan).toLocaleString()}` : "No scans performed",
-        updatedAt: now,
       };
 
       return {
@@ -371,7 +368,6 @@ export class RommAdapter {
             detail: `${j.roms_processed} ROMs processed`,
             state: j.status === "running" ? "loading" : j.status === "completed" ? "healthy" : "critical",
           })),
-        updatedAt: now,
       };
 
       return {
@@ -440,7 +436,6 @@ export class RommAdapter {
             unit: "platforms",
           },
         ],
-        updatedAt: now,
       };
 
       return {
@@ -472,7 +467,6 @@ export class RommAdapter {
         state: "offline",
         items: [],
         metrics: [],
-        updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),

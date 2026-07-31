@@ -66,7 +66,6 @@ function flattenResult(
     ...(d.edges ? { edges: d.edges as Edge[] } : {}),
     ...(d.events ? { events: d.events as Event[] } : {}),
     ...(d.summary ? { summary: d.summary } : {}),
-    ...(d.query ? { query: d.query } : {}),
   };
   return result;
 }
