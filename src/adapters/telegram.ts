@@ -1,5 +1,5 @@
 import { BaseAdapter } from "./BaseAdapter";
-import type { AdapterResult, AdapterState } from "./types";
+import type { AdapterState } from "./types";
 import axios from "axios";
 
 /**
@@ -111,7 +111,7 @@ export class TelegramAdapter extends BaseAdapter {
             onUpdate(update);
           }
         }
-      } catch (err) {
+      } catch {
         // Silently retry on error
       }
 

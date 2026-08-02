@@ -16,7 +16,7 @@ interface UniFiClient {
   uptime: number;
 }
 
-interface UniFiNetworkStat {
+interface _UniFiNetworkStat {
   tx_bytes: number;
   rx_bytes: number;
   tx_bytes_r: number;

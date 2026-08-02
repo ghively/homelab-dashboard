@@ -10,19 +10,14 @@
  * - GET /api/v2/workers (worker nodes)
  */
 
-import { z } from "zod";
 import type {
   VisualData,
   VisualQueryResult,
   FreshnessInfo,
-  Metric,
   Item,
-  Event,
 } from "../core/contracts";
-import { VisualStateSchema } from "../core/contracts";
 import type {
   TdarrLibrary,
-  TdarrFile,
   TdarrJob,
   TdarrWorker,
   TdarrSystemStatus,
@@ -82,9 +77,8 @@ export class TdarrAdapter {
    * Health check - fetch system status.
    */
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
     try {
-      const status = await this.fetch<TdarrSystemStatus>("/api/v2/status");
+      const _status = await this.fetch<TdarrSystemStatus>("/api/v2/status");
       return {
         timestamp: new Date().toISOString(),
         source: `Tdarr:${this.baseUrl}/api/v2/status`,

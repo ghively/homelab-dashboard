@@ -49,7 +49,7 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
   async health() {
     const now = new Date().toISOString();
     try {
-      const { data: runners } = await this.client.get<GitLabRunner[]>("/runners");
+      const { data: _runners } = await this.client.get<GitLabRunner[]>("/runners");
       return {
         adapter: this.name,
         source: this.host,
@@ -63,7 +63,7 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
     }
   }
 
-  async query(queryType: string = "overview", params: Record<string, unknown> = {}): Promise<VisualQueryResult> {
+  async query(_queryType: string = "overview", _params: Record<string, unknown> = {}): Promise<VisualQueryResult> {
     const now = new Date().toISOString();
 
     try {

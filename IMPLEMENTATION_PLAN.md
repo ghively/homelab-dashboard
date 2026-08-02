@@ -66,6 +66,8 @@ that a module existing is not evidence that it works.
   them against real endpoints needs credentials and network reach.
 - **Drill-down click-through is unexercised.** Rows render and are declared
   clickable, but no browser session was available to click one.
+- **Three services are validated live** (comfyui, litellm, synology-dsm); the
+  other 27 are not. See the Phase 6 section for details.
 - **`.github/workflows/ci.yml`.** Jobs are named `build` and `lint` to match
   `main`'s required status checks. Do not rename them without updating the
   branch protection rule — the repo previously had protection requiring checks
@@ -850,14 +852,78 @@ Verified by driving the running app against the real LiteLLM proxy on gh-arm.
 - [x] **Translucency, blur, gradients, and a 12-column grid.** DashboardGrid
       emits `cnv-grid` with `col-4`/`col-6`/`col-8`/`col-12` children;
       surfaceStyle emits `tr-medium`, `bl-md`, `gl-state`.
-- [x] **`npm run build` and `npm run lint` pass.** Lint went 68 errors -> 0 and
-      CI no longer suppresses it with `|| true`. 68 warnings remain, not gating.
+- [x] **`npm run build` and `npm run lint` pass.** Lint is fully clean — 0
+      errors and 0 warnings, down from 153 problems. `--max-warnings 0` keeps it
+      that way and CI no longer suppresses it with `|| true`.
 
-### What is NOT verified
+### Live-service validation
 
-- **No adapter has been run against a live service.** All 30 were checked
-  structurally (every displayed value derives from a parsed response) and
-  against dead hosts. Real endpoints need credentials and network reach.
+Three adapters have now been run against the real services and returned correct
+data:
+
+Credentials come from 1Password (vault "Gregory"); Hermes holds a service
+account token at `OP_SERVICE_ACCOUNT_TOKEN` in `~/.hermes/.env`.
+
+| adapter | result |
+|---|---|
+| `sonarr` | 260 shows — 68 continuing, 192 ended, 190 monitored |
+| `radarr` | 533 movies — 523 released, 8 announced |
+| `sabnzbd` | v5.0.4, queue idle |
+| `syncthing` | v2.1.2, 2 folders, 1,674 files, 965 GB. **Both folders report `state: error` from Syncthing itself**, and all 3 configured devices are disconnected. |
+| `comfyui` | 1 device, NVIDIA RTX 3060, 9.2 GB / 12.5 GB VRAM, queue empty |
+| `litellm` | 22 models across the proxy |
+| `synology-dsm` | 2 volumes, 13 disks, 35.3 TB / 49.8 TB used. Correctly reported `warning`: `volume_2` is full (15.3/15.3 TB) and DSM flags it `attention`. Real drive models and per-disk temperatures. |
+
+Live contact found three defects that dead-host testing could never have:
+
+- **SABnzbd read `queue.jobs`; the API returns `queue.slots`.** `.map()` threw
+  on every call, so the panel rendered `offline` even with a valid key. The
+  schema also required numbers where SABnzbd sends strings (`"0.00"`).
+- **Syncthing read `version` off `/rest/system/status`.** That document has no
+  such field — it lives at `/rest/system/version`, so the panel always said
+  "unknown".
+- **Radarr listens on 8310**, not the 7878 default.
+
+For contrast, the mock `synology-dsm` this replaced claimed 3 volumes, 8 disks
+and 32 TB. It was wrong in every particular — which is the case for treating
+"a module exists" as evidence that it works.
+
+**Watchtower was coded against an API that does not exist.** The three
+`watchtower-*` adapters queried `/v1/containers`; Watchtower has no such
+endpoint (its HTTP API is a token-gated `POST /v1/update` plus optional
+`/v1/metrics`), verified by probing the live hosts — every path 404s. They now
+query the Docker Engine API (`GET /containers/json?all=1`), which is the actual
+source of container inventory. No Docker API is currently exposed on those
+hosts, so they report `NOT CONFIGURED` until a read-only socket-proxy exists.
+
+### Tailnet service map (port-scanned 2026-08-02)
+
+The `.env.example` defaults were wrong about which host runs what. Verified:
+
+| host | tailnet IP | listening |
+|---|---|---|
+| gh-ai | 100.92.162.32 | 443/8443 (TLS), 8080, 3000 |
+| gh-arm | 100.65.126.126 | **litellm 4000**, ntfy 8080, 8082 (307) |
+| gh-media | 100.116.139.100 | **emby 8096**, 80, 443 |
+| gh-nvidia | 100.88.26.95 | **comfyui 8188** |
+| gh-storage | 100.88.40.87 | **dsm 5000**, **sabnzbd 8080**, **syncthing 8384**, **sonarr 8989** |
+
+Corrections this produced:
+- Sonarr and SABnzbd were pointed at gh-media; they run on **gh-storage**.
+- RomM was pointed at gh-media:8082; that port is on **gh-arm**.
+- **There is no `gh-vps` node.** 100.92.162.32 is gh-ai. The `watchtower-vps`
+  adapter keeps its name (it is in `WORLDS`; renaming drops the tool spec) but
+  its labels now say gh-ai.
+- **Ollama is not listening** on gh-nvidia:11434 — the port is closed, so it
+  likely binds to localhost. Radarr, Tdarr and the Caddy admin API (2019) were
+  not found listening on any tailnet host.
+
+### What is still NOT verified
+
+- **27 of 30 adapters have not touched a live service.** `emby`, `sonarr`,
+  `sabnzbd` and `syncthing` are confirmed reachable and only need an API key.
+  `ollama`, `radarr`, `tdarr` and `caddy` are not listening anywhere on the
+  tailnet. The rest need credentials.
 - **Drill-down click-through was not exercised.** VisualTable/Kanban rows are
   declared clickable and the components render; actually clicking one needs a
   browser session, which was not available.

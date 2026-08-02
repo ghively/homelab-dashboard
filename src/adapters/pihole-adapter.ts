@@ -4,7 +4,7 @@ import type { FreshnessInfo, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
 
-interface PiHoleSummary {
+interface _PiHoleSummary {
   queries: number;
   blocked: number;
   block_rate: number;
@@ -40,10 +40,9 @@ export class PiHoleAdapter implements DataAdapter {
       };
     }
 
-    const start = Date.now();
     try {
       const url = `${this.baseUrl}/admin/api.php?summary&auth=${this.apiKey}`;
-      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      const _response = await fetch(url, { signal: AbortSignal.timeout(5000) });
       return {
         adapter: this.name,
         source: this.baseUrl,
@@ -53,7 +52,7 @@ export class PiHoleAdapter implements DataAdapter {
         lastChange: undefined,
         version: undefined,
       };
-    } catch (error) {
+    } catch {
       return {
         adapter: this.name,
         source: this.baseUrl,
@@ -72,7 +71,6 @@ export class PiHoleAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureState);
     }
 
-    const start = Date.now();
     try {
       const url = `${this.baseUrl}/admin/api.php?summary&auth=${this.apiKey}`;
       const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -117,7 +115,7 @@ export class PiHoleAdapter implements DataAdapter {
           cacheHit: false,
         },
       };
-    } catch (error) {
+    } catch {
       const now = new Date().toISOString();
       return {
         title: "Pi-hole DNS Sinkhole",

@@ -349,7 +349,6 @@ function AIWorkspace({
 // ── Adapter Result Card ──────────────────────────────────────
 
 function AdapterResultCard({
-  adapterName,
   result,
   onItemClick,
 }: {

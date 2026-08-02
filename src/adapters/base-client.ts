@@ -3,7 +3,6 @@
  * and standard response parsing.
  */
 import { ApiClientConfig } from "./types";
-import { credentials } from "./onepassword";
 
 export interface AdapterResponse<T> {
   data: T;

@@ -80,7 +80,7 @@ export class GitLabAdapter implements ServiceAdapter {
   async health(): Promise<FreshnessInfo> {
     const now = new Date().toISOString();
     try {
-      const { data } = await this.client.get<GitLabRunner[]>("/runners");
+      const { data: _data } = await this.client.get<GitLabRunner[]>("/runners");
 
       return {
         adapter: this.name,

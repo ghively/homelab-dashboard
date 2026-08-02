@@ -30,7 +30,7 @@ interface GitLabPipeline {
   variables: { key: string; value: string }[];
 }
 
-interface GitLabJob {
+interface _GitLabJob {
   id: number;
   name: string;
   status: string;
@@ -89,7 +89,7 @@ export class AnsibleAdapter implements ServiceAdapter {
 
   async query(
     queryType: string = "overview",
-    params: Record<string, unknown> = {}
+    _params: Record<string, unknown> = {}
   ): Promise<VisualQueryResult> {
     const now = new Date().toISOString();
 

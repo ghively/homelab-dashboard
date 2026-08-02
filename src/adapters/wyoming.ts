@@ -1,5 +1,5 @@
 import { BaseAdapter } from "./BaseAdapter";
-import type { AdapterResult, AdapterState } from "./types";
+import type { AdapterState } from "./types";
 import { WebSocket } from "ws";
 
 /**
@@ -65,7 +65,7 @@ export class WyomingAdapter extends BaseAdapter {
 
         connected = this.clients.get(i)!.readyState === WebSocket.OPEN;
         services = this.connectedServices.get(i) || [];
-      } catch (err) {
+      } catch {
         connected = false;
       }
 
