@@ -879,11 +879,34 @@ query the Docker Engine API (`GET /containers/json?all=1`), which is the actual
 source of container inventory. No Docker API is currently exposed on those
 hosts, so they report `NOT CONFIGURED` until a read-only socket-proxy exists.
 
+### Tailnet service map (port-scanned 2026-08-02)
+
+The `.env.example` defaults were wrong about which host runs what. Verified:
+
+| host | tailnet IP | listening |
+|---|---|---|
+| gh-ai | 100.92.162.32 | 443/8443 (TLS), 8080, 3000 |
+| gh-arm | 100.65.126.126 | **litellm 4000**, ntfy 8080, 8082 (307) |
+| gh-media | 100.116.139.100 | **emby 8096**, 80, 443 |
+| gh-nvidia | 100.88.26.95 | **comfyui 8188** |
+| gh-storage | 100.88.40.87 | **dsm 5000**, **sabnzbd 8080**, **syncthing 8384**, **sonarr 8989** |
+
+Corrections this produced:
+- Sonarr and SABnzbd were pointed at gh-media; they run on **gh-storage**.
+- RomM was pointed at gh-media:8082; that port is on **gh-arm**.
+- **There is no `gh-vps` node.** 100.92.162.32 is gh-ai. The `watchtower-vps`
+  adapter keeps its name (it is in `WORLDS`; renaming drops the tool spec) but
+  its labels now say gh-ai.
+- **Ollama is not listening** on gh-nvidia:11434 — the port is closed, so it
+  likely binds to localhost. Radarr, Tdarr and the Caddy admin API (2019) were
+  not found listening on any tailnet host.
+
 ### What is still NOT verified
 
-- **27 of 30 adapters have not touched a live service.** They are verified
-  structurally and against dead hosts only. `ollama`, `sonarr`, `radarr` and
-  `caddy` are not routable from the dev machine; the rest need credentials.
+- **27 of 30 adapters have not touched a live service.** `emby`, `sonarr`,
+  `sabnzbd` and `syncthing` are confirmed reachable and only need an API key.
+  `ollama`, `radarr`, `tdarr` and `caddy` are not listening anywhere on the
+  tailnet. The rest need credentials.
 - **Drill-down click-through was not exercised.** VisualTable/Kanban rows are
   declared clickable and the components render; actually clicking one needs a
   browser session, which was not available.

@@ -1,4 +1,9 @@
-// watchtower-vps adapter — Docker container fleet for gh-vps.
+// watchtower-vps adapter — Docker container fleet.
+//
+// The adapter name says "vps" and its default host was 100.92.162.32, but there
+// is no gh-vps node on this tailnet — that address is gh-ai. The name is kept
+// because it exists in WORLDS and renaming it would drop the tool spec; the
+// labels below say gh-ai, which is what the address actually is.
 //
 // NOTE ON THE DATA SOURCE. This previously queried Watchtower at
 // `/v1/containers`. That endpoint does not exist. Watchtower's HTTP API is only
@@ -41,7 +46,7 @@ interface DockerContainer {
 
 class WatchtowerVpsAdapter implements DataAdapter {
   readonly name = "watchtower-vps";
-  readonly description = "Docker container fleet on gh-vps — running state and images.";
+  readonly description = "Docker container fleet on gh-ai — running state and images.";
   readonly category = "ops" as const;
 
   async health(): Promise<FreshnessInfo> {
@@ -63,7 +68,7 @@ class WatchtowerVpsAdapter implements DataAdapter {
 
     if (!WATCHTOWER_VPS_URL) {
       return {
-        title: "Docker — gh-vps",
+        title: "Docker — gh-ai",
         subtitle: "Endpoint not configured",
         state: "empty",
         freshness: makeFreshness(),
@@ -111,7 +116,7 @@ class WatchtowerVpsAdapter implements DataAdapter {
       }));
 
       return {
-        title: "Docker — gh-vps",
+        title: "Docker — gh-ai",
         subtitle: `${running.length}/${containers.length} running`,
         state: unhealthy.length > 0 ? "critical" : stopped.length > 0 ? "warning" : "healthy",
         freshness: makeFreshness(),
@@ -121,7 +126,7 @@ class WatchtowerVpsAdapter implements DataAdapter {
       };
     } catch {
       return {
-        title: "Docker — gh-vps",
+        title: "Docker — gh-ai",
         subtitle: "Docker API unreachable",
         state: "offline",
         freshness: makeFreshness(),
