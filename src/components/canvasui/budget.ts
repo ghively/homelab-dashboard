@@ -18,7 +18,18 @@
  * a long panel list mounts first.
  */
 
-const MAX_EFFECTS = 15;
+/**
+ * Chrome starts evicting at around 16 live contexts, and 15 left no headroom
+ * whatsoever — the dashboard hit "Too many active WebGL contexts. Oldest
+ * context will be lost" immediately and the earliest panels went dead. The
+ * browser's ceiling is per-process and shared with everything else on the page,
+ * so budgeting right up to it was never going to hold.
+ *
+ * Eight is deliberately conservative. Effects are an accent; a page where every
+ * panel shimmers is noise anyway, and panels past the budget get the CSS glass,
+ * which looks good on its own.
+ */
+const MAX_EFFECTS = 8;
 const RESERVED = 3; // hero, chat, sidebar — claimed via `priority`
 
 let used = 0;

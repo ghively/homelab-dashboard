@@ -7,6 +7,11 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import {
+  subscribeNativeMode,
+  getNativeMode,
+  getNativeModeServer,
+} from "@/components/canvasui/native-mode";
 import { recordDrawFailure } from "@/components/canvasui/probe";
 
 export interface GlyphRainOptions {
@@ -845,6 +850,12 @@ export function createGlyphRain(
       gl!.deleteShader(vertexShader);
       gl!.deleteShader(fragmentShader);
       gl!.deleteBuffer(quad);
+      // Deleting the GL objects does NOT free the context — it lives until
+      // GC, and Chrome caps live contexts near 16. Every remount (React
+      // StrictMode double-invokes effects in dev, and HMR remounts freely)
+      // leaked one, producing a flood of "Too many active WebGL contexts.
+      // Oldest context will be lost" and killing the earliest panels.
+      gl!.getExtension("WEBGL_lose_context")?.loseContext();
       if (htmlInCanvas) paintable.onpaint = null;
     },
   };
@@ -856,7 +867,6 @@ export interface GlyphRainProps extends GlyphRainOptions {
   style?: React.CSSProperties;
 }
 
-const emptySubscribe = () => () => {};
 
 export function GlyphRain({
   children,
@@ -871,10 +881,16 @@ export function GlyphRain({
   const [initialOptions] = useState(options);
   const [failed, setFailed] = useState(false);
 
+  // Driven by the FUNCTIONAL probe, not by whether drawElementImage exists.
+  // Native mode moves this component's children inside the <canvas> as fallback
+  // content, which the document pipeline does not paint — only the
+  // HTML-in-Canvas draw does. If that draw fails, the content is invisible, not
+  // merely un-refracted. Starting false keeps content in normal DOM and on
+  // screen; it flips true only once pixels have been proven. See native-mode.ts.
   const supported = useSyncExternalStore(
-    emptySubscribe,
-    supportsHtmlInCanvas,
-    () => false,
+    subscribeNativeMode,
+    getNativeMode,
+    getNativeModeServer,
   );
   const native = supported && !failed;
 
