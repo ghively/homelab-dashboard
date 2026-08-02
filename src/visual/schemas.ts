@@ -294,7 +294,7 @@ export const PlaybackSessionsSchema = defineComponent({
   props: z.object({ ...baseFields, items: z.array(ItemSchema) }),
   description:
     "Active media streams / playback sessions (Emby/Jellyfin/Plex current plays). " +
-    "Each Item: {id, label (title), subtitle? (client), image? (thumbnail), progress? (0–1), meta?: {mode?, client?, device?, user?, quality?, paused?}}. " +
+    "Each Item: {id, label (title), subtitle? (client), image? (thumbnail), progress? (0–1), meta?: {mode?, client?, device?, user?, quality?, isPaused?, paused?}}. isPaused is the live Emby pause state; paused is a legacy alias. " +
     "Use ArtworkWall for a static library browse view.",
   component: null as never,
 });

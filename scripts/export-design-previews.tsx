@@ -93,7 +93,14 @@ const PROPS: Record<string, Record<string, unknown>> = {
   Kanban: { ...base, title: "Download queue", items },
   VisualTable: { ...base, title: "Series library", items },
   ArtworkWall: { ...base, title: "Recently added", items },
-  PlaybackSessions: { ...base, title: "Now playing", items: items.slice(0, 2) },
+  PlaybackSessions: {
+    ...base,
+    title: "Now playing",
+    items: [
+      { ...items[0], meta: { client: "Apple TV", quality: "4K HDR", isPaused: true } },
+      { ...items[1], meta: { client: "Safari", quality: "4K", isPaused: false } },
+    ],
+  },
   Capacity: { ...base, title: "Storage", state: "warning", metrics: [{ label: "Used", value: 71, unit: "%" }], series },
   SecurityPosture: { ...base, title: "Wazuh", items: items.slice(0, 3), metrics: metrics.slice(0, 3) },
   MarkdownReader: { ...base, title: "Runbook", markdown: "## Synology\n\n`volume_2` is full. DSM reports **attention**.\n\n- Free space or expand the pool\n- Re-check SMART on the Seagate drives" },
