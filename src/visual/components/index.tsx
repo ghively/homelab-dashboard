@@ -146,7 +146,15 @@ export function Surface({
   return (
     <section className={`${surfaceClass(state, surfaceStyle, gridSpan)}${className ? ` ${className}` : ""}`}>
       <header className="cnv-head">
-        <div>
+        {/* Traffic-light dots, per the design system's Window Header component.
+            Decorative only — the panel is not a real window — so they are
+            aria-hidden and carry no controls. */}
+        <div className="cnv-dots" aria-hidden="true">
+          <i className="cnv-dot cnv-dot-r" />
+          <i className="cnv-dot cnv-dot-y" />
+          <i className="cnv-dot cnv-dot-g" />
+        </div>
+        <div className="cnv-head-title">
           <h3>{title}</h3>
           {subtitle && <small>{subtitle}</small>}
         </div>
