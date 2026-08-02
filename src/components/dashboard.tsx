@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/visual-states";
+import { Surface, Metrics } from "@/visual/components";
 import type { VisualStateValue } from "@/adapters/types";
 
 // ── Dashboard Shell ──────────────────────────────────────────
@@ -219,6 +220,15 @@ interface VisualPanelProps {
   children: ReactNode;
 }
 
+/**
+ * Panel chrome for the dashboard shell.
+ *
+ * This used to be a hand-rolled copy of the visual library's Surface. Plan
+ * Task 5.2 called for deleting it and importing the real one; that step was
+ * skipped, so every page you navigate rendered older markup with none of the
+ * Phase 5 surface treatment. It now delegates to Surface and adds only what the
+ * shell needs on top: the sample-data badge and a state glow.
+ */
 export function VisualPanel({
   title,
   subtitle,
@@ -226,63 +236,59 @@ export function VisualPanel({
   source,
   children,
 }: VisualPanelProps) {
-  // A fixture panel MUST be visually distinct from a live one. Without this
-  // badge an unconfigured service renders exactly like a real one — RomM's
-  // sample data sat beside Emby's real 523 movies with nothing to tell them
-  // apart. Appendix C requires unconfigured services to fall back "visibly and
-  // labelled"; this is where that promise is kept.
   const isFixture = source === "fixture";
   return (
-    <section
-      className={`cnv cnv-surface tr-subtle bl-sm el-sm state-${state}${
-        NEEDS_ATTENTION.includes(String(state)) ? " gl-state" : ""
-      }${isFixture ? " is-fixture" : ""}`}
+    <Surface
+      title={title}
+      {...(subtitle ? { subtitle } : {})}
+      state={state}
+      surfaceStyle={{
+        translucency: "subtle",
+        blur: "sm",
+        elevation: "sm",
+        ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
+      }}
+      {...(isFixture ? { className: "is-fixture" } : {})}
+      badge={
+        isFixture ? (
+          <span
+            className="cnv-badge cnv-badge-fixture"
+            title="Sample data — this service is not configured"
+          >
+            SAMPLE DATA
+          </span>
+        ) : undefined
+      }
     >
-      <header className="cnv-head">
-        <div>
-          <h3>{title}</h3>
-          {subtitle && <small>{subtitle}</small>}
-        </div>
-        <div className="cnv-badges">
-          {isFixture && (
-            <span className="cnv-badge cnv-badge-fixture" title="Sample data — this service is not configured">
-              SAMPLE DATA
-            </span>
-          )}
-          <span className="cnv-badge">{state}</span>
-        </div>
-      </header>
       {children}
-    </section>
+    </Surface>
   );
 }
+
 
 // ── Metric Strip ─────────────────────────────────────────────
 
-interface MetricStripProps {
-  metrics: Array<{ label: string; value: string | number; unit?: string; trend?: number; state?: string }>;
+/**
+ * Thin alias over the visual library's Metrics row.
+ *
+ * The shell used to carry its own copy of this markup (plan Task 5.2, skipped).
+ * The name is kept so callers are unchanged, but there is now exactly one
+ * implementation.
+ */
+export function MetricStrip({
+  metrics,
+}: {
+  metrics: Array<{
+    label: string;
+    value: string | number;
+    unit?: string;
+    trend?: number;
+    state?: string;
+  }>;
+}) {
+  return <Metrics metrics={metrics} />;
 }
 
-export function MetricStrip({ metrics }: MetricStripProps) {
-  return (
-    <div className="cnv-metrics">
-      {metrics.slice(0, 8).map((m) => (
-        <article key={m.label} className={`state-${m.state ?? "healthy"}`}>
-          <small>{m.label}</small>
-          <strong>
-            {m.value}
-            {m.unit}
-          </strong>
-          {m.trend != null && (
-            <span>
-              {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
-            </span>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
 
 // ── Entity Detail Drawer ─────────────────────────────────────
 

@@ -112,12 +112,26 @@ tagSchemaId(EdgeSchema, "Edge");
 
 // ── Helper components ─────────────────────────────────────────
 
-function Surface({
+/**
+ * The panel chrome every visual component renders inside.
+ *
+ * Exported because the dashboard shell needs it too. Plan Task 5.2 called for
+ * deleting the duplicate `VisualPanel`/`MetricStrip` in
+ * src/components/dashboard.tsx and importing these instead; that task was
+ * skipped, so the shell kept rendering its own older copies and none of the
+ * Phase 5 surface treatment reached the pages you actually navigate.
+ *
+ * `badge` is an optional slot rendered before the state pill — the shell uses
+ * it to mark a panel as sample data.
+ */
+export function Surface({
   title,
   subtitle,
   state = "healthy",
   surfaceStyle,
   gridSpan,
+  badge,
+  className,
   children,
 }: {
   title: string;
@@ -125,19 +139,53 @@ function Surface({
   state?: string;
   surfaceStyle?: SurfaceStyle | undefined;
   gridSpan?: GridSpan | undefined;
+  badge?: React.ReactNode;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className={surfaceClass(state, surfaceStyle, gridSpan)}>
+    <section className={`${surfaceClass(state, surfaceStyle, gridSpan)}${className ? ` ${className}` : ""}`}>
       <header className="cnv-head">
         <div>
           <h3>{title}</h3>
           {subtitle && <small>{subtitle}</small>}
         </div>
-        <span className="cnv-badge">{state}</span>
+        <div className="cnv-badges">
+          {badge}
+          <span className="cnv-badge">{state}</span>
+        </div>
       </header>
       {children}
     </section>
+  );
+}
+
+/**
+ * The KPI row. Extracted so MetricStrip and the dashboard shell render the
+ * exact same markup instead of maintaining two copies that drift.
+ */
+export function Metrics({
+  metrics,
+}: {
+  metrics: Array<{ label: string; value: string | number; unit?: string; trend?: number }>;
+}) {
+  return (
+    <div className="cnv-metrics">
+      {metrics.slice(0, 6).map((m, i) => (
+        <article key={i}>
+          <small>{m.label}</small>
+          <strong>
+            {m.value}
+            {m.unit}
+          </strong>
+          {m.trend != null && (
+            <span>
+              {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
+            </span>
+          )}
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -171,15 +219,7 @@ export const MetricStrip = defineComponent({
     if (!props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Metrics"} state={props.state}><NoData label="No metrics" /></Surface>;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state}>
-        <div className="cnv-metrics">
-          {props.metrics.slice(0, 6).map((m, i) => (
-            <article key={i}>
-              <small>{m.label}</small>
-              <strong>{m.value}{m.unit}</strong>
-              {m.trend != null && <span>{m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%</span>}
-            </article>
-          ))}
-        </div>
+        <Metrics metrics={props.metrics} />
       </Surface>
     );
   },
