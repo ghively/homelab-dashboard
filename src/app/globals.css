@@ -90,6 +90,20 @@ body::before {
     url("/backdrop.webp") center / cover no-repeat;
 }
 
+/* On a portrait viewport the landscape backdrop covers by height and crops to
+   about a QUARTER of its width — you lose most of the artwork and see a narrow
+   vertical slice. The portrait cut of the same artwork is the right shape for
+   that screen: it shows ~80% of its width instead, and downscales rather than
+   upscales. Swapped by orientation, not by width, because that is the actual
+   condition. */
+@media (orientation: portrait) {
+  body::before {
+    background:
+      linear-gradient(rgba(11, 11, 14, 0.18), rgba(11, 11, 14, 0.42)),
+      url("/backdrop-portrait.webp") center / cover no-repeat;
+  }
+}
+
 /* Everything else sits above the ambient field. */
 .dash-root { position: relative; z-index: 1; }
 
