@@ -11,6 +11,7 @@
  * - GET /System/Info (server info)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -130,9 +131,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.ProductionYear?.toString(),
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         value: item.CommunityRating,
         state: "healthy",
         meta: {
@@ -196,9 +197,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.ProductionYear?.toString(),
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         progress: item.UserData?.PlayedPercentage
           ? item.UserData.PlayedPercentage / 100
           : undefined,
@@ -246,9 +247,9 @@ export class EmbyAdapter {
         id: session.Id,
         label: session.NowPlayingItem?.Name || "Unknown",
         subtitle: session.NowPlayingItem?.Type,
-        image: session.NowPlayingItem?.ImageTags?.Primary
+        image: proxyImage("emby", session.NowPlayingItem?.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${session.NowPlayingItem.Id}/Images/Primary?tag=${session.NowPlayingItem.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         progress: session.PlayState?.PositionTicks && session.NowPlayingItem?.RunTimeTicks
           ? session.PlayState.PositionTicks / session.NowPlayingItem.RunTimeTicks
           : undefined,
@@ -391,9 +392,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.ProductionYear?.toString(),
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         state: "healthy",
         meta: {
           unplayedCount: item.UserData?.UnplayedItemCount,
@@ -453,9 +454,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.Genres?.[0],
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         state: "healthy",
         meta: {
           albumArtist: item.AlbumArtist,

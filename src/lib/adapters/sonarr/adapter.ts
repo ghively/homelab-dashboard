@@ -11,6 +11,7 @@
  * - GET /api/v3/diskspace (disk usage)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -114,7 +115,7 @@ export class SonarrAdapter {
         id: s.id.toString(),
         label: s.title,
         subtitle: s.year?.toString(),
-        image: s.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", s.images?.find((img) => img.coverType === "poster")?.url),
         value: s.year,
         state: s.monitored ? "healthy" : "warning",
         group: s.status,
@@ -186,7 +187,7 @@ export class SonarrAdapter {
         id: item.id.toString(),
         label: item.series?.title || "Unknown Series",
         subtitle: `S${item.episode?.seasonNumber}E${item.episode?.episodeNumber}`,
-        image: item.series?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         state: "critical",
         group: item.airDate,
         meta: {
@@ -240,7 +241,7 @@ export class SonarrAdapter {
         id: item.id.toString(),
         label: item.title,
         subtitle: item.episode?.title || item.series?.title,
-        image: item.series?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         value: item.size,
         progress: item.sizeleft ? 1 - item.sizeleft / item.size : undefined,
         state: item.status === "downloading" ? "loading" : item.status === "completed" ? "healthy" : "warning",
@@ -322,7 +323,7 @@ export class SonarrAdapter {
         id: item.id.toString(),
         label: item.series?.title || "Unknown Series",
         subtitle: `S${item.seasonNumber}E${item.episodeNumber}: ${item.title}`,
-        image: item.series?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         state: item.hasFile ? "healthy" : "warning",
         group: item.airDate,
         meta: {
