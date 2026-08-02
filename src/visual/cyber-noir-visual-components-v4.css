@@ -130,14 +130,18 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   box-shadow: 0 0 0 1px var(--cnv-series-1), 0 0 22px oklch(0.72 0.16 220 / 0.30);
 }
 /* gl-state ties the glow to the panel's health — a critical panel glows red. */
-.cnv-surface.gl-state.state-healthy  { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-healthy) 18%, transparent), 0 0 16px color-mix(in srgb, var(--cnv-healthy) 12%, transparent); }
-.cnv-surface.gl-state.state-warning,
-.cnv-surface.gl-state.state-stale    { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-warning) 22%, transparent), 0 0 18px color-mix(in srgb, var(--cnv-warning) 15%, transparent); }
-.cnv-surface.gl-state.state-critical,
-.cnv-surface.gl-state.state-denied   { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-critical) 28%, transparent), 0 0 20px color-mix(in srgb, var(--cnv-critical) 18%, transparent); }
-.cnv-surface.gl-state.state-offline,
-.cnv-surface.gl-state.state-empty,
-.cnv-surface.gl-state.state-loading  { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 14px rgba(255, 255, 255, 0.05); }
+.cnv-surface.gl-state.state-healthy  { box-shadow: 0 0 18px oklch(0.75 0.17 155 / 0.28); }
+.cnv-surface.gl-state.state-warning  { box-shadow: 0 0 20px oklch(0.82 0.15 85 / 0.34); }
+.cnv-surface.gl-state.state-critical { box-shadow: 0 0 24px oklch(0.65 0.22 25 / 0.42); }
+.cnv-surface.gl-state.state-offline  { box-shadow: 0 0 16px oklch(0.55 0.02 265 / 0.34); }
+.chat-rendered .cnv-surface.gl-state.state-healthy  { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-healthy) 18%, transparent), 0 0 16px color-mix(in srgb, var(--cnv-healthy) 12%, transparent); }
+.chat-rendered .cnv-surface.gl-state.state-warning,
+.chat-rendered .cnv-surface.gl-state.state-stale    { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-warning) 22%, transparent), 0 0 18px color-mix(in srgb, var(--cnv-warning) 15%, transparent); }
+.chat-rendered .cnv-surface.gl-state.state-critical,
+.chat-rendered .cnv-surface.gl-state.state-denied   { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-critical) 28%, transparent), 0 0 20px color-mix(in srgb, var(--cnv-critical) 18%, transparent); }
+.chat-rendered .cnv-surface.gl-state.state-offline,
+.chat-rendered .cnv-surface.gl-state.state-empty,
+.chat-rendered .cnv-surface.gl-state.state-loading  { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 14px rgba(255, 255, 255, 0.05); }
 
 /* ── Motion ──────────────────────────────────────────────────────────── */
 .cnv-surface {
@@ -150,7 +154,8 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
-.cnv-clickable {
+.cnv-clickable { transition: background-color 120ms ease; }
+.chat-rendered .cnv-clickable {
   transition: background-color 120ms ease, transform 160ms var(--ease-out-quart);
 }
 
@@ -187,9 +192,6 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
    nothing now match the cards Gene liked. */
 
 .cnv-surface {
-  --cnv-surface-bloom: color-mix(in srgb, var(--cnv-series-1) 13%, transparent);
-  position: relative;
-  isolation: isolate;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-neutral);
   border-radius: 14px;
@@ -200,32 +202,37 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
 }
-.cnv-surface.state-healthy  { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-healthy) 12%, transparent); }
-.cnv-surface.state-warning,
-.cnv-surface.state-stale    { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-warning) 15%, transparent); }
-.cnv-surface.state-critical,
-.cnv-surface.state-denied   { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-critical) 19%, transparent); }
-.cnv-surface.state-offline,
-.cnv-surface.state-empty,
-.cnv-surface.state-loading  { --cnv-surface-bloom: rgba(255, 255, 255, 0.055); }
-.cnv-surface::before,
-.cnv-surface::after {
+.chat-rendered .cnv-surface {
+  --cnv-surface-bloom: color-mix(in srgb, var(--cnv-series-1) 13%, transparent);
+  position: relative;
+  isolation: isolate;
+}
+.chat-rendered .cnv-surface.state-healthy  { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-healthy) 12%, transparent); }
+.chat-rendered .cnv-surface.state-warning,
+.chat-rendered .cnv-surface.state-stale    { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-warning) 15%, transparent); }
+.chat-rendered .cnv-surface.state-critical,
+.chat-rendered .cnv-surface.state-denied   { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-critical) 19%, transparent); }
+.chat-rendered .cnv-surface.state-offline,
+.chat-rendered .cnv-surface.state-empty,
+.chat-rendered .cnv-surface.state-loading  { --cnv-surface-bloom: rgba(255, 255, 255, 0.055); }
+.chat-rendered .cnv-surface::before,
+.chat-rendered .cnv-surface::after {
   content: "";
   position: absolute;
   pointer-events: none;
   z-index: 0;
 }
-.cnv-surface::before {
+.chat-rendered .cnv-surface::before {
   inset: 0 12% auto;
   height: 42px;
   background: radial-gradient(ellipse at top, var(--cnv-surface-bloom), transparent 72%);
 }
-.cnv-surface::after {
+.chat-rendered .cnv-surface::after {
   inset: 0;
   border-radius: inherit;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.16);
 }
-.cnv-surface > * {
+.chat-rendered .cnv-surface > * {
   position: relative;
   z-index: 1;
 }
@@ -255,15 +262,15 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 /* Match the world card's accent edge so a panel and a card read as one family.
    Driven by state, so the top edge is also the fastest health signal on screen. */
 .cnv-surface.state-healthy  { border-top: 2px solid rgba(0, 255, 0, 0.34); }
-.cnv-surface.state-warning,
-.cnv-surface.state-stale    { border-top: 2px solid rgba(255, 194, 102, 0.42); }
-.cnv-surface.state-critical,
-.cnv-surface.state-denied   { border-top: 2px solid rgba(255, 95, 86, 0.5); }
+.cnv-surface.state-warning  { border-top: 2px solid rgba(255, 194, 102, 0.42); }
+.cnv-surface.state-critical { border-top: 2px solid rgba(255, 95, 86, 0.5); }
 .cnv-surface.state-offline,
 .cnv-surface.state-empty,
 .cnv-surface.state-loading  { border-top: 2px solid rgba(255, 255, 255, 0.12); }
+.chat-rendered .cnv-surface.state-stale  { border-top: 2px solid rgba(255, 194, 102, 0.42); }
+.chat-rendered .cnv-surface.state-denied { border-top: 2px solid rgba(255, 95, 86, 0.5); }
 
-.cnv-surface.cnv-clickable:hover {
+.chat-rendered .cnv-surface.cnv-clickable:hover {
   background: rgba(255, 255, 255, 0.065);
   border-color: rgba(0, 255, 0, 0.34);
   box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.22), 0 12px 34px rgba(0, 0, 0, 0.5);
@@ -681,18 +688,18 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 
 /* A line draws once to establish its direction; its area follows after the
    line is legible. Neither animation changes chart geometry or values. */
-.cnv-chart-line-reveal {
+.chat-rendered .cnv-chart-line-reveal {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: cnv-draw-line 700ms var(--ease-out-quart) forwards;
 }
 
-.cnv-chart-area-reveal {
+.chat-rendered .cnv-chart-area-reveal {
   opacity: 0;
   animation: cnv-fade-area 420ms 180ms ease-out forwards;
 }
 
-.cnv-network-flow {
+.chat-rendered .cnv-network-flow {
   stroke-dasharray: 5 8;
   animation: cnv-flow-dash 1400ms linear infinite;
 }
@@ -772,6 +779,8 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   display: grid;
   place-items: center;
   max-width: 190px;
+}
+.chat-rendered .cnv-capacity > .cnv-ring {
   opacity: 0;
   transform: scale(0.96);
   animation: cnv-reveal-ring 460ms var(--ease-out-quart) forwards;
@@ -839,21 +848,23 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 .cnv-bars article i {
   border-radius: 4px;
   transition: width var(--dur-base) var(--ease-out-quart);
+}
+.chat-rendered .cnv-bars article i {
   transform: scaleX(0);
   transform-origin: left center;
   animation: cnv-reveal-bar 360ms var(--ease-out-quart) forwards;
 }
-.cnv-bars article:nth-child(2) i  { animation-delay: 45ms; }
-.cnv-bars article:nth-child(3) i  { animation-delay: 90ms; }
-.cnv-bars article:nth-child(4) i  { animation-delay: 135ms; }
-.cnv-bars article:nth-child(5) i  { animation-delay: 180ms; }
-.cnv-bars article:nth-child(6) i  { animation-delay: 225ms; }
-.cnv-bars article:nth-child(7) i  { animation-delay: 270ms; }
-.cnv-bars article:nth-child(8) i  { animation-delay: 315ms; }
-.cnv-bars article:nth-child(9) i  { animation-delay: 360ms; }
-.cnv-bars article:nth-child(10) i { animation-delay: 405ms; }
-.cnv-bars article:nth-child(11) i { animation-delay: 450ms; }
-.cnv-bars article:nth-child(12) i { animation-delay: 495ms; }
+.chat-rendered .cnv-bars article:nth-child(2) i  { animation-delay: 45ms; }
+.chat-rendered .cnv-bars article:nth-child(3) i  { animation-delay: 90ms; }
+.chat-rendered .cnv-bars article:nth-child(4) i  { animation-delay: 135ms; }
+.chat-rendered .cnv-bars article:nth-child(5) i  { animation-delay: 180ms; }
+.chat-rendered .cnv-bars article:nth-child(6) i  { animation-delay: 225ms; }
+.chat-rendered .cnv-bars article:nth-child(7) i  { animation-delay: 270ms; }
+.chat-rendered .cnv-bars article:nth-child(8) i  { animation-delay: 315ms; }
+.chat-rendered .cnv-bars article:nth-child(9) i  { animation-delay: 360ms; }
+.chat-rendered .cnv-bars article:nth-child(10) i { animation-delay: 405ms; }
+.chat-rendered .cnv-bars article:nth-child(11) i { animation-delay: 450ms; }
+.chat-rendered .cnv-bars article:nth-child(12) i { animation-delay: 495ms; }
 @keyframes cnv-reveal-bar {
   to { transform: scaleX(1); }
 }
@@ -1043,6 +1054,10 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
    affordance they had. */
 .cnv-clickable {
   border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) var(--ease-out-quart),
+    border-color var(--dur-fast) var(--ease-out-quart);
+}
+.chat-rendered .cnv-clickable {
   transition: background-color var(--dur-fast) var(--ease-out-quart),
     border-color var(--dur-fast) var(--ease-out-quart),
     transform var(--dur-fast) var(--ease-out-quart);
@@ -1312,12 +1327,12 @@ svg .cnv-clickable:focus-visible circle {
 /* Motion marks interactivity, active playback, and critical state. Static
    panels never lift, and status text remains fully legible between pulses. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .cnv-clickable:not(g):hover {
+  .chat-rendered .cnv-clickable:not(g):hover {
     transform: translateY(-2px);
   }
 }
-.cnv-playback-state.is-active,
-.cnv-surface.state-critical .cnv-badge {
+.chat-rendered .cnv-playback-state.is-active,
+.chat-rendered .cnv-surface.state-critical .cnv-badge {
   animation: cnv-live-marker 1800ms ease-in-out infinite;
 }
 @keyframes cnv-live-marker {
@@ -1329,30 +1344,30 @@ svg .cnv-clickable:focus-visible circle {
    reduced. Flow direction remains represented by the dashed link itself. */
 @media (prefers-reduced-motion: reduce) {
   .chat-rendered .cnv-surface,
-  .cnv-chart-line-reveal,
-  .cnv-chart-area-reveal,
-  .cnv-network-flow,
-  .cnv-bars article i,
-  .cnv-capacity > .cnv-ring,
-  .cnv-playback-state.is-active,
-  .cnv-surface.state-critical .cnv-badge {
+  .chat-rendered .cnv-chart-line-reveal,
+  .chat-rendered .cnv-chart-area-reveal,
+  .chat-rendered .cnv-network-flow,
+  .chat-rendered .cnv-bars article i,
+  .chat-rendered .cnv-capacity > .cnv-ring,
+  .chat-rendered .cnv-playback-state.is-active,
+  .chat-rendered .cnv-surface.state-critical .cnv-badge {
     animation: none;
   }
   .chat-rendered .cnv-surface,
-  .cnv-clickable,
-  .cnv-bars article i,
-  .cnv-capacity > .cnv-ring {
+  .chat-rendered .cnv-clickable,
+  .chat-rendered .cnv-bars article i,
+  .chat-rendered .cnv-capacity > .cnv-ring {
     transform: none;
     transition: none;
   }
-  .cnv-chart-line-reveal,
-  .cnv-network-flow {
+  .chat-rendered .cnv-chart-line-reveal,
+  .chat-rendered .cnv-network-flow {
     stroke-dashoffset: 0;
   }
-  .cnv-chart-area-reveal {
+  .chat-rendered .cnv-chart-area-reveal {
     opacity: var(--cnv-chart-area-opacity);
   }
-  .cnv-capacity > .cnv-ring {
+  .chat-rendered .cnv-capacity > .cnv-ring {
     opacity: 1;
   }
 }
