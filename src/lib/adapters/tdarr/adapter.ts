@@ -103,63 +103,82 @@ export class TdarrAdapter {
   async querySystemStatus(): Promise<VisualQueryResult> {
     const start = Date.now();
     try {
-      const status = await this.fetch<TdarrSystemStatus>("/api/v2/status");
+      // /api/v2/status returns ONLY {status, isProduction, os, version,
+      // buildDate, uptime, serverEngine}. The previous version read
+      // workers_online, libraries_count, files_count, total_size and four job
+      // counters off it — none of which exist — so every metric rendered
+      // "undefined" and Total Size rendered NaN. It also called
+      // /api/v2/config/libraries and /api/v2/workers, which both 404.
+      // Verified against Tdarr 2.84.01.
+      //
+      // Worker capacity comes from /api/v2/get-nodes, which returns a map of
+      // node id -> {nodeName, workers, workerLimits, nodePaused}.
+      const status = await this.fetch<{
+        status?: string;
+        version?: string;
+        os?: string;
+        uptime?: number;
+      }>("/api/v2/status");
+
+      interface TdarrNode {
+        nodeName?: string;
+        nodePaused?: boolean;
+        workers?: Record<string, unknown>;
+        workerLimits?: Record<string, number>;
+      }
+
+      let nodes: TdarrNode[] = [];
+      try {
+        const raw = await this.fetch<Record<string, TdarrNode>>("/api/v2/get-nodes");
+        nodes = Object.values(raw ?? {});
+      } catch {
+        // Node list unavailable; server status alone is still real data.
+      }
+
+      const activeWorkers = nodes.reduce(
+        (a, n) => a + Object.keys(n.workers ?? {}).length,
+        0,
+      );
+      const workerCapacity = nodes.reduce(
+        (a, n) => a + Object.values(n.workerLimits ?? {}).reduce((x, y) => x + (y || 0), 0),
+        0,
+      );
+      const pausedNodes = nodes.filter((n) => n.nodePaused).length;
+      const uptimeHours = status.uptime != null ? Math.round(status.uptime / 3600) : undefined;
 
       const now = new Date().toISOString();
 
       const data: VisualData = {
         title: "Tdarr System",
-        subtitle: `v${status.version} - ${status.workers_online} workers online`,
-        state: status.workers_online > 0 ? "healthy" : "warning",
+        subtitle: `v${status.version ?? "unknown"} • ${nodes.length} node(s) • ${activeWorkers} worker(s) active`,
+        state:
+          status.status === "good" && pausedNodes === 0
+            ? "healthy"
+            : pausedNodes > 0
+              ? "warning"
+              : "healthy",
         metrics: [
-          { label: "Version", value: status.version, unit: "" },
+          { label: "Version", value: status.version ?? "unknown" },
+          { label: "Server", value: (status.status ?? "unknown").toUpperCase() },
+          { label: "Nodes", value: nodes.length },
+          { label: "Workers Active", value: activeWorkers },
+          { label: "Worker Capacity", value: workerCapacity },
           {
-            label: "Libraries",
-            value: status.libraries_count,
-            unit: "libraries",
+            label: "Paused Nodes",
+            value: pausedNodes,
+            state: pausedNodes > 0 ? "warning" : "healthy",
           },
-          {
-            label: "Total Files",
-            value: status.files_count,
-            unit: "files",
-          },
-          {
-            label: "Total Size",
-            value: ((status.total_size / 1024 / 1024 / 1024)).toFixed(2),
-            unit: "GB",
-          },
-          {
-            label: "Workers",
-            value: status.workers_online,
-            unit: "online",
-          },
-          {
-            label: "Jobs Queued",
-            value: status.jobs_queued,
-            unit: "jobs",
-            state: status.jobs_queued > 0 ? "loading" : "healthy",
-          },
-          {
-            label: "Jobs Processing",
-            value: status.jobs_processing,
-            unit: "jobs",
-            state: status.jobs_processing > 0 ? "loading" : "healthy",
-          },
-          {
-            label: "Completed Today",
-            value: status.jobs_completed_today,
-            unit: "jobs",
-          },
-          {
-            label: "Failed Today",
-            value: status.jobs_failed_today,
-            unit: "jobs",
-            state: status.jobs_failed_today > 0 ? "critical" : "healthy",
-          },
+          ...(uptimeHours != null
+            ? [{ label: "Uptime", value: uptimeHours, unit: "h" }]
+            : []),
         ],
-        items: [],
-        summary: status.uptime ? `Uptime: ${status.uptime}` : undefined,
-        updatedAt: now,
+        items: nodes.map((n, i) => ({
+          id: n.nodeName ?? `node-${i}`,
+          label: n.nodeName ?? `node ${i}`,
+          subtitle: `${Object.keys(n.workers ?? {}).length} active${n.nodePaused ? " • paused" : ""}`,
+          state: n.nodePaused ? ("warning" as const) : ("healthy" as const),
+          group: "nodes",
+        })),
       };
 
       return {
