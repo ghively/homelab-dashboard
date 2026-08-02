@@ -133,3 +133,82 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   .cnv-surface { animation: none; transition: none; }
   .cnv-clickable { transition: none; }
 }
+
+/* ── Panels adopt the world-card treatment ───────────────────
+   Gene compared the fleet grid against a Prometheus panel and preferred the
+   grid: "I like this style more than this style."
+
+   The difference was never the layout, it was depth. A world card is
+   `rgba(255,255,255,.04)` — the wallpaper reads straight through it, so the
+   card sits IN the scene. A panel was `var(--cnv-panel)`, an opaque fill that
+   covers the artwork and sits ON TOP of it. Then the panel nested a SECOND
+   opaque box for every metric, and card-inside-a-card is what made it read
+   heavy and boxy next to the grid.
+
+   These rules live at the end of this file, not in globals.css, on purpose:
+   Turbopack emits this stylesheet as a LATER chunk than globals even though
+   globals @imports it, so panel overrides written in globals lose silently.
+   Same-file and later is the only ordering that reliably wins.
+
+   The `tr-*` opacity classes still override this — the model can still ask for
+   a heavier surface. This only changes the DEFAULT, so panels that specify
+   nothing now match the cards Gene liked. */
+
+.cnv-surface {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-neutral);
+  border-radius: 14px;
+  /* Blur is what keeps text legible over a busy wallpaper without an opaque
+     fill. Saturation lifts the magenta and cyan that the artwork carries at the
+     margins, so the colour bleeds through the panel instead of dying under it. */
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+}
+
+/* Flatten the inner tiles. They were bordered, opaque, 11px-radius boxes — a
+   full second card per metric. A hairline and a barely-there wash give the same
+   grouping with none of the weight, and the big numerals carry the hierarchy
+   on their own. */
+.cnv-metrics article,
+.cnv-table article,
+.cnv-board section,
+.cnv-flow article,
+.cnv-matrix article,
+.cnv-playback article {
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+}
+
+/* The table keeps its row rules rather than becoming a stack of chips. */
+.cnv-table article {
+  background: none;
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+
+/* Match the world card's accent edge so a panel and a card read as one family.
+   Driven by state, so the top edge is also the fastest health signal on screen. */
+.cnv-surface.state-healthy  { border-top: 2px solid rgba(0, 255, 0, 0.34); }
+.cnv-surface.state-warning  { border-top: 2px solid rgba(255, 194, 102, 0.42); }
+.cnv-surface.state-critical { border-top: 2px solid rgba(255, 95, 86, 0.5); }
+.cnv-surface.state-offline,
+.cnv-surface.state-empty,
+.cnv-surface.state-loading  { border-top: 2px solid rgba(255, 255, 255, 0.12); }
+
+.cnv-surface:hover {
+  background: rgba(255, 255, 255, 0.065);
+  border-color: rgba(0, 255, 0, 0.34);
+  box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.22), 0 12px 34px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  /* Translucency is a preference some people switch off. Fall back to the
+     opaque fill rather than dropping the blur and leaving text on artwork. */
+  .cnv-surface {
+    background: var(--cnv-panel);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
