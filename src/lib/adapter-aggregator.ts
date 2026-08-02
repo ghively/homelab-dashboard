@@ -457,10 +457,21 @@ export function worldSummary(
   results: { adapter: string; result: VisualQueryResult }[],
 ): { state: VisualStateValue; healthy: number; total: number; title: string; subtitle: string } {
   const total = results.length;
+
+  // Rollup severity for a WORLD tile, which is not the same as a panel's state.
+  //
+  // `empty` and `loading` describe a panel with nothing to draw; they say
+  // nothing bad about the service. Ranking them above `healthy` meant one idle
+  // panel dragged a whole world down: SABnzbd with an empty download queue —
+  // the desirable state — made the entire Media world read `empty` on the
+  // landing page while Emby, Sonarr, Radarr and Tdarr were all healthy.
+  //
+  // They now rank alongside `healthy`, so only a real problem (stale, warning,
+  // denied, critical, offline) can degrade a world.
   const stateRank: Record<VisualStateValue, number> = {
     healthy: 0,
-    loading: 1,
-    empty: 1,
+    loading: 0,
+    empty: 0,
     stale: 2,
     warning: 3,
     denied: 4,

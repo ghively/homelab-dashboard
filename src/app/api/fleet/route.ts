@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
   const overallHealthy = worlds.reduce((a, w) => a + w.healthy, 0);
   const overallTotal = worlds.reduce((a, w) => a + w.total, 0);
   const worstStates = worlds.map((w) => w.state);
+  // Same ranking as worldSummary: `empty`/`loading` mean "nothing to draw",
+  // not "something is wrong", so they must not degrade the fleet rollup.
   const stateRank: Record<string, number> = {
-    healthy: 0, loading: 1, empty: 1, stale: 2, warning: 3, denied: 4, critical: 5, offline: 6,
+    healthy: 0, loading: 0, empty: 0, stale: 2, warning: 3, denied: 4, critical: 5, offline: 6,
   };
   const overallState = worstStates.reduce(
     (worst, s) => (stateRank[s] > stateRank[worst] ? s : worst),
