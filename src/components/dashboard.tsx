@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/visual-states";
 import { Surface, Metrics } from "@/visual/components";
-import { Glass } from "@/components/canvasui/Glass";
 import { GlyphRain } from "@/components/canvasui/GlyphRain";
 import { useEffectGate } from "@/components/canvasui/Effect";
 import { DecryptText } from "@/components/decrypt-text";
@@ -220,7 +219,6 @@ export function WorldCard({
   accent,
   onClick,
 }: WorldCardProps) {
-  const glass = useEffectGate();
 
   const card = (
     <button
@@ -249,22 +247,12 @@ export function WorldCard({
     </button>
   );
 
-  if (!glass) return card;
-
-  return (
-    <Glass
-      className="cnv-glass-host dash-world-glass"
-      ior={1.22}
-      blur={0.3}
-      edge={0.45}
-      bevel={0.3}
-      aberration={0.16}
-      shine={0.3}
-      reflection={0.22}
-    >
-      {card}
-    </Glass>
-  );
+  // No Glass wrapper. Every card claimed its own WebGL context, and a fleet
+  // grid plus a page of panels blew past the browser's ~16-context ceiling.
+  // Chrome then killed the oldest contexts and those panels rendered as blank
+  // white boxes. Effects are reserved for the few large elements where one
+  // context buys something; a card gets the CSS glass, which costs nothing.
+  return card;
 }
 
 // ── Quick Tags ───────────────────────────────────────────────
@@ -325,30 +313,18 @@ export function VisualPanel({
   children,
 }: VisualPanelProps) {
   const isFixture = source === "fixture";
-  const glass = useEffectGate();
 
   const panel = (
     <Surface
       title={title}
       {...(subtitle ? { subtitle } : {})}
       state={state}
-      surfaceStyle={
-        glass
-          ? // Real refraction is doing the work, so the CSS translucency and
-            // blur come off — stacking both muddies the result and costs a
-            // backdrop-filter pass for nothing. Elevation and the state glow
-            // stay, since Glass does not provide them.
-            {
-              elevation: "md",
-              ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
-            }
-          : {
-              translucency: "medium",
-              blur: "md",
-              elevation: "md",
-              ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
-            }
-      }
+      surfaceStyle={{
+        translucency: "medium",
+        blur: "md",
+        elevation: "md",
+        ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
+      }}
       {...(isFixture ? { className: "is-fixture" } : {})}
       badge={
         isFixture ? (
@@ -365,22 +341,8 @@ export function VisualPanel({
     </Surface>
   );
 
-  if (!glass) return panel;
-
-  return (
-    <Glass
-      className="cnv-glass-host"
-      ior={1.28}
-      blur={0.4}
-      edge={0.5}
-      bevel={0.35}
-      aberration={0.22}
-      shine={0.35}
-      reflection={0.28}
-    >
-      {panel}
-    </Glass>
-  );
+  // See WorldCard: panels do not claim WebGL contexts.
+  return panel;
 }
 
 // ── Metric Strip ─────────────────────────────────────────────
