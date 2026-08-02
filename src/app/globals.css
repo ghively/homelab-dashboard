@@ -77,8 +77,12 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    /* Darkening veil first so the image never overpowers foreground text. */
-    linear-gradient(rgba(11, 11, 14, 0.55), rgba(11, 11, 14, 0.72)),
+    /* Veil over the image so foreground text is never at risk. Measured rather
+       than guessed: the artwork's centre band, where body copy sits, averages
+       ~16/255 luminance, so a heavy veil would only crush the colour out of the
+       margins. Kept light, and stronger toward the bottom where the amber
+       circuitry is brightest. */
+    linear-gradient(rgba(11, 11, 14, 0.34), rgba(11, 11, 14, 0.60)),
     url("/backdrop.webp") center / cover no-repeat fixed;
 }
 
