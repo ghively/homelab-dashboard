@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Renderer } from "@openuidev/react-lang";
 import { library } from "@/lib/library";
 import { createToolProvider } from "@/lib/tools";
+import { DecryptText } from "@/components/decrypt-text";
 
 // Module-scope toolProvider — built once, shared by every Renderer instance.
 // A new object per render would thrash the query manager (it keys memoization
@@ -105,6 +106,19 @@ export function useGenerativeChat(): UseGenerativeChat {
             }
           }
 
+          // A stream can complete with nothing in `content`: some models put
+          // everything in `reasoning_content` (which is deliberately ignored
+          // here), and a refusal or filter can end the stream empty. Pushing
+          // that as a message renders a blank bubble with no explanation, which
+          // is indistinguishable from a UI bug. Surface it as an error instead.
+          if (!accumulated.trim()) {
+            setError(
+              "The model returned no dashboard code. Try rephrasing, or naming the adapters you want.",
+            );
+            setStreamedResponse("");
+            return;
+          }
+
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: accumulated },
@@ -146,117 +160,185 @@ export function useGenerativeChat(): UseGenerativeChat {
   };
 }
 
-// ── Suggestion prompts ───────────────────────────────────────
+// ── Streaming render ─────────────────────────────────────────
 
-const SUGGESTIONS = [
-  "Show pipeline health",
-  "Show fleet status overview",
-  "Display media server activity",
-  "Show network topology",
-];
+/**
+ * The dashboard mid-generation.
+ *
+ * The WebGL DecryptReveal is gone — it alone among the seven components has no
+ * no-content branch, so with HTML-in-Canvas disabled it had nothing to
+ * scramble. The DOM DecryptText covers the same idea for text, and while a
+ * response is streaming the honest signal is simply that tokens are arriving,
+ * which the role indicator already carries.
+ *
+ * Kept as its own component because the streaming Renderer takes different
+ * props from the settled one — isStreaming, and no onAction, since a partial
+ * tree has nothing stable to click.
+ */
+function StreamingRender({ response }: { response: string }) {
+  return (
+    <Renderer
+      response={response}
+      library={library}
+      toolProvider={toolProvider}
+      isStreaming={true}
+    />
+  );
+}
 
 // ── GenerativeChat component ─────────────────────────────────
 
-export function GenerativeChat() {
+/**
+ * The home page, laid out as a conversation.
+ *
+ * Two states, one component. With no messages the composer sits centred in the
+ * page under a title — the whole screen is an invitation to type, which is the
+ * point of a product whose entire interface is generated from a sentence. Once
+ * a conversation starts the composer docks to the bottom and the thread takes
+ * the space, because from then on the content is what matters.
+ *
+ * Generated dashboards render inline in the thread as real components, not as
+ * code blocks or images: a panel in the transcript is the same live panel a
+ * world view would show, drill-down and all.
+ */
+export function GenerativeChat({ subtitle }: { subtitle?: string }) {
   const chat = useGenerativeChat();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const empty = chat.messages.length === 0 && !chat.isStreaming;
 
-  return (
-    <div className="dash-generative-chat">
-      {/* Conversation history */}
-      {chat.messages.length > 0 && (
-        <div className="dash-chat-history" ref={scrollRef}>
-          {chat.messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`dash-chat-msg dash-chat-msg-${msg.role}`}
-            >
-              <div className="dash-chat-msg-role">
-                {msg.role === "user" ? "You" : "Assistant"}
-              </div>
-              {msg.role === "assistant" ? (
-                <div className="dash-chat-rendered">
-                  <Renderer
-                    response={msg.content}
-                    library={library}
-                    toolProvider={toolProvider}
-                    isStreaming={false}
-                    // Drill-down: clicking a row/card/node sends its label back
-                    // as a follow-up so the model can answer with a detail view.
-                    // Only on settled messages — a live stream is still arriving.
-                    onAction={(event) => chat.sendMessage(event.humanFriendlyMessage)}
-                  />
-                </div>
-              ) : (
-                <div className="dash-chat-text">{msg.content}</div>
-              )}
-            </div>
-          ))}
+  // Follow the stream. Only when already near the bottom, so scrolling up to
+  // read an earlier panel is not yanked back every time a token lands.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 240;
+    if (nearBottom) el.scrollTop = el.scrollHeight;
+  }, [chat.streamedResponse, chat.messages.length]);
 
-          {/* Live streaming response */}
-          {chat.isStreaming && (
-            <div className="dash-chat-msg dash-chat-msg-assistant">
-              <div className="dash-chat-msg-role">
-                Assistant
-                <span className="dash-chat-streaming-dot" />
-              </div>
-              <div className="dash-chat-rendered">
-                <Renderer
-                  response={chat.streamedResponse}
-                  library={library}
-                  toolProvider={toolProvider}
-                  isStreaming={true}
-                />
-              </div>
-            </div>
-          )}
+  // The textarea grows with its content instead of scrolling internally, up to
+  // a cap — a one-line box makes people write one-line prompts.
+  const autoSize = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, []);
+
+  useEffect(autoSize, [chat.inputValue, autoSize]);
+
+  const composer = (
+    <div className={`chat-composer${chat.isStreaming ? " is-streaming" : ""}`}>
+      <textarea
+        ref={inputRef}
+        rows={1}
+        value={chat.inputValue}
+        onChange={(e) => chat.setInputValue(e.target.value)}
+        placeholder="Describe the dashboard you want to see…"
+        onKeyDown={(e) => {
+          // Enter sends; Shift+Enter is a newline. Standard for chat inputs,
+          // and the reason the textarea needs to auto-size at all.
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            if (!chat.isStreaming) chat.sendMessage();
+          }
+        }}
+        aria-label="Describe the dashboard you want to see"
+      />
+      <div className="chat-composer-bar">
+        <div className="chat-composer-hint">
+          <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line
         </div>
-      )}
-
-      {chat.error && (
-        <div className="dash-chat-error">{chat.error}</div>
-      )}
-
-      {/* Input row */}
-      <div className="dash-ai-input-wrap">
-        <input
-          type="text"
-          value={chat.inputValue}
-          onChange={(e) => chat.setInputValue(e.target.value)}
-          placeholder="Ask in natural language: 'Show me how gh-vps connects to caddy'"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") chat.sendMessage();
-          }}
-          disabled={chat.isStreaming}
-        />
         {chat.isStreaming ? (
-          <button onClick={chat.stop} className="dash-chat-stop-btn">
+          <button className="chat-send is-stop" onClick={chat.stop} aria-label="Stop generating">
+            <span className="chat-stop-glyph" aria-hidden="true" />
             Stop
           </button>
         ) : (
-          <button onClick={() => chat.sendMessage()}>Send →</button>
+          <button
+            className="chat-send"
+            onClick={() => chat.sendMessage()}
+            disabled={!chat.inputValue.trim()}
+            aria-label="Send"
+          >
+            Generate <span aria-hidden="true">→</span>
+          </button>
         )}
       </div>
+    </div>
+  );
 
-      {/* Suggestion chips */}
-      {chat.messages.length === 0 && (
-        <div className="dash-chat-suggestions">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              className="dash-tag"
-              onClick={() => chat.sendMessage(s)}
-            >
-              {s}
-            </button>
-          ))}
+  return (
+    <div className={`chat-shell${empty ? " is-empty" : ""}`}>
+      <div className="chat-scroll" ref={scrollRef}>
+        {empty ? (
+          <div className="chat-welcome">
+            <div className="chat-welcome-mark" aria-hidden="true">◉</div>
+            <h1>
+              <DecryptText text="What do you want to see?" duration={1100} />
+            </h1>
+            <p className="chat-welcome-sub">
+              {subtitle ?? "Describe a dashboard in plain language and it is generated live."}
+            </p>
+
+            {composer}
+
+          </div>
+        ) : (
+          <div className="chat-thread">
+            {chat.messages.map((msg, i) => (
+              <article key={i} className={`chat-msg chat-msg-${msg.role}`}>
+                <div className="chat-msg-role">
+                  {msg.role === "user" ? "You" : "Visual OS"}
+                </div>
+                {msg.role === "assistant" ? (
+                  <div className="chat-rendered">
+                    <Renderer
+                      response={msg.content}
+                      library={library}
+                      toolProvider={toolProvider}
+                      isStreaming={false}
+                      // Drill-down: clicking a row/card/node sends its label
+                      // back as a follow-up so the model can answer with a
+                      // detail view. Only on settled messages — a live stream
+                      // is still arriving.
+                      onAction={(event) => chat.sendMessage(event.humanFriendlyMessage)}
+                    />
+                  </div>
+                ) : (
+                  <div className="chat-msg-text">{msg.content}</div>
+                )}
+              </article>
+            ))}
+
+            {chat.isStreaming && (
+              <article className="chat-msg chat-msg-assistant">
+                <div className="chat-msg-role">
+                  Visual OS
+                  <span className="chat-streaming-dot" aria-hidden="true" />
+                </div>
+                <div className="chat-rendered">
+                  <StreamingRender response={chat.streamedResponse} />
+                </div>
+              </article>
+            )}
+          </div>
+        )}
+
+        {chat.error && <div className="chat-error">{chat.error}</div>}
+      </div>
+
+      {/* Docked composer, only once a conversation exists. In the empty state
+          the same element lives inside the welcome block instead, so it reads
+          as the centre of the page rather than as a footer. */}
+      {!empty && (
+        <div className="chat-dock">
+          {composer}
+          <button className="chat-clear" onClick={chat.clear}>
+            New dashboard
+          </button>
         </div>
-      )}
-
-      {chat.messages.length > 0 && (
-        <button className="dash-chat-clear" onClick={chat.clear}>
-          Clear conversation
-        </button>
       )}
     </div>
   );

@@ -6,6 +6,7 @@ import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const COMFYUI_URL = process.env.COMFYUI_URL || "http://gh-nvidia:8188";
 
@@ -44,7 +45,7 @@ class ComfyUIAdapter implements DataAdapter {
 
   async health(): Promise<FreshnessInfo> {
     try {
-      await fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(5000) });
+      await fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) });
     } catch {
       // Unreachable — freshness still records the endpoint queried.
     }
@@ -59,8 +60,8 @@ class ComfyUIAdapter implements DataAdapter {
 
     try {
       const [statsRes, queueRes] = await Promise.all([
-        fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(8000) }),
-        fetch(`${COMFYUI_URL}/queue`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
+        fetch(`${COMFYUI_URL}/queue`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
       ]);
       if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
 

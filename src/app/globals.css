@@ -1,35 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "./design-tokens.css";
 @import "../visual/cyber-noir-visual-components-v4.css";
 
 /* ═══ Dashboard Shell ═══════════════════════════════════════════ */
 :root {
-  --dash-bg: #0b0d12;
-  --dash-sidebar: #11141c;
-  --dash-panel: #171a23;
-  --dash-panel2: #20242e;
-  --dash-line: #2a2e3a;
-  --dash-text: #f2f4fa;
-  --dash-muted: #9299a9;
-  --dash-accent: #27d7f2;
-  --state-healthy: #29e39b;
-  --state-warning: #ffc266;
-  --state-critical: #ff6b6b;
-  --state-offline: #6b7280;
-  --state-stale: #9299a9;
-  --state-loading: #27d7f2;
-  --state-empty: #9299a9;
-  --state-denied: #ff6b6b;
+  /* ------------------------------------------------------------------
+     Dashboard tokens, remapped onto the Cyber-Noir design system.
+
+     These names are used throughout the dashboard's CSS. Rather than
+     rewrite every rule, each one now resolves to a design-system token, so
+     the whole surface adopts the system at once: JetBrains Mono, the
+     #16161b mocha ground, glass panels, neon accents, and the uniform 10px
+     radius. The previous values were an unrelated palette (#0b0d12 ground,
+     #27d7f2 accent, Inter) that predated the design system.
+     ------------------------------------------------------------------ */
+  --dash-bg: var(--bg-dark);
+  --dash-sidebar: var(--bg-mantle);
+  --dash-panel: var(--bg-glass);
+  --dash-panel2: var(--bg-glass-strong);
+  --dash-line: var(--border-neutral);
+  --dash-text: var(--text-primary);
+  --dash-muted: var(--text-dim);
+  --dash-accent: var(--neon-green);
+
+  /* Status semantics borrow the window-dot hues; healthy is the phosphor
+     accent, and the "nothing to report" states share the muted text tone. */
+  --state-healthy: var(--neon-green);
+  --state-warning: var(--dot-yellow);
+  --state-critical: var(--dot-red);
+  --state-offline: var(--text-mute);
+  --state-stale: var(--text-dim);
+  --state-loading: var(--neon-cyan);
+  --state-empty: var(--text-mute);
+  --state-denied: var(--dot-red);
+}
+
+/* One true radius — the shell previously mixed 8/10/12/14px. */
+.dash-hero,
+.dash-world-card,
+.dash-drawer,
+.dash-empty-filter,
+.cnv-surface {
+  border-radius: var(--radius);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
+  /* `html` carries the base colour; `body` is made transparent immediately
+     below so the fixed wallpaper can sit between the two. */
   background: var(--dash-bg);
   color: var(--dash-text);
-  font: 14px Inter, system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
+  /* The design system is monospace throughout. This was previously the `font`
+     SHORTHAND naming Inter, which sits later in the file than any
+     font-family rule and silently reset the face — JetBrains Mono was loading
+     and then being discarded. Use longhands so nothing resets the family. */
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: var(--lh-base);
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Ambient ground ──────────────────────────────────────────
+   Glass only reads as glass when there is something behind it to blur and
+   saturate; against a flat fill a translucent panel is just a slightly
+   different flat.
+
+   backdrop.webp carries colour at the edges and stays dark through the middle,
+   which is exactly where the content sits — so panels pick up magenta, cyan and
+   amber at the margins without ever fighting the text. Fixed to the viewport so
+   panels travel across it on scroll. 40 KB, resized to 1600px: it lives behind
+   blurred glass and never needs to be sharp. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  /* BEHIND the content, not merely at its level.
+     At `z-index: 0` this is still a POSITIONED element, and CSS paints
+     positioned boxes after every static in-flow box — so the wallpaper covered
+     any page that did not explicitly lift itself above it. `.dash-root` did;
+     a plain `<main>` (the /lab page) did not, and its headings, banner and
+     borders were painted underneath an opaque image. Only the Canvas UI
+     wrappers survived, because each one establishes its own stacking context.
+     Negative z-index puts the wallpaper below all content unconditionally, so
+     a new page is correct without having to know this rule exists. This works
+     only because `body` is transparent above: an opaque background on body
+     paints AFTER its own negative-z-index children and would hide this. */
+  z-index: -1;
+  pointer-events: none;
+  background:
+    /* Veil over the image so foreground text is never at risk. Measured rather
+       than guessed: the artwork's centre band, where body copy sits, averages
+       ~16/255 luminance, so a heavy veil would only crush the colour out of the
+       margins. Kept light, and stronger toward the bottom where the amber
+       circuitry is brightest. */
+    linear-gradient(rgba(11, 11, 14, 0.18), rgba(11, 11, 14, 0.42)),
+    /* No `fixed` attachment: this pseudo-element is ALREADY position:fixed, so
+       it adds nothing, and on mobile it promotes the image to its own
+       compositing layer that many browsers rasterise at reduced resolution —
+       a common and very visible source of background blur. */
+    url("/backdrop.webp") center / cover no-repeat;
+}
+
+/* On a portrait viewport the landscape backdrop covers by height and crops to
+   about a QUARTER of its width — you lose most of the artwork and see a narrow
+   vertical slice. The portrait cut of the same artwork is the right shape for
+   that screen: it shows ~80% of its width instead, and downscales rather than
+   upscales. Swapped by orientation, not by width, because that is the actual
+   condition. */
+@media (orientation: portrait) {
+  body::before {
+    background:
+      linear-gradient(rgba(11, 11, 14, 0.18), rgba(11, 11, 14, 0.42)),
+      url("/backdrop-portrait.webp") center / cover no-repeat;
+  }
+}
+
+/* body must not paint its own background, or it would cover the negative
+   z-index wallpaper above. `html` already supplies the base colour, so the
+   page still has a solid ground while the image loads. */
+body { background: transparent; }
+
+/* The dashboard shell keeps its own stacking context: the sidebar wallpaper,
+   waybar and entity drawer all layer within it. It no longer needs to escape
+   the backdrop — the backdrop is behind everything now — but the context is
+   still what those children position against. */
+.dash-root { position: relative; z-index: 1; }
 
 .dash-root {
   display: flex;
@@ -41,11 +138,27 @@ html, body {
 .dash-sidebar {
   width: 240px;
   min-width: 240px;
-  background: var(--dash-sidebar);
   border-right: 1px solid var(--dash-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Wallpaper is pre-cropped to a 1:3.7 strip matching this column's shape, at
+     the source's native pixels — see scripts/ notes. Two things were making it
+     look low-resolution:
+
+     `100% 100%` squashed a 900x1599 image into a ~240x1080 column, compressing
+     it 2.5x more horizontally than vertically. The mesh smeared into vertical
+     streaks, which reads as blur rather than as distortion.
+
+     `cover` on the un-cropped portrait would instead have thrown away ~60% of
+     the width and kept only the dark centre band. Cropping at source solves
+     both: the aspect already matches, so cover neither stretches nor discards
+     anything meaningful. */
+  position: relative;
+  background:
+    linear-gradient(rgba(11, 11, 14, 0.34), rgba(11, 11, 14, 0.52)),
+    url("/sidebar.webp") center / cover no-repeat,
+    var(--dash-sidebar);
 }
 
 .dash-brand {
@@ -138,8 +251,21 @@ html, body {
 /* ── Main Content ───────────────────────────────────────────── */
 .dash-main {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 24px 32px;
+}
+
+/* The chat owns its own scrolling and its own edges: the composer docks to the
+   bottom of the viewport and the thread scrolls behind it, which cannot work
+   while the parent is also a scroll container with padding. Scoped with :has()
+   rather than a prop on DashboardShell, so the shell stays unaware of what it
+   is hosting and every other page keeps the padded, scrolling main it wants. */
+.dash-main:has(> .chat-shell) {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Demo Data Banner ───────────────────────────────────────── */
@@ -660,3 +786,942 @@ html, body {
 }
 
 .dash-chat-clear:hover { color: var(--dash-text); }
+
+/* ── Data-provenance badge ───────────────────────────────────── */
+/* A panel showing sample data must never look like a panel showing live data.
+   The dashed border and amber badge make an unconfigured service obvious at a
+   glance, so a demo value is never mistaken for a real one. */
+.cnv-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cnv-badge-fixture {
+  border-color: rgba(255, 194, 102, 0.45);
+  color: #ffc266;
+  background: rgba(255, 194, 102, 0.1);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.cnv-surface.is-fixture {
+  border-style: dashed;
+  border-color: rgba(255, 194, 102, 0.32);
+}
+
+/* Drawer provenance: sample data must read as sample data here too, not just
+   on the panel it was opened from. */
+.dash-drawer-fixture {
+  color: #ffc266;
+}
+
+/* ── Empty filter state ──────────────────────────────────────── */
+/* Shown when a saved view or tag filters everything out. Without this the grid
+   just renders blank, which reads as a broken page rather than "nothing to
+   report" — and "Alerts" on a healthy world hits this constantly. */
+.dash-empty-filter {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  border: 1px dashed var(--dash-line);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--dash-muted);
+}
+
+.dash-empty-filter strong {
+  color: var(--dash-text);
+  font-size: 15px;
+}
+
+.dash-empty-filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dash-empty-filter-actions button {
+  background: transparent;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  padding: 7px 14px;
+  color: var(--dash-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dash-empty-filter-actions button:hover {
+  border-color: var(--dash-accent);
+}
+
+/* Quick Access filters are real <button>s now, not decorative spans, so they
+   need the button reset. `.dash-tag.active` above already covers the styling. */
+button.dash-tag {
+  cursor: pointer;
+  font: inherit;
+}
+
+/* ── Chat-first landing ──────────────────────────────────────── */
+/* The generative chat is the product, not a widget inside a sub-tab. This gives
+   it the weight of a primary surface: a large prompt, a roomy input, and the
+   generated dashboard rendering directly beneath it. */
+.dash-hero-chat h1 {
+  font-size: 28px;
+  margin: 0 0 6px;
+}
+
+.dash-hero-chat p {
+  max-width: 62ch;
+}
+
+.dash-generative-chat {
+  margin-bottom: 28px;
+}
+
+/* The ask box is the main call to action on the page. */
+.dash-generative-chat .dash-ai-input-wrap input {
+  padding: 16px 18px;
+  font-size: 15px;
+}
+
+.dash-generative-chat .dash-ai-input-wrap button {
+  padding: 16px 28px;
+}
+
+/* Generated dashboards need room to breathe under the prompt. */
+.dash-chat-rendered {
+  margin-top: 10px;
+}
+
+/* ============================================================
+   Design-system component adoption
+   ------------------------------------------------------------
+   Ported from the "Gene Hively Cyber-Noir Design System" project:
+   preview/components-window-header.html, components-buttons.html,
+   components-tags.html.
+
+   The JSX in that project's ui_kits/portfolio is not importable here — it
+   assumes React as a global, registers itself on `window`, and hardcodes
+   portfolio navigation. What transfers is the component SPEC, applied to the
+   class names this app already renders.
+   ============================================================ */
+
+/* ── Window chrome (preview/components-window-header.html) ───── */
+.cnv-surface {
+  box-shadow: var(--shadow-window);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.cnv-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 15px;
+  /* Was an opaque var(--bg-mantle) band bleeding to the panel edges, which
+     made sense while panels were opaque too. Against a translucent panel it
+     became the one solid block interrupting the wallpaper — a dark strip
+     across artwork that reads through everywhere else. A faint wash keeps the
+     header separated from the body without breaking the glass. */
+  background: rgba(255, 255, 255, 0.035);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin: -16px -16px 14px;          /* bleed to the panel edges */
+}
+
+/* Title is cyan and sits after the dots, per the spec. */
+.cnv-head-title { min-width: 0; }
+
+.cnv-head-title h3 {
+  margin: 0;
+  color: var(--neon-cyan);
+  font-size: var(--fs-md);
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.cnv-head-title small {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.cnv-badges { margin-left: auto; flex: none; }
+
+/* ── CMD buttons (preview/components-buttons.html) ───────────── */
+.dash-empty-filter-actions button,
+.dash-ai-input-wrap button {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  border-radius: var(--radius);
+  border: 1px solid var(--neon-green);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--neon-green);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out-quart);
+}
+
+.dash-empty-filter-actions button:hover,
+.dash-ai-input-wrap button:hover {
+  background: var(--neon-green);
+  color: #000;
+  box-shadow: var(--glow-green-lg);
+  opacity: 1;
+}
+
+/* ── Tags (preview/components-tags.html) ─────────────────────── */
+.dash-tag {
+  font-size: 0.78rem;
+  color: var(--neon-purple);
+  border: 1px solid var(--border-purple-30);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+}
+
+.dash-tag:hover,
+.dash-tag.active {
+  color: var(--neon-purple);
+  border-color: var(--neon-purple);
+  box-shadow: var(--glow-purple-sm);
+  background: transparent;
+}
+
+/* ============================================================
+   Alignment with themes/cyber-noir.html
+   ------------------------------------------------------------
+   Ported from the dashboard theme in the "gh-nvidia Homelab Dashboard"
+   design project. Values are taken from that mockup, not invented.
+   ============================================================ */
+
+/* ── Waybar prompt bar ───────────────────────────────────────
+   The most distinctive element of the theme: a sticky terminal prompt
+   across the top with a blinking cursor and a clock. */
+.dash-waybar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--border-neutral);
+  padding: 10px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-size: 0.82rem;
+}
+
+.dash-waybar-host { color: var(--neon-green); font-weight: 700; }
+
+.dash-waybar-prompt {
+  flex: 1;
+  color: var(--text-dim);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-waybar-prompt .p { color: var(--neon-purple); }
+
+.dash-waybar-clock {
+  color: var(--neon-cyan);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.dash-cursor {
+  display: inline-block;
+  color: var(--neon-green);
+  animation: dash-blink 1s step-end infinite;
+}
+
+@keyframes dash-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Section headings ────────────────────────────────────────
+   Gene's h2 pattern — cyan on a purple underline. I previously skipped this
+   when vendoring colors_and_type.css, judging it portfolio-only; it is in the
+   dashboard theme too. Scoped to section headers so it cannot disturb panel
+   titles, which are their own thing. */
+.dash-section-header h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--neon-cyan);
+  border-bottom: 2px solid var(--neon-purple);
+  display: inline-block;
+  padding-right: 2rem;
+  padding-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Panel and tile hover ────────────────────────────────────
+   Green rim plus a ring, easing on the design system's curve. */
+.cnv-surface,
+.dash-world-card {
+  transition:
+    border-color var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-fast) var(--ease-out-quart);
+}
+
+.cnv-surface:hover,
+.dash-world-card:hover {
+  border-color: var(--border-green-30);
+  box-shadow: 0 0 0 1px var(--border-green-30), 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.dash-world-card:focus-visible,
+.cnv-surface:focus-within {
+  outline: none;
+  border-color: var(--neon-green);
+  box-shadow: var(--shadow-window-active);
+}
+
+/* ── Panel titlebar ──────────────────────────────────────────
+   Theme centres the title between the dots and the status pill. */
+.cnv-head-title {
+  flex: 1;
+  text-align: center;
+}
+
+/* ── Metric fill track ───────────────────────────────────────
+   Green-to-cyan gradient under any percentage metric. */
+.cnv-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.cnv-track i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+}
+
+/* ── Chat bubbles ────────────────────────────────────────────
+   Purple-tinted for you, green-tinted for the assistant. */
+.dash-chat-msg-user .dash-chat-text {
+  align-self: flex-end;
+  border: 1px solid var(--border-neutral-strong);
+  background: rgba(128, 0, 255, 0.14);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: inline-block;
+}
+
+.dash-chat-msg-assistant .dash-chat-text {
+  border: 1px solid var(--border-green-30);
+  background: rgba(0, 40, 10, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: inline-block;
+}
+
+/* ── World tile icon ─────────────────────────────────────────
+   Theme frames the service glyph in a bordered tile. */
+.dash-world-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-neutral-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-cursor { animation: none; }
+}
+
+/* ============================================================
+   Obsidian treatment, cyber-noir palette
+   ------------------------------------------------------------
+   Gene preferred the Obsidian theme's *styling* over Cyber-Noir's, but wants
+   the Cyber-Noir colours. Obsidian's structural moves are ported here and its
+   indigo accent (#6e7cff) is replaced throughout by the phosphor green/cyan
+   pair. Type stays JetBrains Mono — Obsidian's Space Grotesk + Inter would
+   undo the design system.
+   ============================================================ */
+
+/* ── Signature: pulse hairline ───────────────────────────── */
+.dash-pulse {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dash-pulse i {
+  position: absolute;
+  inset: 0;
+  width: 37%;
+  background: linear-gradient(90deg, transparent, var(--neon-green), var(--neon-cyan));
+  animation: dash-pulse 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes dash-pulse {
+  from { opacity: 0.6; transform: translateX(-8%); }
+  to   { opacity: 1;   transform: translateX(180%); }
+}
+
+/* Panel fills live in cyber-noir-visual-components-v4.css, NOT here: globals
+   @imports that sheet, but Turbopack emits it as a later chunk, so a rule
+   written here loses to the base rule at equal specificity. Overrides in this
+   file silently did nothing. */
+.dash-world-card { background: rgba(255, 255, 255, 0.04); }
+
+/* Hover lifts rather than just glowing. */
+.cnv-surface:hover,
+.dash-world-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(0, 255, 0, 0.42);
+  box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.28), 0 10px 30px rgba(0, 0, 0, 0.55);
+  transform: translateY(-1px);
+}
+
+.cnv-surface,
+.dash-world-card {
+  transition:
+    border-color var(--dur-fast) var(--ease-out-quart),
+    background var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-fast) var(--ease-out-quart);
+}
+
+/* ── Group headers: title · rule · count ─────────────────────
+   Replaces the purple-underline h2 with Obsidian's cleaner arrangement — the
+   rule fills the gap and the count sits right. Uses the existing markup
+   (<h2> followed by <small>) with a generated rule between them. */
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-section-header h2 {
+  order: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  border-bottom: 0;
+  display: inline;
+  padding: 0;
+}
+
+.dash-section-header::after {
+  content: "";
+  order: 1;
+  flex: 1;
+  height: 1px;
+  background: var(--border-neutral);
+}
+
+.dash-section-header small {
+  order: 2;
+  flex: none;
+  font-size: 0.7rem;
+  color: var(--text-mute);
+}
+
+/* ── Status as a glowing dot ─────────────────────────────────
+   Obsidian reads state from an 8px dot rather than a word. Keeps the badge
+   for the exact state but leads with colour. */
+.cnv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cnv-badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  flex: none;
+}
+
+/* ── Icon tiles: tinted, not outlined ────────────────────── */
+.dash-world-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 0;
+  background: rgba(0, 255, 0, 0.12);
+}
+
+/* ── Stat labels ────────────────────────────────────────── */
+.cnv-metrics small {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  font-weight: 600;
+}
+
+.cnv-track { height: 4px; border-radius: 3px; }
+
+/* ── Pill bookmarks / tags ──────────────────────────────── */
+.dash-tag { border-radius: 999px; padding: 6px 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-pulse i { animation: none; }
+  .cnv-surface:hover,
+  .dash-world-card:hover { transform: none; }
+}
+
+/* ============================================================
+   Canvas UI hosts
+   ------------------------------------------------------------
+   These wrappers each mount a WebGL canvas over their children. They must not
+   disturb the grid they sit in, and when the effect is unavailable the wrapper
+   is absent entirely — so every rule here is additive and safe to lose.
+   ============================================================ */
+
+/* Glass wraps a panel; the wrapper has to inherit the panel's grid placement
+   rather than introducing a box of its own. */
+.cnv-glass-host {
+  display: block;
+  min-width: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* The panel inside a glass host drops its own backdrop-filter — real
+   refraction is doing that job, and stacking both is wasted GPU work. */
+.cnv-glass-host .cnv-surface {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Glyph rain sits behind the hero. Corner radius has to match or the canvas
+   squares off the hero's rounded edge. */
+.dash-hero-rain {
+  display: block;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.dash-hero-rain .dash-hero {
+  margin-bottom: 0;
+}
+
+/* Reduced motion is already honoured in useEffectGate — no effect mounts at
+   all — so there is nothing to disable here. This is a backstop for the
+   wrapper elements themselves. */
+@media (prefers-reduced-motion: reduce) {
+  .cnv-glass-host,
+  .dash-hero-rain {
+    animation: none !important;
+  }
+}
+
+/* A glass-wrapped world tile: the wrapper must carry the grid placement and the
+   button inside must fill it, or the tile collapses to content height. */
+.dash-world-glass { height: 100%; }
+.dash-world-glass .dash-world-card {
+  height: 100%;
+  width: 100%;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ═══ Chat-first home ═══════════════════════════════════════════
+   The home page is a conversation, not a dashboard with a search box bolted
+   on. Everything this product does starts with a sentence, so the sentence
+   gets the centre of the screen until there is something better to put there.
+
+   Two states, one layout. Empty: the composer sits mid-page under the title,
+   and the whole viewport reads as an invitation. Active: the composer docks to
+   the bottom and the thread takes the space, because from then on the
+   generated content is the point. */
+
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;                       /* lets .chat-scroll actually scroll */
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-neutral) transparent;
+}
+
+/* ── Empty state ─────────────────────────────────────────────
+   Centred vertically, but biased slightly above the midpoint: optical centre
+   sits higher than geometric centre, and a block pinned to true 50% reads as
+   if it has sagged. */
+.chat-shell.is-empty .chat-scroll {
+  display: grid;
+  place-items: center;
+  padding: 4vh 24px 8vh;
+}
+
+.chat-welcome {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.chat-welcome-mark {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--neon-green);
+  /* The glow is the only place on this screen where the accent is allowed to
+     bloom. Everything else stays hairline, so this reads as the source. */
+  filter: drop-shadow(0 0 14px rgba(0, 255, 0, 0.45));
+  animation: chat-mark-pulse 4s ease-in-out infinite;
+}
+
+@keyframes chat-mark-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
+
+.chat-welcome h1 {
+  font-size: clamp(1.5rem, 3.4vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--text-primary);
+}
+
+.chat-welcome-sub {
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  max-width: 52ch;
+  text-wrap: balance;
+}
+
+/* ── Composer ────────────────────────────────────────────────
+   One bordered well containing the textarea and its action bar, so the whole
+   thing reads as a single control rather than a field with a button beside it.
+   Focus lights the well, not the textarea, for the same reason. */
+.chat-composer {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--border-neutral);
+  border-radius: 16px;
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+  transition:
+    border-color var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-fast) var(--ease-out-quart),
+    background var(--dur-fast) var(--ease-out-quart);
+  overflow: hidden;
+  text-align: left;
+}
+
+.chat-composer:focus-within {
+  border-color: rgba(0, 255, 0, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.25), 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.chat-composer textarea {
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.6;
+  padding: 15px 17px 6px;
+  max-height: 200px;
+}
+
+.chat-composer textarea::placeholder { color: var(--text-mute); }
+
+.chat-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 10px 17px;
+}
+
+.chat-composer-hint {
+  color: var(--text-mute);
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+}
+
+/* Hidden on touch, where there is no Enter key to speak of and the hint is
+   just noise taking a line. */
+@media (pointer: coarse) {
+  .chat-composer-hint { display: none; }
+}
+
+.chat-composer-hint kbd {
+  font: inherit;
+  border: 1px solid var(--border-neutral);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--text-dim);
+}
+
+.chat-send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(0, 255, 0, 0.4);
+  background: rgba(0, 255, 0, 0.11);
+  color: var(--neon-green);
+  border-radius: 9px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    border-color var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.chat-send:hover:not(:disabled) {
+  background: rgba(0, 255, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Disabled rather than hidden: a control that vanishes when the field is empty
+   makes the layout twitch as you type the first character. */
+.chat-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-neutral);
+  color: var(--text-mute);
+  background: none;
+}
+
+.chat-send.is-stop {
+  border-color: rgba(255, 95, 86, 0.45);
+  background: rgba(255, 95, 86, 0.12);
+  color: var(--dot-red);
+}
+
+.chat-stop-glyph {
+  width: 9px;
+  height: 9px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+/* ── Suggestions ─────────────────────────────────────────────
+   Rows, not chips. A chip has to be short enough to fit, which pushes every
+   prompt toward something too generic to demonstrate anything. */
+.chat-suggestions {
+  width: 100%;
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.chat-suggestions-label {
+  color: var(--text-mute);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 0 4px 8px;
+}
+
+.chat-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background var(--dur-fast) var(--ease-out-quart);
+}
+
+.chat-suggestion:hover,
+.chat-suggestion:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  outline: none;
+}
+
+.chat-suggestion strong {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.chat-suggestion:hover strong { color: var(--neon-green); }
+.chat-suggestion small { color: var(--text-mute); font-size: 0.76rem; }
+
+/* ── Thread ──────────────────────────────────────────────────
+   The same max-width as the composer, so the conversation and the control that
+   drives it share one column and the eye never has to re-find the measure. */
+.chat-thread {
+  width: min(860px, 100%);
+  margin: 0 auto;
+  padding: 26px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.chat-msg { display: flex; flex-direction: column; gap: 8px; }
+
+.chat-msg-role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-mute);
+}
+
+.chat-msg-assistant .chat-msg-role { color: var(--neon-green); }
+
+/* The user's own words sit in a bubble; the assistant's answer does not. A
+   generated dashboard is full-width content, and boxing it would put a frame
+   around something that already has its own panels. */
+.chat-msg-user .chat-msg-text {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--border-neutral);
+  border-radius: 12px;
+  padding: 10px 14px;
+  max-width: 90%;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.chat-rendered { display: flex; flex-direction: column; gap: 14px; }
+
+.chat-streaming-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  animation: chat-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes chat-blink {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1; }
+}
+
+.chat-error {
+  width: min(860px, 100%);
+  margin: 12px auto;
+  border: 1px solid rgba(255, 95, 86, 0.4);
+  background: rgba(255, 95, 86, 0.08);
+  color: var(--dot-red);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  font-size: 0.82rem;
+}
+
+/* ── Docked composer ─────────────────────────────────────────
+   A gradient rather than a hard edge, so the thread fades under the dock
+   instead of being sliced by a line. */
+.chat-dock {
+  flex: none;
+  padding: 12px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(to top, rgba(11, 11, 14, 0.92) 55%, transparent);
+}
+
+.chat-dock .chat-composer { width: min(860px, 100%); margin-top: 0; }
+
+.chat-clear {
+  background: none;
+  border: 0;
+  color: var(--text-mute);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.chat-clear:hover { color: var(--neon-green); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-welcome-mark,
+  .chat-streaming-dot { animation: none; }
+  .chat-send:hover:not(:disabled) { transform: none; }
+}
+
+/* ── Sidebar primary action ──────────────────────────────────
+   Deliberately not a nav row. Starting a new dashboard is the most frequent
+   thing anyone does here, and as the first item in a list of destinations it
+   read as one — the accent border and fill mark it as an action instead. */
+.dash-new {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 14px 12px 6px;
+  padding: 9px 12px;
+  border: 1px solid rgba(0, 255, 0, 0.34);
+  background: rgba(0, 255, 0, 0.09);
+  color: var(--neon-green);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.dash-new:hover {
+  background: rgba(0, 255, 0, 0.17);
+  transform: translateY(-1px);
+}
+
+.dash-new-icon { font-size: 1rem; line-height: 1; }
+
+.dash-nav-label {
+  color: var(--text-mute);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 10px 16px 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-new:hover { transform: none; }
+}

@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import {
   DashboardShell,
   Hero,
-  WorldCard,
   QuickTags,
   VisualPanel,
   MetricStrip,
@@ -12,14 +11,18 @@ import {
   SavedViews,
   useWorldData,
   useFleetData,
+  type FleetData,
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
-import { ALL_STATES } from "@/lib/adapter-aggregator";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
 export default function Home() {
   const [activeWorld, setActiveWorld] = useState<WorldId | "home">("home");
+  // Remounts the chat, which is how the conversation is cleared. Chat state
+  // lives inside GenerativeChat, so bumping its key is both the simplest reset
+  // and the one that cannot leave a half-cleared thread behind.
+  const [chatKey, setChatKey] = useState(0);
   const [fixtureState, setFixtureState] = useState<VisualStateValue | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [drawerEntity, setDrawerEntity] = useState<{
@@ -31,20 +34,30 @@ export default function Home() {
     meta?: Record<string, unknown>;
   } | null>(null);
   const [drawerAdapter, setDrawerAdapter] = useState<string | undefined>();
+  const [drawerSource, setDrawerSource] = useState<"live" | "fixture" | "offline" | undefined>();
   const [savedView, setSavedView] = useState("overview");
+
+  // Fetched once here rather than inside LandingPage, because the shell needs
+  // it too: the DEMO DATA banner is a claim about the whole fleet, and the only
+  // thing that knows whether any adapter is live is the fleet endpoint.
+  const { data: fleet, loading: fleetLoading } = useFleetData(fixtureState);
+  const dataSource: "fixture" | "live" | "unknown" = fleetLoading || !fleet
+    ? "unknown"
+    : fleet.overall.live > 0
+      ? "live"
+      : "fixture";
 
   if (activeWorld === "home") {
     return (
       <DashboardShell
         activeWorld={activeWorld}
         onWorldChange={setActiveWorld}
+        onNewChat={() => setChatKey((k) => k + 1)}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
+        dataSource={dataSource}
       >
-        <LandingPage
-          fixtureState={fixtureState}
-          onWorldSelect={setActiveWorld}
-        />
+        <LandingPage key={chatKey} fleet={fleet} />
       </DashboardShell>
     );
   }
@@ -54,15 +67,21 @@ export default function Home() {
       <DashboardShell
         activeWorld={activeWorld}
         onWorldChange={setActiveWorld}
+        onNewChat={() => {
+          setChatKey((k) => k + 1);
+          setActiveWorld("home");
+        }}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
+        dataSource={dataSource}
       >
         <AIWorkspace
           fixtureState={fixtureState}
           activeTag={activeTag}
           onTagClick={setActiveTag}
-          onEntityClick={(entity, adapter) => {
+          onEntityClick={(entity, adapter, source) => {
             setDrawerEntity(entity);
+            setDrawerSource(source);
             setDrawerAdapter(adapter);
           }}
         />
@@ -71,6 +90,7 @@ export default function Home() {
           onClose={() => setDrawerEntity(null)}
           entity={drawerEntity}
           adapterName={drawerAdapter}
+          entitySource={drawerSource}
         />
       </DashboardShell>
     );
@@ -82,6 +102,7 @@ export default function Home() {
       onWorldChange={setActiveWorld}
       fixtureState={fixtureState}
       onFixtureChange={setFixtureState}
+      dataSource={dataSource}
     >
       <WorldView
         world={activeWorld}
@@ -90,8 +111,9 @@ export default function Home() {
         onTagClick={setActiveTag}
         savedView={savedView}
         onSaveView={setSavedView}
-        onEntityClick={(entity, adapter) => {
+        onEntityClick={(entity, adapter, source) => {
           setDrawerEntity(entity);
+          setDrawerSource(source);
           setDrawerAdapter(adapter);
         }}
       />
@@ -100,6 +122,7 @@ export default function Home() {
         onClose={() => setDrawerEntity(null)}
         entity={drawerEntity}
         adapterName={drawerAdapter}
+        entitySource={drawerSource}
       />
     </DashboardShell>
   );
@@ -107,99 +130,65 @@ export default function Home() {
 
 // ── Landing Page (Visual OS Home) ────────────────────────────
 
-function LandingPage({
-  fixtureState,
-  onWorldSelect,
-}: {
-  fixtureState: VisualStateValue | null;
-  onWorldSelect: (w: WorldId) => void;
-}) {
-  const { data, loading } = useFleetData(fixtureState);
 
-  const worldStates = useMemo(() => {
-    if (!data) return {};
-    return Object.fromEntries(data.worlds.map((w) => [w.id, w]));
-  }, [data]);
+function LandingPage({ fleet }: { fleet: FleetData | null }) {
+  const overall = fleet?.overall;
 
-  const overall = data?.overall;
+  /*
+    The home page IS the conversation.
 
+    It previously opened on a hero, then the chat, then a grid of world tiles —
+    so the one thing this product does was the third thing on the page, below
+    two blocks explaining that it existed. Everything here is generated from a
+    sentence, so the sentence gets the screen.
+
+    The worlds did not disappear; they moved to the sidebar, which is where
+    navigation belongs and where it stays reachable from inside a conversation
+    rather than only from the top of the home page. Fleet health rides along as
+    the composer's subtitle, so the context survives without costing a section.
+  */
   return (
-    <>
-      <Hero
-        title="Visual OS"
-        subtitle="Single pane of glass for the homelab fleet — 8 worlds, 60+ adapters, 905 visual components"
-        accent="var(--dash-accent)"
-        metrics={
-          overall
-            ? [
-                { label: "Overall", value: overall.state, state: overall.state },
-                { label: "Adapters", value: overall.total },
-                { label: "Healthy", value: overall.healthy, state: "healthy" },
-                { label: "Worlds", value: overall.worldCount },
-              ]
-            : undefined
-        }
-      />
-
-      <div className="dash-section-header">
-        <h2>Worlds</h2>
-        <small>{loading ? "Loading fleet status..." : "Click a world to drill in"}</small>
-      </div>
-
-      <div className="dash-world-grid">
-        {WORLDS.map((w) => {
-          const ws = worldStates[w.id];
-          return (
-            <WorldCard
-              key={w.id}
-              icon={w.icon}
-              label={w.label}
-              tagline={w.tagline}
-              adapterCount={w.adapters.length}
-              state={ws?.state ?? "loading"}
-              healthy={ws?.healthy ?? 0}
-              total={ws?.total ?? w.adapters.length}
-              accent={w.accent}
-              onClick={() => onWorldSelect(w.id)}
-            />
-          );
-        })}
-      </div>
-
-      <div className="dash-section-header">
-        <h2>Quick Access</h2>
-      </div>
-      <div className="dash-quick-tags">
-        {[
-          "All Healthy",
-          "Warnings",
-          "Critical",
-          "Recently Changed",
-          "Energy Flow",
-          "Network Mesh",
-          "Security Alerts",
-          "AI Spend",
-        ].map((tag) => (
-          <span
-            key={tag}
-            className="dash-tag"
-            style={{ cursor: "default" }}
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      <div className="dash-section-header">
-        <h2>State Fixture Exerciser</h2>
-        <small>All 8 states rendered across sample adapters</small>
-      </div>
-      <FixtureExerciser />
-    </>
+    <GenerativeChat
+      subtitle={
+        overall
+          ? `Live from ${overall.healthy}/${overall.total} reporting adapters · fleet ${overall.state}`
+          : undefined
+      }
+    />
   );
 }
 
+
 // ── World View (generic workspace) ───────────────────────────
+
+/**
+ * Does a panel match a quick-tag? Matches the adapter name, its title/subtitle,
+ * and its metric labels.
+ *
+ * Shared so the AI Workspace and the world views filter identically. The AI
+ * Workspace previously rendered QuickTags but mapped over the unfiltered list,
+ * so clicking a tag there highlighted it and changed nothing.
+ */
+function matchesTag(
+  adapter: string,
+  result: { title?: string; subtitle?: string; metrics?: Array<{ label: string }> },
+  tag: string,
+): boolean {
+  const haystack = `${adapter} ${result.title ?? ""} ${result.subtitle ?? ""} ${(result.metrics ?? [])
+    .map((m) => m.label)
+    .join(" ")}`.toLowerCase();
+  return haystack.includes(tag.toLowerCase());
+}
+
+// States that mean "something needs attention". `empty` and `loading` are
+// deliberately excluded — an idle panel is not an alert.
+const ALERT_STATES = ["warning", "critical", "offline", "stale", "denied"];
+
+// Worst-first ordering for the Detail view, so problems lead.
+const STATE_RANK: Record<string, number> = {
+  offline: 0, critical: 1, denied: 2, warning: 3, stale: 4,
+  loading: 5, empty: 6, healthy: 7,
+};
 
 function WorldView({
   world,
@@ -216,7 +205,11 @@ function WorldView({
   onTagClick: (tag: string) => void;
   savedView: string;
   onSaveView: (id: string) => void;
-  onEntityClick: (entity: Record<string, unknown>, adapter: string) => void;
+  onEntityClick: (
+    entity: Record<string, unknown>,
+    adapter: string,
+    source?: "live" | "fixture" | "offline",
+  ) => void;
 }) {
   const { data, loading } = useWorldData(world, fixtureState);
   const worldConfig = WORLDS.find((w) => w.id === world)!;
@@ -230,13 +223,26 @@ function WorldView({
 
   const filteredResults = useMemo(() => {
     if (!data) return [];
-    if (!activeTag) return data.results;
-    // Simple tag-based filter: show adapters whose name or data matches the tag
-    return data.results.filter(({ adapter, result }) => {
-      const haystack = `${adapter} ${result.title} ${result.subtitle ?? ""} ${(result.metrics ?? []).map((m) => m.label).join(" ")}`.toLowerCase();
-      return haystack.includes(activeTag.toLowerCase());
-    });
-  }, [data, activeTag]);
+    let results = data.results;
+
+    // The saved-view buttons used to be decorative: `savedView` only drove which
+    // button looked active, and the list below never consulted it, so "Health
+    // Only" and "Alerts" rendered exactly the same panels as "Overview".
+    if (savedView === "health") {
+      results = results.filter(({ result }) => result.state === "healthy");
+    } else if (savedView === "alerts") {
+      results = results.filter(({ result }) => ALERT_STATES.includes(String(result.state)));
+    } else if (savedView === "detail") {
+      // Detail sorts worst-first so problems lead, rather than filtering.
+      results = [...results].sort(
+        (a, b) =>
+          (STATE_RANK[String(a.result.state)] ?? 9) - (STATE_RANK[String(b.result.state)] ?? 9),
+      );
+    }
+
+    if (!activeTag) return results;
+    return results.filter(({ adapter, result }) => matchesTag(adapter, result, activeTag));
+  }, [data, activeTag, savedView]);
 
   return (
     <>
@@ -268,6 +274,32 @@ function WorldView({
           <div className="dash-loading-spinner" />
           Loading {worldConfig.label}...
         </div>
+      ) : filteredResults.length === 0 ? (
+        // Now that the saved views actually filter, an empty result is a normal
+        // outcome — "Alerts" on a healthy world is the common case. Say why the
+        // grid is empty and offer the way out, rather than rendering nothing.
+        <div className="dash-empty-filter">
+          <strong>
+            {savedView === "alerts"
+              ? `Nothing needs attention in ${worldConfig.label}.`
+              : savedView === "health"
+                ? `No healthy adapters in ${worldConfig.label}.`
+                : `No adapters match this filter.`}
+          </strong>
+          <small>
+            {activeTag ? `Filtered by tag "${activeTag}".` : null}
+            {activeTag && savedView !== "overview" ? " " : null}
+            {savedView !== "overview" ? `View: ${savedView}.` : null}
+          </small>
+          <div className="dash-empty-filter-actions">
+            {activeTag && (
+              <button onClick={() => onTagClick(activeTag)}>Clear tag</button>
+            )}
+            {savedView !== "overview" && (
+              <button onClick={() => onSaveView("overview")}>Show all</button>
+            )}
+          </div>
+        </div>
       ) : (
         <div className="dash-adapter-grid">
           {filteredResults.map(({ adapter, result }) => (
@@ -275,7 +307,7 @@ function WorldView({
               key={adapter}
               adapterName={adapter}
               result={result}
-              onItemClick={(item) => onEntityClick(item, adapter)}
+              onItemClick={(item) => onEntityClick(item, adapter, result.source)}
             />
           ))}
         </div>
@@ -295,7 +327,11 @@ function AIWorkspace({
   fixtureState: VisualStateValue | null;
   activeTag: string | null;
   onTagClick: (tag: string) => void;
-  onEntityClick: (entity: Record<string, unknown>, adapter: string) => void;
+  onEntityClick: (
+    entity: Record<string, unknown>,
+    adapter: string,
+    source?: "live" | "fixture" | "offline",
+  ) => void;
 }) {
   const { data, loading } = useWorldData("ai", fixtureState);
   const worldConfig = WORLDS.find((w) => w.id === "ai")!;
@@ -332,14 +368,16 @@ function AIWorkspace({
         </div>
       ) : (
         <div className="dash-adapter-grid">
-          {data.results.map(({ adapter, result }) => (
-            <AdapterResultCard
-              key={adapter}
-              adapterName={adapter}
-              result={result}
-              onItemClick={(item) => onEntityClick(item, adapter)}
-            />
-          ))}
+          {data.results
+            .filter(({ adapter, result }) => !activeTag || matchesTag(adapter, result, activeTag))
+            .map(({ adapter, result }) => (
+              <AdapterResultCard
+                key={adapter}
+                adapterName={adapter}
+                result={result}
+                onItemClick={(item) => onEntityClick(item, adapter, result.source)}
+              />
+            ))}
         </div>
       )}
     </>
@@ -362,7 +400,12 @@ function AdapterResultCard({
   const hasNodes = result.nodes && result.nodes.length > 0;
 
   return (
-    <VisualPanel title={result.title} subtitle={result.subtitle} state={result.state}>
+    <VisualPanel
+      title={result.title}
+      subtitle={result.subtitle}
+      state={result.state}
+      source={result.source}
+    >
       {hasMetrics && <MetricStrip metrics={result.metrics!} />}
 
       {hasItems && (
@@ -414,62 +457,16 @@ function AdapterResultCard({
       )}
 
       {!hasItems && !hasMetrics && !hasEvents && !hasNodes && (
-        <div className="dash-loading" style={{ padding: 20 }}>
-          <small>No data to display</small>
+        // Same empty treatment the generated panels use, rather than the
+        // loading spinner's styling reused as a shrug.
+        <div className="cnv-state-nodata" role="status">
+          <span className="cnv-state-glyph" aria-hidden="true">
+            ◌
+          </span>
+          <strong>No data reported</strong>
+          <small>The adapter answered with nothing to show.</small>
         </div>
       )}
     </VisualPanel>
-  );
-}
-
-// ── Fixture Exerciser (all 8 states) ─────────────────────────
-
-function FixtureExerciser() {
-  const sampleAdapters = ["emby", "prometheus", "synology-dsm", "wazuh-manager"];
-
-  return (
-    <div className="dash-fixture-grid">
-      {ALL_STATES.map((state) => (
-        <div key={state} className="dash-fixture-cell">
-          <div className="dash-fixture-cell-head">
-            <h5>State: {state}</h5>
-            <span className={`cnv-badge state-${state}`}>{state}</span>
-          </div>
-          {sampleAdapters.map((adapter) => (
-            <FixtureStatePreview key={adapter} adapter={adapter} state={state} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FixtureStatePreview({
-  adapter,
-  state,
-}: {
-  adapter: string;
-  state: VisualStateValue;
-}) {
-  const [result, setResult] = useState<VisualQueryResult | null>(null);
-
-  useMemo(() => {
-    fetch(`/api/adapters?adapter=${adapter}&state=${state}`)
-      .then((r) => r.json())
-      .then((d) => setResult(d.result))
-      .catch(() => setResult(null));
-  }, [adapter, state]);
-
-  if (!result) return null;
-
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <small style={{ color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>
-        {adapter}
-      </small>
-      <div className={`state-${result.state}`} style={{ fontSize: 12 }}>
-        {result.title}
-      </div>
-    </div>
   );
 }

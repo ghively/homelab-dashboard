@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
-import { ALL_STATES } from "@/lib/adapter-aggregator";
+import { ALL_STATES } from "@/lib/visual-states";
+import { Surface, Metrics } from "@/visual/components";
+import { GlyphRain } from "@/components/canvasui/GlyphRain";
+import { useEffectGate } from "@/components/canvasui/Effect";
+import { DecryptText } from "@/components/decrypt-text";
 import type { VisualStateValue } from "@/adapters/types";
 
 // ── Dashboard Shell ──────────────────────────────────────────
@@ -11,21 +15,52 @@ interface ShellProps {
   children: ReactNode;
   activeWorld: WorldId | "home";
   onWorldChange: (w: WorldId | "home") => void;
+  /** Start a fresh conversation. Distinct from navigating home: pressing "New
+   *  dashboard" while already on the home page must still clear the thread,
+   *  and onWorldChange("home") is a no-op in that case. */
+  onNewChat?: () => void;
   fixtureState: VisualStateValue | null;
   onFixtureChange: (s: VisualStateValue | null) => void;
-  dataSource?: "fixture" | "live";
+  /**
+   * Whether the page is showing real adapter output. Defaults to `unknown`,
+   * not `fixture`: until the fleet has answered we do not know, and asserting
+   * DEMO DATA before asking is exactly the bug this replaced — every call site
+   * omitted the old prop, so the banner latched on with 68 adapters live.
+   */
+  dataSource?: "fixture" | "live" | "unknown";
 }
 
 export function DashboardShell({
   children,
   activeWorld,
   onWorldChange,
+  onNewChat,
   fixtureState,
   onFixtureChange,
-  dataSource = "fixture",
+  dataSource = "unknown",
 }: ShellProps) {
+  const [clock, setClock] = useState("");
+  useEffect(() => {
+    const tick = () =>
+      setClock(
+        new Date().toLocaleString(undefined, {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
+      );
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="dash-root">
+      {/* Obsidian's signature: a hairline across the top with a travelling
+          highlight. Purely ambient — it carries no state, so it is aria-hidden. */}
+      <div className="dash-pulse" aria-hidden="true"><i /></div>
       <aside className="dash-sidebar">
         <div className="dash-brand">
           <span className="dash-brand-icon">◉</span>
@@ -34,14 +69,20 @@ export function DashboardShell({
             <small>Homelab Dashboard</small>
           </div>
         </div>
+        {/* Primary action, above the nav and styled unlike it. Starting a new
+            dashboard is the one thing a person does far more than navigating,
+            and burying it as the first row of a list made it look like just
+            another destination. */}
+        <button
+          className="dash-new"
+          onClick={() => (onNewChat ? onNewChat() : onWorldChange("home"))}
+        >
+          <span className="dash-new-icon" aria-hidden="true">+</span>
+          New dashboard
+        </button>
+
         <nav className="dash-nav">
-          <button
-            className={`dash-nav-item ${activeWorld === "home" ? "active" : ""}`}
-            onClick={() => onWorldChange("home")}
-          >
-            <span className="dash-nav-icon">⌂</span>
-            <span>Home</span>
-          </button>
+          <div className="dash-nav-label">Worlds</div>
           {WORLDS.map((w) => (
             <button
               key={w.id}
@@ -75,15 +116,42 @@ export function DashboardShell({
         </div>
       </aside>
       <main className="dash-main">
-        {dataSource === "fixture" && (
+        {/* Waybar-style prompt bar, from the cyber-noir dashboard theme. The
+            clock is client-only and rendered after mount so server and client
+            markup match — a live time in SSR output hydrates mismatched. */}
+        <div className="dash-waybar">
+          <span className="dash-waybar-host">gh-ai</span>
+          <span className="dash-waybar-prompt">
+            <span className="p">gene@gh-ai:~$</span> dashboard --live{" "}
+            <span className="dash-cursor" aria-hidden="true">▊</span>
+          </span>
+          <span className="dash-waybar-clock">{clock}</span>
+        </div>
+        {/* Two distinct conditions, said distinctly. Forcing a state from the
+            sidebar is a deliberate preview and should not read as a broken
+            deployment; "no live adapters" is a real fault worth alarming
+            about. Panels that are individually stubbed carry their own SAMPLE
+            marker, so a mostly-live fleet gets no page-level banner at all. */}
+        {fixtureState !== null ? (
+          <div className="dash-demo-banner" role="status">
+            <span className="dash-demo-banner-icon">◈</span>
+            <span>
+              <strong>STATE PREVIEW</strong>
+              <small>
+                Every panel forced to “{fixtureState}” from the sidebar — set State
+                Fixture back to Live to see real adapters
+              </small>
+            </span>
+          </div>
+        ) : dataSource === "fixture" ? (
           <div className="dash-demo-banner" role="status">
             <span className="dash-demo-banner-icon">◈</span>
             <span>
               <strong>DEMO DATA</strong>
-              <small>Showing fixture data — no live adapters connected</small>
+              <small>No adapter returned live data — check .env credentials</small>
             </span>
           </div>
-        )}
+        ) : null}
         {children}
       </main>
     </div>
@@ -100,8 +168,17 @@ interface HeroProps {
 }
 
 export function Hero({ title, subtitle, metrics, accent }: HeroProps) {
-  return (
-    <header className="dash-hero" style={accent ? { borderColor: accent } : undefined}>
+  const rain = useEffectGate(true);
+
+  const inner = (
+    // Phase 5's visual language (glass, gradient, elevation, glow) was only
+    // ever applied to the GENERATED components. The app shell kept its original
+    // flat styling, so the dashboard you actually navigate looked pre-redesign.
+    // These are the same closed-enum classes the generated panels use.
+    <header
+      className="dash-hero cnv-surface tr-medium bl-md bg-gradient el-md"
+      style={accent ? { borderColor: accent } : undefined}
+    >
       <div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
@@ -117,6 +194,30 @@ export function Hero({ title, subtitle, metrics, accent }: HeroProps) {
         </div>
       )}
     </header>
+  );
+
+  if (!rain) return inner;
+
+  // Density and glow are deliberately low: this sits behind the headline and
+  // the ask box, and the point is atmosphere, not a wall of falling glyphs.
+  // Katakana plus hex digits reads as the terminal language the rest of the
+  // system speaks.
+  return (
+    <GlyphRain
+      className="dash-hero-rain"
+      charset="0123456789ABCDEFｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ"
+      cell={13}
+      color={[0, 0.62, 0.42]}
+      headColor={[0.1, 1, 0.55]}
+      speed={0.14}
+      density={0.055}
+      glow={1.15}
+      trail={0.86}
+      stir={0.35}
+      dim={0.72}
+    >
+      {inner}
+    </GlyphRain>
   );
 }
 
@@ -145,13 +246,24 @@ export function WorldCard({
   accent,
   onClick,
 }: WorldCardProps) {
-  return (
-    <button className="dash-world-card" onClick={onClick} style={{ borderTopColor: accent }}>
+
+  const card = (
+    <button
+      className={`dash-world-card cnv-surface tr-medium bl-md el-sm state-${state}${
+        ["warning", "critical", "offline", "stale", "denied"].includes(String(state))
+          ? " gl-state"
+          : ""
+      }`}
+      onClick={onClick}
+      style={{ borderTopColor: accent }}
+    >
       <div className="dash-world-card-head">
         <span className="dash-world-icon">{icon}</span>
         <span className={`dash-world-state state-${state}`}>{state}</span>
       </div>
-      <h3>{label}</h3>
+      <h3>
+        <DecryptText text={label} duration={700} trigger="hover" />
+      </h3>
       <p>{tagline}</p>
       <div className="dash-world-card-foot">
         <span>{adapterCount} adapters</span>
@@ -161,6 +273,13 @@ export function WorldCard({
       </div>
     </button>
   );
+
+  // No Glass wrapper. Every card claimed its own WebGL context, and a fleet
+  // grid plus a page of panels blew past the browser's ~16-context ceiling.
+  // Chrome then killed the oldest contexts and those panels rendered as blank
+  // white boxes. Effects are reserved for the few large elements where one
+  // context buys something; a card gets the CSS glass, which costs nothing.
+  return card;
 }
 
 // ── Quick Tags ───────────────────────────────────────────────
@@ -189,54 +308,93 @@ export function QuickTags({ tags, activeTag, onTagClick }: QuickTagsProps) {
 
 // ── Visual Panel (renders adapter result inline) ─────────────
 
+/** States worth drawing the eye to — these get the state-coloured glow. */
+const NEEDS_ATTENTION = ["warning", "critical", "offline", "stale", "denied"];
+
 interface VisualPanelProps {
   title: string;
   subtitle?: string;
   state?: VisualStateValue;
+  /**
+   * Where the numbers came from. "fixture" means this service is not configured
+   * and the panel is showing sample data.
+   */
+  source?: "live" | "fixture" | "offline";
   children: ReactNode;
 }
 
-export function VisualPanel({ title, subtitle, state = "healthy", children }: VisualPanelProps) {
-  return (
-    <section className={`cnv cnv-surface state-${state}`}>
-      <header className="cnv-head">
-        <div>
-          <h3>{title}</h3>
-          {subtitle && <small>{subtitle}</small>}
-        </div>
-        <span className="cnv-badge">{state}</span>
-      </header>
+/**
+ * Panel chrome for the dashboard shell.
+ *
+ * This used to be a hand-rolled copy of the visual library's Surface. Plan
+ * Task 5.2 called for deleting it and importing the real one; that step was
+ * skipped, so every page you navigate rendered older markup with none of the
+ * Phase 5 surface treatment. It now delegates to Surface and adds only what the
+ * shell needs on top: the sample-data badge and a state glow.
+ */
+export function VisualPanel({
+  title,
+  subtitle,
+  state = "healthy",
+  source,
+  children,
+}: VisualPanelProps) {
+  const isFixture = source === "fixture";
+
+  const panel = (
+    <Surface
+      title={title}
+      {...(subtitle ? { subtitle } : {})}
+      state={state}
+      surfaceStyle={{
+        translucency: "medium",
+        blur: "md",
+        elevation: "md",
+        ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
+      }}
+      {...(isFixture ? { className: "is-fixture" } : {})}
+      badge={
+        isFixture ? (
+          <span
+            className="cnv-badge cnv-badge-fixture"
+            title="Sample data — this service is not configured"
+          >
+            SAMPLE DATA
+          </span>
+        ) : undefined
+      }
+    >
       {children}
-    </section>
+    </Surface>
   );
+
+  // See WorldCard: panels do not claim WebGL contexts.
+  return panel;
 }
 
 // ── Metric Strip ─────────────────────────────────────────────
 
-interface MetricStripProps {
-  metrics: Array<{ label: string; value: string | number; unit?: string; trend?: number; state?: string }>;
+/**
+ * Thin alias over the visual library's Metrics row.
+ *
+ * The shell used to carry its own copy of this markup (plan Task 5.2, skipped).
+ * The name is kept so callers are unchanged, but there is now exactly one
+ * implementation.
+ */
+export function MetricStrip({
+  metrics,
+}: {
+  metrics: Array<{
+    label: string;
+    value: string | number;
+    unit?: string;
+    trend?: number;
+    state?: string;
+  }>;
+}) {
+  return <Metrics metrics={metrics} />;
 }
 
-export function MetricStrip({ metrics }: MetricStripProps) {
-  return (
-    <div className="cnv-metrics">
-      {metrics.slice(0, 8).map((m) => (
-        <article key={m.label} className={`state-${m.state ?? "healthy"}`}>
-          <small>{m.label}</small>
-          <strong>
-            {m.value}
-            {m.unit}
-          </strong>
-          {m.trend != null && (
-            <span>
-              {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
-            </span>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
 
 // ── Entity Detail Drawer ─────────────────────────────────────
 
@@ -252,9 +410,17 @@ interface EntityDrawerProps {
     meta?: Record<string, unknown>;
   } | null;
   adapterName?: string;
+  /** Whether the panel this entity came from was live or a fixture. */
+  entitySource?: "live" | "fixture" | "offline";
 }
 
-export function EntityDrawer({ open, onClose, entity, adapterName }: EntityDrawerProps) {
+export function EntityDrawer({
+  open,
+  onClose,
+  entity,
+  adapterName,
+  entitySource,
+}: EntityDrawerProps) {
   if (!open || !entity) return null;
   return (
     <div className="dash-drawer-overlay" onClick={onClose}>
@@ -276,8 +442,20 @@ export function EntityDrawer({ open, onClose, entity, adapterName }: EntityDrawe
           )}
           {adapterName && (
             <div className="dash-drawer-row">
-              <small>Source</small>
+              {/* Labelled "Adapter", not "Source" — `source` means live vs
+                  sample everywhere else in this codebase, and reusing the word
+                  for the adapter name made the drawer ambiguous about where
+                  the numbers actually came from. */}
+              <small>Adapter</small>
               <strong>{adapterName}</strong>
+            </div>
+          )}
+          {entitySource && (
+            <div className="dash-drawer-row">
+              <small>Data source</small>
+              <strong className={entitySource === "fixture" ? "dash-drawer-fixture" : undefined}>
+                {entitySource === "fixture" ? "SAMPLE DATA (service not configured)" : "Live"}
+              </strong>
             </div>
           )}
           {entity.meta && Object.keys(entity.meta).length > 0 && (
@@ -362,18 +540,22 @@ export function useWorldData(world: WorldId, fixtureState: VisualStateValue | nu
 
 // ── Hook: fetch fleet data (all worlds for landing) ──────────
 
-interface FleetData {
+export interface FleetData {
   worlds: Array<{
     id: WorldId;
     state: VisualStateValue;
     healthy: number;
     total: number;
+    /** Panels in this world backed by a live adapter rather than a stub. */
+    live: number;
   }>;
   overall: {
     state: VisualStateValue;
     healthy: number;
     total: number;
     worldCount: number;
+    /** Fleet-wide live-adapter count; 0 means nothing real is connected. */
+    live: number;
   };
 }
 

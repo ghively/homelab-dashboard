@@ -42,9 +42,22 @@ import hermesDashboard from "@/adapters/hermes/hermes-dashboard";
 import hermesApiServer from "@/adapters/hermes/hermes-api-server";
 import hermesMcpBridge from "@/adapters/hermes/hermes-mcp-bridge";
 import hermesWorkspace from "@/adapters/hermes/hermes-workspace";
+import prometheus from "@/adapters/ops/prometheus-adapter";
+import loki from "@/adapters/ops/loki-adapter";
+import grafana from "@/adapters/ops/grafana-adapter";
+import ntfy from "@/adapters/ops/ntfy-adapter";
+import cadvisor from "@/adapters/ops/cadvisor-adapter";
+import blackbox from "@/adapters/ops/blackbox-adapter";
+import uptimeKuma from "@/adapters/ops/uptime-kuma-adapter";
+import nodeExporter from "@/adapters/infra/node-exporter-adapter";
+import tailscale from "@/adapters/infra/tailscale-adapter";
+import { registerWorldAdapters } from "@/lib/registration";
+import openwebui from "@/adapters/ai/openwebui";
+import langfuse from "@/adapters/ai/langfuse";
 
 const registry = new Map<string, DataAdapter>();
 let initialized = false;
+// (adapter registry rev: romm heartbeat default + ops/infra adapters)
 
 function registerEmby(): void {
   const cfg = getServiceConfig("emby");
@@ -175,11 +188,21 @@ function registerTdarr(): void {
   );
 }
 
+/**
+ * RomM registers on ROMM_URL alone.
+ *
+ * Unlike the *arr services, RomM's API key is optional at construction — and
+ * the deployed instance answers /api/heartbeat anonymously while returning 403
+ * for /api/platforms. Requiring ROMM_API_KEY here meant a reachable, running
+ * RomM rendered a healthy-looking fixture labelled SAMPLE DATA. Registering on
+ * the URL lets the 403 surface as `denied`, which names the actual problem.
+ */
 function registerRomm(): void {
-  const cfg = getServiceConfig("romm");
-  if (!cfg) return;
+  const url = process.env.ROMM_URL;
+  if (!url) return;
+  const apiKey = process.env.ROMM_API_KEY ?? "";
 
-  const adapter = new RommAdapter({ baseUrl: cfg.url, apiKey: cfg.apiKey });
+  const adapter = new RommAdapter({ baseUrl: url, apiKey });
 
   registry.set(
     "romm",
@@ -189,12 +212,16 @@ function registerRomm(): void {
       category: "media",
       adapter,
       queryMap: {
+        // Default is heartbeat: the only endpoint a keyless RomM answers. The
+        // rest need ROMM_API_KEY and will render `denied` (naming the fix)
+        // rather than a misleading offline when no key is set.
+        "heartbeat": (a) => a.queryHeartbeat(),
         "platforms": (a) => a.queryPlatforms(),
         "status": (a) => a.querySystemStatus(),
         "scans": (a) => a.queryScanJobs(),
         "missing": (a) => a.queryMissingRoms(),
       },
-      defaultQuery: "platforms",
+      defaultQuery: "heartbeat",
     }),
   );
 }
@@ -266,6 +293,17 @@ const ENV_GATED: Array<[name: string, envVar: string, adapter: DataAdapter]> = [
   ["hermes-api-server", "HERMES_API_SERVER_URL", hermesApiServer],
   ["hermes-mcp-bridge", "HERMES_MCP_BRIDGE_URL", hermesMcpBridge],
   ["hermes-workspace", "HERMES_WORKSPACE_URL", hermesWorkspace],
+  ["prometheus", "PROMETHEUS_URL", prometheus],
+  ["loki", "LOKI_URL", loki],
+  ["grafana", "GRAFANA_URL", grafana],
+  ["ntfy", "NTFY_URL", ntfy],
+  ["cadvisor", "CADVISOR_URL", cadvisor],
+  ["blackbox", "BLACKBOX_URL", blackbox],
+  ["uptime-kuma", "UPTIME_KUMA_URL", uptimeKuma],
+  ["node-exporter", "NODE_EXPORTER_URLS", nodeExporter],
+  ["tailscale", "TAILSCALE_SOCKET", tailscale],
+  ["openwebui", "OPENWEBUI_URL", openwebui],
+  ["langfuse", "LANGFUSE_URL", langfuse],
 ];
 
 function registerEnvGated(): void {
@@ -295,6 +333,9 @@ export function initAdapters(): void {
   registerSearxng();
   registerEnvGated();
   registerCloudflare();
+  // Per-world modules under src/lib/registration/. Runs last so a world
+  // module can override an earlier registration for the same adapter name.
+  registerWorldAdapters(registry);
 }
 
 export function getAdapter(name: string): DataAdapter | undefined {

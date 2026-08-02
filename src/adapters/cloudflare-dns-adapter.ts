@@ -3,6 +3,7 @@ import type { DataAdapter } from "./adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 type HealthCheck = FreshnessInfo;
 
@@ -44,7 +45,7 @@ export class CloudflareDNSAdapter implements DataAdapter {
           Authorization: `Bearer ${this.apiToken}`,
           "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
 
       return {
@@ -81,7 +82,7 @@ export class CloudflareDNSAdapter implements DataAdapter {
             Authorization: `Bearer ${this.apiToken}`,
             "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }
       );
 

@@ -3,6 +3,7 @@ import type { DataAdapter } from "./adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 interface UniFiClient {
   mac: string;
@@ -84,11 +85,11 @@ export class UnifiAdapter implements DataAdapter {
       const [clientsResponse, statsResponse] = await Promise.all([
         fetch(`${this.baseUrl}/proxy/network/api/s/default/stat/client`, {
           headers: this.getHeaders(),
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
         fetch(`${this.baseUrl}/proxy/network/api/s/default/stat/health`, {
           headers: this.getHeaders(),
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
       ]);
 
@@ -156,7 +157,7 @@ export class UnifiAdapter implements DataAdapter {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: this.username, password: this.password }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
     });
 
     if (!response.ok) {

@@ -17,6 +17,7 @@ import type { DataAdapter } from "../adapter-base";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WATCHTOWER_MEDIA_URL = process.env.WATCHTOWER_MEDIA_URL || "";
 
@@ -47,7 +48,7 @@ class WatchtowerMediaAdapter implements DataAdapter {
   async health(): Promise<FreshnessInfo> {
     if (WATCHTOWER_MEDIA_URL) {
       try {
-        await fetch(`${WATCHTOWER_MEDIA_URL}/containers/json?all=1`, { signal: AbortSignal.timeout(5000) });
+        await fetch(`${WATCHTOWER_MEDIA_URL}/containers/json?all=1`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) });
       } catch {
         // Unreachable — freshness still records the endpoint queried.
       }
@@ -74,7 +75,7 @@ class WatchtowerMediaAdapter implements DataAdapter {
 
     try {
       const res = await fetch(`${WATCHTOWER_MEDIA_URL}/containers/json?all=1`, {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 

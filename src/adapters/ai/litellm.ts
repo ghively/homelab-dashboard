@@ -6,6 +6,7 @@ import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const LITELLM_URL = process.env.LITELLM_URL || "http://gh-arm:4000";
 const LITELLM_API_KEY = process.env.LITELLM_API_KEY || "";
@@ -43,7 +44,7 @@ class LiteLLMAdapter implements DataAdapter {
     try {
       await fetch(`${LITELLM_URL}/v1/models`, {
         headers: authHeaders(),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // Unreachable — freshness still records the endpoint queried.
@@ -60,7 +61,7 @@ class LiteLLMAdapter implements DataAdapter {
     try {
       const modelsRes = await fetch(`${LITELLM_URL}/v1/models`, {
         headers: authHeaders(),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
       if (!modelsRes.ok) throw new Error(`HTTP ${modelsRes.status}`);
 
@@ -74,9 +75,13 @@ class LiteLLMAdapter implements DataAdapter {
       let unhealthy: LiteLLMHealthEntry[] = [];
       let healthKnown = false;
       try {
+        // /health makes LiteLLM probe every configured upstream, so it can take
+        // many seconds — it was 8.2s here and dominated the whole fleet rollup.
+        // The model list is the primary data; endpoint health is a bonus, and a
+        // timeout is already treated as "health unknown" rather than an error.
         const healthRes = await fetch(`${LITELLM_URL}/health`, {
           headers: authHeaders(),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(2500),
         });
         if (healthRes.ok) {
           const h = (await healthRes.json()) as {

@@ -22,6 +22,7 @@ import type {
   SabServerStatus,
   SabQueueSlot,
 } from "./types";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * SABnzbd adapter configuration.
@@ -62,15 +63,15 @@ export class SabnzbdAdapter {
    * Generic fetch with error handling.
    */
   private async fetch<T>(url: string): Promise<T> {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`SABnzbd API error: ${res.status} ${res.statusText}`);
-      }
-      return (await res.json()) as T;
-    } catch (err) {
-      throw new Error(`SABnzbd fetch failed: ${err}`);
-    }
+    // The signal is load-bearing. Node fetch has no default timeout, so a host
+    // that accepts the connection and never answers held this promise for the
+    // kernel's full TCP retry window (~130s). /api/fleet awaits every adapter
+    // in a world, so one such host pinned the whole endpoint and the world tile
+    // sat on LOADING. AdapterHttpError is thrown rather than a stringified
+    // Error so classifyError() can still tell 401 from offline.
+    const res = await fetchWithTimeout(url, {}, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+    return (await res.json()) as T;
   }
 
   /**

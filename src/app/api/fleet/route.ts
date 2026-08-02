@@ -9,7 +9,7 @@ initAdapters();
 // GET /api/fleet — aggregate health across all 8 worlds (for landing page)
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const state = (sp.get("state") as VisualStateValue) || "healthy";
+  const state = (sp.get("state") as VisualStateValue | null) ?? null;
 
   const worlds = await Promise.all(
     WORLDS.map(async (w) => {
@@ -20,6 +20,10 @@ export async function GET(req: NextRequest) {
         state: summary.state,
         healthy: summary.healthy,
         total: summary.total,
+        // How many of these panels are real. A world whose adapters are all
+        // stubs (`home`) is not the same as one that queried live services and
+        // found them down, and the UI must not present them identically.
+        live: results.filter((r) => r.result.source === "live").length,
       };
     }),
   );
@@ -27,8 +31,10 @@ export async function GET(req: NextRequest) {
   const overallHealthy = worlds.reduce((a, w) => a + w.healthy, 0);
   const overallTotal = worlds.reduce((a, w) => a + w.total, 0);
   const worstStates = worlds.map((w) => w.state);
+  // Same ranking as worldSummary: `empty`/`loading` mean "nothing to draw",
+  // not "something is wrong", so they must not degrade the fleet rollup.
   const stateRank: Record<string, number> = {
-    healthy: 0, loading: 1, empty: 1, stale: 2, warning: 3, denied: 4, critical: 5, offline: 6,
+    healthy: 0, loading: 0, empty: 0, stale: 2, warning: 3, denied: 4, critical: 5, offline: 6,
   };
   const overallState = worstStates.reduce(
     (worst, s) => (stateRank[s] > stateRank[worst] ? s : worst),
@@ -42,6 +48,11 @@ export async function GET(req: NextRequest) {
       healthy: overallHealthy,
       total: overallTotal,
       worldCount: worlds.length,
+      // Fleet-wide count of panels backed by a live adapter. This is what
+      // decides whether the app is running on real data — previously nothing
+      // reported it, so the shell defaulted to "fixture" forever and the
+      // DEMO DATA banner showed even with 68 adapters live.
+      live: worlds.reduce((a, w) => a + w.live, 0),
     },
   });
 }

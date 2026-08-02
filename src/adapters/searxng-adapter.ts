@@ -3,18 +3,19 @@ import type { DataAdapter } from "./adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
+import { ADAPTER_FANOUT_TIMEOUT_MS, ADAPTER_TIMEOUT_MS, AdapterHttpError, failureResult, makeFreshness } from "@/lib/adapter-http";
 
-interface SearXNGEngine {
+// /config engine entries — no score/error here, those live in /stats.
+interface SearXNGConfigEngine {
   name: string;
-  score: number;
-  error?: string;
+  enabled: boolean;
+  categories?: string[];
+  shortcut?: string;
 }
 
-interface SearXNGStats {
-  engine_count: number;
-  result_count: number;
-  search_count: number;
-}
+// /stats/errors?format=json — the one stats surface this SearXNG build serves
+// as JSON. Keyed by engine name; value is a list of recent error records.
+type SearXNGErrors = Record<string, unknown[]>;
 
 export class SearXNGAdapter implements DataAdapter {
   readonly name: string;
@@ -45,7 +46,7 @@ export class SearXNGAdapter implements DataAdapter {
 
     try {
       await fetch(`${this.baseUrl}/health`, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -65,69 +66,72 @@ export class SearXNGAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureState);
     }
 
+    const base = this.baseUrl.replace(/\/$/, "");
     const start = Date.now();
     try {
-      const [enginesResponse, statsResponse] = await Promise.all([
-        fetch(`${this.baseUrl}/config`, {
-          signal: AbortSignal.timeout(10000),
-        }),
-        fetch(`${this.baseUrl}/stats`, {
-          signal: AbortSignal.timeout(10000),
-        }),
-      ]);
+      // /config is the source of truth for the engine roster and is valid JSON.
+      // /stats is NOT — this SearXNG build serves it as an HTML page even with
+      // ?format=json, which is exactly what made the old adapter throw a JSON
+      // parse error and render offline while the service was perfectly healthy.
+      // /stats/errors?format=json is the one stats surface that is real JSON, so
+      // error attribution comes from there and is best-effort.
+      const configRes = await fetch(`${base}/config`, {
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
+        cache: "no-store",
+      });
+      if (!configRes.ok) throw new AdapterHttpError(`${base}/config`, configRes.status);
+      const configData = (await configRes.json()) as { engines?: SearXNGConfigEngine[] };
+      const engines = configData.engines ?? [];
+      const enabled = engines.filter((e) => e.enabled);
 
-      const enginesData = await enginesResponse.json();
-      const statsData = await statsResponse.json();
+      let errored: string[] = [];
+      try {
+        const errRes = await fetch(`${base}/stats/errors?format=json`, {
+          signal: AbortSignal.timeout(ADAPTER_FANOUT_TIMEOUT_MS),
+          cache: "no-store",
+        });
+        if (errRes.ok && errRes.headers.get("content-type")?.includes("application/json")) {
+          const errData = (await errRes.json()) as SearXNGErrors;
+          errored = Object.entries(errData)
+            .filter(([, v]) => Array.isArray(v) && v.length > 0)
+            .map(([name]) => name);
+        }
+      } catch {
+        // errors endpoint is enrichment only — never fail the panel on it.
+      }
 
-      const engines: SearXNGEngine[] = enginesData.engines || [];
-      const stats: SearXNGStats = statsData || {};
-
-      const workingEngines = engines.filter((e) => !e.error);
-      const failedEngines = engines.filter((e) => e.error);
+      const erroredEnabled = enabled.filter((e) => errored.includes(e.name));
 
       return {
         title: `SearXNG (${this.name})`,
-        subtitle: `${this.baseUrl}`,
-        state: workingEngines.length > 0 ? "healthy" : "offline",
+        subtitle: `${enabled.length}/${engines.length} engines enabled${
+          erroredEnabled.length ? ` • ${erroredEnabled.length} erroring` : ""
+        }`,
+        state: erroredEnabled.length > 0 ? "warning" : "healthy",
         metrics: [
-          { label: "Engines", value: engines.length },
-          { label: "Working", value: workingEngines.length },
-          { label: "Failed", value: failedEngines.length, state: failedEngines.length > 0 ? "warning" : "healthy" },
-          { label: "Searches", value: stats.search_count || 0 },
-          { label: "Results", value: stats.result_count || 0 },
+          { label: "Engines Enabled", value: enabled.length },
+          { label: "Engines Total", value: engines.length },
+          {
+            label: "Erroring",
+            value: erroredEnabled.length,
+            state: erroredEnabled.length > 0 ? "warning" : "healthy",
+          },
         ],
-        items: workingEngines.map((e, i) => ({
-          id: `${this.name}-${i}`,
+        items: enabled.slice(0, 40).map((e, i) => ({
+          id: `${this.name}-${e.name || i}`,
           label: e.name,
-          subtitle: `Score: ${e.score.toFixed(2)}`,
-          value: "OK",
-          state: "healthy",
+          subtitle: (e.categories ?? []).join(", ") || (e.shortcut ?? ""),
+          value: errored.includes(e.name) ? "erroring" : "ok",
+          state: (errored.includes(e.name) ? "warning" : "healthy") as "warning" | "healthy",
         })),
         source: "live",
-        freshness: {
-          adapter: this.name,
-          source: this.name,
-          queriedAt: new Date(start).toISOString(),
-          stalenessSeconds: 0,
-          cacheHit: false,
-        },
+        freshness: makeFreshness(this.name, base, start),
+        summary: `${enabled.length} of ${engines.length} search engines enabled${
+          erroredEnabled.length ? `, ${erroredEnabled.length} currently erroring` : ""
+        }.`,
       };
     } catch (error) {
-      return {
-        title: `SearXNG (${this.name})`,
-        subtitle: `Failed to fetch from ${this.baseUrl}`,
-        state: "offline",
-        metrics: [{ label: "Status", value: "ERROR", state: "offline" }],
-        source: "live",
-        freshness: {
-          adapter: this.name,
-          source: this.name,
-          queriedAt: new Date(start).toISOString(),
-          stalenessSeconds: 0,
-          cacheHit: false,
-        },
-        summary: `Adapter error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      };
+      return failureResult(this.name, `SearXNG (${this.name})`, base, error, start);
     }
   }
 }
