@@ -114,7 +114,7 @@ body::before {
      directly on this rather than inside a glass panel. */
   position: relative;
   background:
-    linear-gradient(rgba(11, 11, 14, 0.72), rgba(11, 11, 14, 0.82)),
+    linear-gradient(rgba(11, 11, 14, 0.58), rgba(11, 11, 14, 0.72)),
     url("/sidebar.webp") 0 0 / 100% 100% no-repeat,
     var(--dash-sidebar);
 }
