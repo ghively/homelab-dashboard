@@ -467,8 +467,6 @@ html, body {
 .dash-view-btn.active { border-color: var(--dash-accent); color: var(--dash-text); background: rgba(39, 215, 242, 0.08); }
 
 /* ── AI Query Input ─────────────────────────────────────────── */
-.dash-ai-query { margin-bottom: 24px; }
-
 .dash-ai-input-wrap {
   display: flex;
   gap: 8px;
@@ -501,27 +499,6 @@ html, body {
 }
 
 .dash-ai-input-wrap button:hover { opacity: 0.9; }
-
-.dash-ai-result {
-  margin-top: 12px;
-  background: var(--dash-panel);
-  border: 1px solid var(--dash-line);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.dash-ai-result strong { display: block; margin-bottom: 8px; }
-
-.dash-ai-components { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.dash-ai-component-tag {
-  background: rgba(168, 121, 255, 0.12);
-  border: 1px solid rgba(168, 121, 255, 0.3);
-  color: #a879ff;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-}
 
 /* ── Loading State ──────────────────────────────────────────── */
 .dash-loading {
