@@ -51,6 +51,8 @@ export const EmbyItemSchema = z.object({
   RunTimeTicks: z.number().optional(),
   Genres: z.array(z.string()).optional(),
   Studios: z.array(z.string()).optional(),
+  // Returned for Audio / MusicAlbum items. Consumed by queryAlbums().
+  AlbumArtist: z.string().optional(),
 });
 export type EmbyItem = z.infer<typeof EmbyItemSchema>;
 

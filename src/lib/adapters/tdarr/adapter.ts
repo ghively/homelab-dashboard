@@ -253,7 +253,7 @@ export class TdarrAdapter {
           .map((j) => ({
             id: j.id,
             at: j.started_at,
-            title: job.file_name,
+            title: j.file_name,
             detail: j.status,
             state: j.status === "processing" ? "loading" : j.status === "completed" ? "healthy" : j.status === "failed" ? "critical" : "warning",
           })),
@@ -477,7 +477,7 @@ export class TdarrAdapter {
           .map((j) => ({
             id: j.id,
             at: j.failed_at!,
-            title: job.file_name,
+            title: j.file_name,
             detail: j.error_message || "Unknown error",
             state: "critical",
           })),

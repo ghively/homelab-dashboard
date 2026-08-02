@@ -47,6 +47,7 @@ export type SabQueueSlot = z.infer<typeof SabQueueSlotSchema>;
 export const SabQueueSchema = z.object({
   queue: z.object({
     status: z.string(),
+    eta: z.string().optional(), // Queue-level ETA, e.g. "2h 30m"
     speedlimit: z.number(), // Speed limit in KB/s
     speedlimit_abs: z.number(), // Absolute speed limit
     paused: z.boolean(),

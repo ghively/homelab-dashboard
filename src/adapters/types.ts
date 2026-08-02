@@ -105,12 +105,17 @@ export type FreshnessInfo = z.infer<typeof FreshnessInfoSchema>;
 /**
  * Visual query result returned by all adapters
  * This is the normalized contract between adapters and the OpenUI renderer
+ *
+ * NOTE on `source`: adapters do not set it and cannot know it — whether a
+ * result is live or fixture data is decided at the boundary by queryAdapter().
+ * It is therefore optional here. Use ResolvedQueryResult (below) for the
+ * post-boundary type, where it is guaranteed.
  */
 export const VisualQueryResultSchema = z.object({
   title: z.string(),
   subtitle: z.string().optional(),
   state: z.enum(["healthy", "warning", "critical", "offline", "stale", "loading", "empty", "denied"]).default("healthy"),
-  source: z.enum(["fixture", "live"]).default("fixture"),
+  source: z.enum(["fixture", "live"]).optional(),
   freshness: FreshnessInfoSchema,
   metrics: z.array(z.object({
     label: z.string(),
@@ -174,6 +179,16 @@ export const VisualQueryResultSchema = z.object({
 });
 
 export type VisualQueryResult = z.infer<typeof VisualQueryResultSchema>;
+
+/**
+ * A result that has passed through queryAdapter(), which always stamps
+ * `source`. Use this for anything downstream of the adapter boundary — the API
+ * routes, the tool provider, the DEMO DATA banner — so "is this real data?"
+ * stays a compile-time guarantee rather than a convention.
+ */
+export type ResolvedQueryResult = VisualQueryResult & {
+  source: "fixture" | "live";
+};
 
 /**
  * Adapter contract — all CI/CD adapters implement this
