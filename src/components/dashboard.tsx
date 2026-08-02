@@ -101,7 +101,14 @@ interface HeroProps {
 
 export function Hero({ title, subtitle, metrics, accent }: HeroProps) {
   return (
-    <header className="dash-hero" style={accent ? { borderColor: accent } : undefined}>
+    // Phase 5's visual language (glass, gradient, elevation, glow) was only
+    // ever applied to the GENERATED components. The app shell kept its original
+    // flat styling, so the dashboard you actually navigate looked pre-redesign.
+    // These are the same closed-enum classes the generated panels use.
+    <header
+      className="dash-hero cnv-surface tr-subtle bl-sm bg-gradient el-md"
+      style={accent ? { borderColor: accent } : undefined}
+    >
       <div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
@@ -146,7 +153,15 @@ export function WorldCard({
   onClick,
 }: WorldCardProps) {
   return (
-    <button className="dash-world-card" onClick={onClick} style={{ borderTopColor: accent }}>
+    <button
+      className={`dash-world-card cnv-surface tr-subtle bl-sm el-sm state-${state}${
+        ["warning", "critical", "offline", "stale", "denied"].includes(String(state))
+          ? " gl-state"
+          : ""
+      }`}
+      onClick={onClick}
+      style={{ borderTopColor: accent }}
+    >
       <div className="dash-world-card-head">
         <span className="dash-world-icon">{icon}</span>
         <span className={`dash-world-state state-${state}`}>{state}</span>
@@ -189,6 +204,9 @@ export function QuickTags({ tags, activeTag, onTagClick }: QuickTagsProps) {
 
 // ── Visual Panel (renders adapter result inline) ─────────────
 
+/** States worth drawing the eye to — these get the state-coloured glow. */
+const NEEDS_ATTENTION = ["warning", "critical", "offline", "stale", "denied"];
+
 interface VisualPanelProps {
   title: string;
   subtitle?: string;
@@ -215,7 +233,11 @@ export function VisualPanel({
   // labelled"; this is where that promise is kept.
   const isFixture = source === "fixture";
   return (
-    <section className={`cnv cnv-surface state-${state}${isFixture ? " is-fixture" : ""}`}>
+    <section
+      className={`cnv cnv-surface tr-subtle bl-sm el-sm state-${state}${
+        NEEDS_ATTENTION.includes(String(state)) ? " gl-state" : ""
+      }${isFixture ? " is-fixture" : ""}`}
+    >
       <header className="cnv-head">
         <div>
           <h3>{title}</h3>
