@@ -20,6 +20,13 @@
 - `npm run build` and `npm run lint` must pass.
 - Every animation must honor `prefers-reduced-motion`.
 
+## User Scope Override — 2026-08-02
+
+Connector setup and adapter networking are explicitly out of scope. Tasks 1
+and 2 are skipped. Task 3 supplies artwork only to the deterministic design
+preview. Task 4 modifies the generated component library only; it does not
+change the normal Media-world adapter cards.
+
 ---
 
 ### Task 1: Secure artwork URL normalization
@@ -253,14 +260,13 @@ git commit -m "feat: proxy authenticated media artwork"
 - Create: `public/media-demo/bear.svg`
 - Create: `public/media-demo/severance.svg`
 - Create: `public/media-demo/foundation.svg`
-- Modify: `src/lib/adapter-aggregator.ts`
 - Modify: `scripts/export-design-previews.tsx`
 - Create: `scripts/check-visual-quality.cjs`
 - Modify: `package.json`
 
 **Interfaces:**
 - Consumes: the existing `Item.image` contract.
-- Produces: deterministic local image URLs for fixture and design-preview items, plus `npm run check:visual`.
+- Produces: deterministic local image URLs for design-preview items, plus `npm run check:visual`.
 
 - [ ] **Step 1: Add a failing visual-quality check**
 
@@ -344,12 +350,9 @@ fonts or images. Use accessible `<title>` text and keep each file below 15 KB.
 </svg>
 ```
 
-- [ ] **Step 4: Attach the local covers to labeled fixture data**
+- [ ] **Step 4: Attach the local covers to design-preview data**
 
-Add `/media-demo/*.svg` image values to the existing healthy Emby fixture
-items. Do not change its numbers, titles, state, or `source: "fixture"`.
-
-Update preview `items` with `image`, `progress`, and real optional `meta`:
+Update preview `items` with `image`, `progress`, and optional `meta`:
 
 ```ts
 {
@@ -372,20 +375,18 @@ Expected: PASS.
 - [ ] **Step 6: Commit fixture artwork and the visual guard**
 
 ```bash
-git add public/media-demo src/lib/adapter-aggregator.ts scripts/export-design-previews.tsx scripts/check-visual-quality.cjs package.json
+git add public/media-demo scripts/export-design-previews.tsx scripts/check-visual-quality.cjs package.json
 git commit -m "test: add poster-rich media previews"
 ```
 
 ---
 
-### Task 4: Generated media layouts and Media-world rendering
+### Task 4: Generated media layouts
 
 **Files:**
 - Modify: `src/visual/components/index.tsx`
 - Modify: `src/visual/schemas.ts`
 - Modify: `src/visual/cyber-noir-visual-components-v4.css`
-- Modify: `src/app/page.tsx`
-- Modify: `src/app/globals.css`
 - Modify: `scripts/check-visual-quality.cjs`
 
 **Interfaces:**
@@ -459,21 +460,7 @@ with conditional rendering:
 Show client, device, user, quality, and progress only when present. Use a
 portrait artwork region, readable scrim, and a clear paused/active state.
 
-- [ ] **Step 6: Let normal world cards use artwork**
-
-Pass `adapterName` through `AdapterResultCard` and choose presentation by data:
-
-```ts
-const artworkItems = result.items?.filter((item) => Boolean(item.image)) ?? [];
-const isArtworkResult =
-  artworkItems.length >= Math.min(2, result.items?.length ?? 0);
-```
-
-When `isArtworkResult`, render the shared artwork markup rather than
-`.dash-adapter-items`. Keep generic rows for non-image queue and status data.
-Do not identify visual type from the adapter name.
-
-- [ ] **Step 7: Add responsive cinematic CSS**
+- [ ] **Step 6: Add responsive cinematic CSS**
 
 Implement:
 
@@ -485,7 +472,7 @@ Implement:
 - two poster columns on narrow phones;
 - no hover transform on non-interactive or reduced-motion contexts.
 
-- [ ] **Step 8: Run focused checks**
+- [ ] **Step 7: Run focused checks**
 
 Run:
 
@@ -497,10 +484,10 @@ npx tsc --noEmit
 
 Expected: all three commands pass.
 
-- [ ] **Step 9: Commit media presentation**
+- [ ] **Step 8: Commit media presentation**
 
 ```bash
-git add src/visual/components/index.tsx src/visual/schemas.ts src/visual/cyber-noir-visual-components-v4.css src/app/page.tsx src/app/globals.css scripts/check-visual-quality.cjs
+git add src/visual/components/index.tsx src/visual/schemas.ts src/visual/cyber-noir-visual-components-v4.css scripts/check-visual-quality.cjs
 git commit -m "feat: add cinematic generated media layouts"
 ```
 
@@ -687,7 +674,6 @@ Expected: every command exits zero and the prompt is below 30,000 tokens.
 
 Start `npm run dev` and verify at 1440×1000:
 
-- Media world cards display local fixture covers when unconfigured.
 - Generated `grid`, `rail`, and `feature` previews have distinct layouts.
 - No white blocks, broken-image icons, or unreachable upstream URLs appear.
 - Line, bar, donut, gauge, topology, and playback panels each have one clear
@@ -711,9 +697,8 @@ runs.
 
 - [ ] **Step 5: Inspect network requests**
 
-Verify browser-visible artwork requests use only `/api/media-artwork` or local
-`/media-demo/*` paths. Confirm neither private hostnames nor API keys appear in
-the DOM, request URLs, console, or error messages.
+Verify design-preview artwork requests use local `/media-demo/*` paths and no
+component emits a fabricated media metadata label.
 
 - [ ] **Step 6: Clean generated files and review the diff**
 
