@@ -796,3 +796,107 @@ button.dash-tag {
 .dash-chat-rendered {
   margin-top: 10px;
 }
+
+/* ============================================================
+   Design-system component adoption
+   ------------------------------------------------------------
+   Ported from the "Gene Hively Cyber-Noir Design System" project:
+   preview/components-window-header.html, components-buttons.html,
+   components-tags.html.
+
+   The JSX in that project's ui_kits/portfolio is not importable here — it
+   assumes React as a global, registers itself on `window`, and hardcodes
+   portfolio navigation. What transfers is the component SPEC, applied to the
+   class names this app already renders.
+   ============================================================ */
+
+/* ── Window chrome (preview/components-window-header.html) ───── */
+.cnv-surface {
+  box-shadow: var(--shadow-window);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.cnv-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 15px;
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--border-neutral);
+  margin: -16px -16px 14px;          /* bleed to the panel edges */
+}
+
+.cnv-dots {
+  display: flex;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.cnv-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: block;
+}
+
+.cnv-dot-r { background: var(--dot-red); }
+.cnv-dot-y { background: var(--dot-yellow); }
+.cnv-dot-g { background: var(--dot-green); }
+
+/* Title is cyan and sits after the dots, per the spec. */
+.cnv-head-title { min-width: 0; }
+
+.cnv-head-title h3 {
+  margin: 0;
+  color: var(--neon-cyan);
+  font-size: var(--fs-md);
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.cnv-head-title small {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.cnv-badges { margin-left: auto; flex: none; }
+
+/* ── CMD buttons (preview/components-buttons.html) ───────────── */
+.dash-empty-filter-actions button,
+.dash-ai-input-wrap button {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  border-radius: var(--radius);
+  border: 1px solid var(--neon-green);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--neon-green);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out-quart);
+}
+
+.dash-empty-filter-actions button:hover,
+.dash-ai-input-wrap button:hover {
+  background: var(--neon-green);
+  color: #000;
+  box-shadow: var(--glow-green-lg);
+  opacity: 1;
+}
+
+/* ── Tags (preview/components-tags.html) ─────────────────────── */
+.dash-tag {
+  font-size: 0.78rem;
+  color: var(--neon-purple);
+  border: 1px solid var(--border-purple-30);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+}
+
+.dash-tag:hover,
+.dash-tag.active {
+  color: var(--neon-purple);
+  border-color: var(--neon-purple);
+  box-shadow: var(--glow-purple-sm);
+  background: transparent;
+}
