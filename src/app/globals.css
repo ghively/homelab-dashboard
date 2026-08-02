@@ -1,24 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "./design-tokens.css";
 @import "../visual/cyber-noir-visual-components-v4.css";
 
 /* ═══ Dashboard Shell ═══════════════════════════════════════════ */
 :root {
-  --dash-bg: #0b0d12;
-  --dash-sidebar: #11141c;
-  --dash-panel: #171a23;
-  --dash-panel2: #20242e;
-  --dash-line: #2a2e3a;
-  --dash-text: #f2f4fa;
-  --dash-muted: #9299a9;
-  --dash-accent: #27d7f2;
-  --state-healthy: #29e39b;
-  --state-warning: #ffc266;
-  --state-critical: #ff6b6b;
-  --state-offline: #6b7280;
-  --state-stale: #9299a9;
-  --state-loading: #27d7f2;
-  --state-empty: #9299a9;
-  --state-denied: #ff6b6b;
+  /* ------------------------------------------------------------------
+     Dashboard tokens, remapped onto the Cyber-Noir design system.
+
+     These names are used throughout the dashboard's CSS. Rather than
+     rewrite every rule, each one now resolves to a design-system token, so
+     the whole surface adopts the system at once: JetBrains Mono, the
+     #16161b mocha ground, glass panels, neon accents, and the uniform 10px
+     radius. The previous values were an unrelated palette (#0b0d12 ground,
+     #27d7f2 accent, Inter) that predated the design system.
+     ------------------------------------------------------------------ */
+  --dash-bg: var(--bg-dark);
+  --dash-sidebar: var(--bg-mantle);
+  --dash-panel: var(--bg-glass);
+  --dash-panel2: var(--bg-glass-strong);
+  --dash-line: var(--border-neutral);
+  --dash-text: var(--text-primary);
+  --dash-muted: var(--text-dim);
+  --dash-accent: var(--neon-green);
+
+  /* Status semantics borrow the window-dot hues; healthy is the phosphor
+     accent, and the "nothing to report" states share the muted text tone. */
+  --state-healthy: var(--neon-green);
+  --state-warning: var(--dot-yellow);
+  --state-critical: var(--dot-red);
+  --state-offline: var(--text-mute);
+  --state-stale: var(--text-dim);
+  --state-loading: var(--neon-cyan);
+  --state-empty: var(--text-mute);
+  --state-denied: var(--dot-red);
+}
+
+/* The design system is monospace throughout. */
+body {
+  font-family: var(--font-mono);
+}
+
+/* One true radius — the shell previously mixed 8/10/12/14px. */
+.dash-hero,
+.dash-world-card,
+.dash-drawer,
+.dash-empty-filter,
+.cnv-surface {
+  border-radius: var(--radius);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

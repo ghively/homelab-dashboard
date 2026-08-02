@@ -1,0 +1,89 @@
+/* ============================================================
+   Gene Hively Cyber-Noir — design tokens
+   ============================================================
+   VENDORED from the "Gene Hively Cyber-Noir Design System" project on
+   claude.ai/design (colors_and_type.css, v2 Hyprland-polish pass).
+
+   This is the :root token layer only. The source file also carries
+   element-level rules (body, h2, h3) written for a portfolio site — an
+   inline-block h2 with 2rem margins and a purple underline — which would
+   wreck dashboard chrome. Those are intentionally not vendored; the
+   dashboard's own rules are remapped onto these tokens in globals.css.
+
+   Keep this file in sync with the design project rather than editing it here.
+   ============================================================ */
+
+/* The JetBrains Mono @import lives at the top of globals.css, not here:
+   CSS requires every @import to precede all other rules, and this file is
+   inlined after Tailwind's, so an @import here is invalid and fails the build. */
+
+:root {
+  /* ---------- Brand / surface (Mocha neutrals) ---------- */
+  --bg-dark:         #16161b;
+  --bg-mantle:       #141418;
+  --bg-glass:        rgba(24, 24, 29, 0.85);
+  --bg-glass-strong: rgba(20, 20, 24, 0.92);
+  --bg-overlay:      rgba(0, 0, 0, 0.35);
+  --bg-overlay-2:    rgba(0, 0, 0, 0.5);
+  --bg-overlay-3:    rgba(0, 0, 0, 0.7);
+
+  /* ---------- Accent pops ---------- */
+  --neon-green:  #00ff00;
+  --neon-purple: #8000ff;
+  --neon-cyan:   #00f3ff;
+
+  /* macOS-style window dots — reused for status semantics */
+  --dot-red:    #ff5f56;
+  --dot-yellow: #ffbd2e;
+  --dot-green:  #27c93f;
+
+  /* ---------- Text ---------- */
+  --text-primary: #e4e4ea;
+  --text-dim:     #8a8a92;
+  --text-mute:    #6c6c74;
+  --text-soft:    #a3a3ab;
+
+  /* ---------- Borders ---------- */
+  --border-neutral:        rgba(255, 255, 255, 0.08);
+  --border-neutral-strong: rgba(255, 255, 255, 0.16);
+  --border-green-30: rgba(0, 255, 0, 0.3);
+  --border-purple-30: rgba(128, 0, 255, 0.3);
+
+  /* ---------- Glow ---------- */
+  --glow-green-sm:  0 0 5px var(--neon-green);
+  --glow-green-md:  0 0 10px var(--neon-green);
+  --glow-green-lg:  0 0 15px var(--neon-green);
+  --glow-purple-sm: 0 0 8px var(--neon-purple);
+  --glow-cyan-sm:   0 0 5px var(--neon-cyan);
+
+  --shadow-window:
+    0 4px 24px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--border-neutral);
+  --shadow-window-active:
+    0 0 0 2px var(--neon-green),
+    0 8px 32px rgba(0, 0, 0, 0.6);
+
+  /* ---------- Radii — uniform, Hyprland-style ---------- */
+  --radius:    10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+
+  /* ---------- Spacing ---------- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 10px; --space-4: 15px;
+  --space-5: 16px; --space-6: 20px; --space-7: 24px; --space-8: 30px;
+  --space-9: 40px; --space-10: 60px;
+
+  /* ---------- Type — JetBrains Mono everywhere ---------- */
+  --font-mono: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'Courier New', monospace;
+
+  --fs-xs: 0.7rem; --fs-sm: 0.8rem; --fs-md: 0.9rem; --fs-base: 1rem;
+  --fs-lg: 1.1rem; --fs-xl: 1.2rem; --fs-2xl: 1.5rem;
+
+  --lh-tight: 1.4; --lh-base: 1.5; --lh-loose: 1.8;
+  --ls-tight: 1px; --ls-wide: 2px;
+
+  /* ---------- Motion ---------- */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-hypr:      cubic-bezier(0.55, -0.68, 0.48, 1.682);
+  --dur-fast: 0.2s; --dur-base: 0.3s; --dur-slow: 0.4s;
+}
