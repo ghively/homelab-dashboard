@@ -23,6 +23,7 @@ import { UnifiAdapter } from "@/adapters/unifi-adapter";
 import watchtowerVps from "@/adapters/storage/watchtower-vps-adapter";
 import watchtowerMedia from "@/adapters/storage/watchtower-media-adapter";
 import watchtowerStorage from "@/adapters/storage/watchtower-storage-adapter";
+import { SearXNGAdapter } from "@/adapters/searxng-adapter";
 
 const registry = new Map<string, DataAdapter>();
 let initialized = false;
@@ -210,6 +211,17 @@ function registerWatchtowers(): void {
   if (process.env.WATCHTOWER_STORAGE_URL) registry.set("watchtower-storage", watchtowerStorage);
 }
 
+/**
+ * SearXNG takes its name as a constructor argument — it is written to support
+ * several instances. Only the "searxng" name exists in WORLDS, so that is the
+ * one registered here.
+ */
+function registerSearxng(): void {
+  const url = process.env.SEARXNG_URL;
+  if (!url) return;
+  registry.set("searxng", new SearXNGAdapter("searxng", url));
+}
+
 export function initAdapters(): void {
   if (initialized) return;
   initialized = true;
@@ -222,6 +234,7 @@ export function initAdapters(): void {
   registerPihole();
   registerUnifi();
   registerWatchtowers();
+  registerSearxng();
 }
 
 export function getAdapter(name: string): DataAdapter | undefined {

@@ -10,7 +10,7 @@
 
 1. **Do the phases in order.** Phase N assumes Phase N−1 is done and verified. Do not skip ahead. Do not start Phase 2 because it looks more interesting than Phase 0.
 2. **Do one task at a time.** Each task has a `VERIFY` block. Run it. If it fails, fix it before moving on.
-3. **Do not delete the adapters.** `src/adapters/` and `src/lib/adapters/` contain ~11,800 lines of working API-client code. It is currently unused, but it is correct and expensive to recreate.
+3. **Do not delete the adapters.** `src/adapters/` and `src/lib/adapters/` contain ~11,800 lines of API-client code that is expensive to recreate. **Correction (Phase 6 audit): "it is correct" was wrong.** `src/lib/adapters/*` are genuine clients, but most modules under `src/adapters/` return hardcoded data from `query()` and never call the service. Keep them as scaffolding, but read the Phase 6 audit table before registering any of them.
 4. **Do not "improve" things not in the plan.** No refactors, no renames, no dependency upgrades, no reformatting unrelated files.
 5. **If a task's assumption is wrong** (a file is different from described, an API doesn't exist), STOP and report what you actually found. Do not guess and continue.
 6. **After each phase, run `npm run build` and `npm run lint`.** Both must pass before continuing.
@@ -32,7 +32,7 @@ way it does — do not re-do them.
 | 4 — Interactivity | **DONE** | #10 |
 | 5 — Visual layer | **DONE** | #11 |
 | — Type errors + honest build | **DONE** | #12 |
-| **6 — Remaining ~76 adapters** | **NOT STARTED** | — |
+| **6 — Remaining ~76 adapters** | **IN PROGRESS — 12 live** | #14 |
 
 Verified on `main` after the merges, from a clean `npm ci`:
 
@@ -681,6 +681,53 @@ Add `transition` on state changes and a subtle entrance animation as panels stre
 ---
 
 # PHASE 6 — The remaining 76 adapters
+
+> ## AUDIT RESULT — read before wiring anything else
+>
+> **Rule 3 of this plan says `src/adapters/` contains "~11,800 lines of working
+> API-client code" that "is correct". That is false for most of it.** Every
+> module was audited by reading its `query()` method. The majority return
+> hardcoded values and never contact the service.
+>
+> Registering those modules would stamp invented numbers with `source: "live"`
+> — re-opening the exact compounding bug Phase 0 and Phase 3 closed. The
+> fixture path is honest about being fake; these are not.
+>
+> **Registered — `query()` derives every displayed value from a real fetch, and
+> failure renders `offline` with no invented numbers:**
+>
+> | adapter | module |
+> |---|---|
+> | `emby` `sonarr` `radarr` `sabnzbd` `tdarr` `romm` | `src/lib/adapters/*` (genuine clients) |
+> | `pihole` | `pihole-adapter.ts` — parses `api.php?summary` |
+> | `unifi` | `unifi-adapter.ts` — 3 real calls, client lists derived |
+> | `watchtower-vps` `watchtower-media` `watchtower-storage` | parse `/v1/containers` JSON |
+> | `searxng` | parses `/config` + `/stats` |
+>
+> **Rejected — `query()` returns hardcoded data. Do NOT register without
+> rewriting the module first:**
+>
+> | adapter | what it fabricates |
+> |---|---|
+> | `synology-dsm` | volumes, 8 disks, temps, "DS1817+ • 13 drives". Comment admits *"Using mock data with real API structure"*. **This is the plan's own #1 priority — it does not work.** |
+> | `litellm` `ollama` `comfyui` `omniroute` | model lists and spend (`total_spend: 12.45`). Marked `source: "*-mock"`, `// Mock data for now.` |
+> | `wazuh-manager` | **worst case — mixes real and fake.** Agent counts come from the API; "Security Alerts (24h): 847", "Critical: 3", and invented events (`SSH brute force from 185.220.101.1`, `/etc/passwd modified`) are hardcoded. |
+> | `wazuh-dashboard` `wazuh-indexer` | 5 and 1 hardcoded metric values |
+> | `fail2ban` | both copies. Root fetches, then **silently substitutes hardcoded jails** when the response is empty. Subdir version's `fetch` is only a TCP probe to port 22; jails are a literal array. |
+> | `caddy` `smb-nfs` `spoolman` `syncthing` `garage-s3` `valkey` `iot-vlan` | no network call in `query()` |
+> | `hermes-*` (all 5) | no network call in `query()` |
+> | `gitlab` `ansible` `gitlab-runner` `github-actions` | no network call — and not in `WORLDS`, so no tool spec exists either |
+>
+> **Blocked for a different reason:**
+> - `cloudflare-dns` — `query()` is genuinely real, but the class is not
+>   exported and the only export is an instance built with literal
+>   `"[REDACTED]"` credentials. Needs the module edited to accept config.
+> - `1panel` — real-ish, but the name is absent from `WORLDS`, so no tool spec.
+>
+> **So the honest count is 12 of ~76 wired, not 76 pending registration.** The
+> remaining work is *writing* adapters, not registering them. Treat each
+> rejected row as "implement this client", and re-audit `query()` before
+> registering it.
 
 **Size:** Ongoing. Repetitive, not hard.
 
