@@ -11,6 +11,7 @@
  * - GET /api/v3/diskspace (disk usage)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -114,7 +115,7 @@ export class RadarrAdapter {
         id: m.id.toString(),
         label: m.title,
         subtitle: m.year?.toString(),
-        image: m.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", m.images?.find((img) => img.coverType === "poster")?.url),
         value: m.year,
         state: m.monitored ? "healthy" : "warning",
         group: m.status,
@@ -186,7 +187,7 @@ export class RadarrAdapter {
         id: item.id.toString(),
         label: item.movie?.title || "Unknown Movie",
         subtitle: item.movie?.year?.toString(),
-        image: item.movie?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
         state: "critical",
         group: item.digitalRelease || item.physicalRelease || "Unknown",
         meta: {
@@ -240,7 +241,7 @@ export class RadarrAdapter {
         id: item.id.toString(),
         label: item.title,
         subtitle: item.movie?.title,
-        image: item.movie?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
         value: item.size,
         progress: item.sizeleft ? 1 - item.sizeleft / item.size : undefined,
         state: item.status === "downloading" ? "loading" : item.status === "completed" ? "healthy" : "warning",
@@ -322,7 +323,7 @@ export class RadarrAdapter {
         id: item.id.toString(),
         label: item.title,
         subtitle: item.year?.toString(),
-        image: item.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", item.images?.find((img) => img.coverType === "poster")?.url),
         state: item.hasFile ? "healthy" : "warning",
         group: item.physicalRelease || item.digitalRelease || "Unknown",
         meta: {
