@@ -9,7 +9,7 @@ initAdapters();
 // GET /api/fleet — aggregate health across all 8 worlds (for landing page)
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const state = (sp.get("state") as VisualStateValue) || "healthy";
+  const state = (sp.get("state") as VisualStateValue | null) ?? null;
 
   const worlds = await Promise.all(
     WORLDS.map(async (w) => {

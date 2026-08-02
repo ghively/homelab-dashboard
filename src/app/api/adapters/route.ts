@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const world = sp.get("world") as WorldId | null;
   const adapter = sp.get("adapter");
-  const state = (sp.get("state") as VisualStateValue) || "healthy";
+  // No ?state= means "show me live data". A ?state= value is an explicit
+  // request for that fixture, used by the state exerciser.
+  const state = (sp.get("state") as VisualStateValue | null) ?? null;
   const view = sp.get("view") ?? undefined;
 
   if (adapter) {
