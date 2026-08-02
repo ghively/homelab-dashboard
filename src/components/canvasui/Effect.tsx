@@ -3,30 +3,57 @@
 /**
  * The single gate every Canvas UI effect in this app goes through.
  *
- * Three things have to line up before an effect may render, and each has a
- * different fallback consequence:
+ * IMPORTANT — what this deliberately does NOT check: HTML-in-Canvas.
  *
- *  1. HTML-in-Canvas must actually RASTERISE — see probe.ts. This deliberately
- *     does not ask whether `drawElementImage` exists: enabling the Chrome flag
- *     exposes the method before the draw necessarily works, and the vendored
- *     components swallow the resulting exception, so a nominal check made
- *     turning the flag ON blank out the panels. The probe draws a known colour
- *     and reads the pixels back.
+ * An earlier version of this gate required `drawElementImage` to work, and that
+ * was simply a misreading of the library. These components do not need it.
+ * `createGlass` returns null only when WebGL2 is missing (Glass.tsx:290); the
+ * API's presence is passed to the shader as a uniform instead
+ * (`uHasContent`, Glass.tsx:470), and the shader has a complete branch for its
+ * absence (Glass.tsx:208-216) that draws the lens rim and specular highlight
+ * over the real DOM content underneath. HTML-in-Canvas adds content REFRACTION;
+ * it is an enhancement, not a requirement. The canvasui.dev playground renders
+ * correctly in browsers without the flag for exactly this reason.
+ *
+ * Gating on it meant that when the probe failed, no effect mounted at all — so
+ * the dashboard rendered no effects anywhere, which is the bug this fixes.
+ * Degrade the effect, never suppress it.
+ *
+ * What actually has to line up:
+ *
+ *  1. WebGL2 must be available. This is the one true hard requirement — without
+ *     a context there is nothing to render and the component returns null.
  *  2. A WebGL context slot must be free — see budget.ts for why that is capped.
  *  3. prefers-reduced-motion must not be set. These effects are continuous
  *     animation; honouring that preference is not optional.
  *
  * When any of those fails, children render inside the plain wrapper and the
  * dashboard falls back to its CSS glass, which is the design it had before.
- * Nothing looks broken — it just looks calmer.
- *
- * `useEffectGate` is exported separately so callers can branch on the decision
- * (e.g. to keep a CSS class only in fallback) rather than only wrapping.
  */
 
 import { useEffect, useRef, useState } from "react";
-import { probeHtmlInCanvas } from "@/components/canvasui/probe";
 import { claimSlot, type Slot } from "@/components/canvasui/budget";
+
+let webgl2: boolean | null = null;
+
+/**
+ * Cached because it costs a real context to answer. The probe context is
+ * explicitly released — browsers cap live contexts at around 16, and silently
+ * leaking one here would steal a slot from an actual panel.
+ */
+export function supportsWebGL2(): boolean {
+  if (webgl2 !== null) return webgl2;
+  if (typeof document === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl2");
+    webgl2 = Boolean(gl && !gl.isContextLost());
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  } catch {
+    webgl2 = false;
+  }
+  return webgl2;
+}
 
 export function useEffectGate(priority = false): boolean {
   const [enabled, setEnabled] = useState(false);
@@ -35,16 +62,14 @@ export function useEffectGate(priority = false): boolean {
   useEffect(() => {
     let alive = true;
 
-    // Async because the probe needs a real paint frame to complete. The slot is
-    // claimed only after it resolves, so a browser that cannot rasterise never
-    // consumes one of the capped WebGL contexts.
-    void probeHtmlInCanvas().then((result) => {
-      if (!alive || !result.ok) return;
+    // Deferred to a microtask: these touch browser APIs, so they cannot run
+    // during render, and setting state synchronously inside an effect is what
+    // react-hooks flags as a cascading-render risk.
+    void Promise.resolve().then(() => {
+      if (!alive) return;
 
-      const reduced =
-        typeof window !== "undefined" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduced) return;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced || !supportsWebGL2()) return;
 
       const s = claimSlot(priority);
       if (!s.granted) return;
