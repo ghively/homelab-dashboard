@@ -376,6 +376,51 @@ export class EmbyAdapter {
   }
 
   /**
+   * Query: Overview — the default view.
+   *
+   * The library view alone returns counts but no artwork, so on the media page
+   * Emby rendered as ranked bars while Sonarr/Radarr showed poster walls. This
+   * keeps the per-library count KPIs (which the picker turns into a MetricStrip)
+   * AND attaches the recently-added movie posters (which it turns into an
+   * ArtworkWall), so Emby leads with its numbers and shows its cover art like
+   * the other media services. Both sub-queries already exist and already fail
+   * softly; this only composes them.
+   */
+  async queryOverview(): Promise<VisualQueryResult> {
+    const start = Date.now();
+    try {
+      const [libs, recent] = await Promise.all([
+        this.queryLibraryOverview(),
+        this.queryRecentlyAddedMovies(),
+      ]);
+      const now = new Date().toISOString();
+      const data: VisualData = {
+        title: "Emby",
+        subtitle: libs.data?.summary ?? recent.data?.subtitle,
+        state: "healthy",
+        // Library counts drive the KPI strip; recent movies (with proxied
+        // posters) drive the wall. If either sub-query failed softly its field
+        // is simply absent and the panel drops that half rather than erroring.
+        metrics: libs.data?.metrics,
+        items: recent.data?.items,
+        summary: libs.data?.summary,
+        updatedAt: now,
+      };
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Emby:${this.baseUrl}/overview`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult("Emby", err, start);
+    }
+  }
+
+  /**
    * Query: Series list.
    * Returns VisualData for SeriesWall component.
    */
