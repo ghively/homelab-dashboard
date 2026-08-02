@@ -31,6 +31,7 @@ export default function Home() {
     meta?: Record<string, unknown>;
   } | null>(null);
   const [drawerAdapter, setDrawerAdapter] = useState<string | undefined>();
+  const [drawerSource, setDrawerSource] = useState<"live" | "fixture" | "offline" | undefined>();
   const [savedView, setSavedView] = useState("overview");
 
   if (activeWorld === "home") {
@@ -61,8 +62,9 @@ export default function Home() {
           fixtureState={fixtureState}
           activeTag={activeTag}
           onTagClick={setActiveTag}
-          onEntityClick={(entity, adapter) => {
+          onEntityClick={(entity, adapter, source) => {
             setDrawerEntity(entity);
+            setDrawerSource(source);
             setDrawerAdapter(adapter);
           }}
         />
@@ -71,6 +73,7 @@ export default function Home() {
           onClose={() => setDrawerEntity(null)}
           entity={drawerEntity}
           adapterName={drawerAdapter}
+          entitySource={drawerSource}
         />
       </DashboardShell>
     );
@@ -90,8 +93,9 @@ export default function Home() {
         onTagClick={setActiveTag}
         savedView={savedView}
         onSaveView={setSavedView}
-        onEntityClick={(entity, adapter) => {
+        onEntityClick={(entity, adapter, source) => {
           setDrawerEntity(entity);
+          setDrawerSource(source);
           setDrawerAdapter(adapter);
         }}
       />
@@ -100,6 +104,7 @@ export default function Home() {
         onClose={() => setDrawerEntity(null)}
         entity={drawerEntity}
         adapterName={drawerAdapter}
+        entitySource={drawerSource}
       />
     </DashboardShell>
   );
@@ -216,7 +221,11 @@ function WorldView({
   onTagClick: (tag: string) => void;
   savedView: string;
   onSaveView: (id: string) => void;
-  onEntityClick: (entity: Record<string, unknown>, adapter: string) => void;
+  onEntityClick: (
+    entity: Record<string, unknown>,
+    adapter: string,
+    source?: "live" | "fixture" | "offline",
+  ) => void;
 }) {
   const { data, loading } = useWorldData(world, fixtureState);
   const worldConfig = WORLDS.find((w) => w.id === world)!;
@@ -275,7 +284,7 @@ function WorldView({
               key={adapter}
               adapterName={adapter}
               result={result}
-              onItemClick={(item) => onEntityClick(item, adapter)}
+              onItemClick={(item) => onEntityClick(item, adapter, result.source)}
             />
           ))}
         </div>
@@ -295,7 +304,11 @@ function AIWorkspace({
   fixtureState: VisualStateValue | null;
   activeTag: string | null;
   onTagClick: (tag: string) => void;
-  onEntityClick: (entity: Record<string, unknown>, adapter: string) => void;
+  onEntityClick: (
+    entity: Record<string, unknown>,
+    adapter: string,
+    source?: "live" | "fixture" | "offline",
+  ) => void;
 }) {
   const { data, loading } = useWorldData("ai", fixtureState);
   const worldConfig = WORLDS.find((w) => w.id === "ai")!;
@@ -337,7 +350,7 @@ function AIWorkspace({
               key={adapter}
               adapterName={adapter}
               result={result}
-              onItemClick={(item) => onEntityClick(item, adapter)}
+              onItemClick={(item) => onEntityClick(item, adapter, result.source)}
             />
           ))}
         </div>
@@ -362,7 +375,12 @@ function AdapterResultCard({
   const hasNodes = result.nodes && result.nodes.length > 0;
 
   return (
-    <VisualPanel title={result.title} subtitle={result.subtitle} state={result.state}>
+    <VisualPanel
+      title={result.title}
+      subtitle={result.subtitle}
+      state={result.state}
+      source={result.source}
+    >
       {hasMetrics && <MetricStrip metrics={result.metrics!} />}
 
       {hasItems && (
