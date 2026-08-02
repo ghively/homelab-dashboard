@@ -113,4 +113,3 @@ poster-rich component markup, honest playback metadata, and chart animation
 hooks. Design previews use actual local cover assets. Final verification
 includes TypeScript, parity, prompt-size, build, lint, and browser inspection
 at desktop, tablet, mobile, and reduced-motion settings.
-
