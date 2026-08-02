@@ -59,14 +59,20 @@ export function DashboardShell({
             <small>Homelab Dashboard</small>
           </div>
         </div>
+        {/* Primary action, above the nav and styled unlike it. Starting a new
+            dashboard is the one thing a person does far more than navigating,
+            and burying it as the first row of a list made it look like just
+            another destination. */}
+        <button
+          className="dash-new"
+          onClick={() => onWorldChange("home")}
+        >
+          <span className="dash-new-icon" aria-hidden="true">+</span>
+          New dashboard
+        </button>
+
         <nav className="dash-nav">
-          <button
-            className={`dash-nav-item ${activeWorld === "home" ? "active" : ""}`}
-            onClick={() => onWorldChange("home")}
-          >
-            <span className="dash-nav-icon">⌂</span>
-            <span>Home</span>
-          </button>
+          <div className="dash-nav-label">Worlds</div>
           {WORLDS.map((w) => (
             <button
               key={w.id}
