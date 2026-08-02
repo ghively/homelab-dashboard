@@ -907,8 +907,13 @@ button.dash-tag {
   align-items: center;
   gap: var(--space-3);
   padding: 10px 15px;
-  background: var(--bg-mantle);
-  border-bottom: 1px solid var(--border-neutral);
+  /* Was an opaque var(--bg-mantle) band bleeding to the panel edges, which
+     made sense while panels were opaque too. Against a translucent panel it
+     became the one solid block interrupting the wallpaper — a dark strip
+     across artwork that reads through everywhere else. A faint wash keeps the
+     header separated from the body without breaking the glass. */
+  background: rgba(255, 255, 255, 0.035);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin: -16px -16px 14px;          /* bleed to the panel edges */
 }
 

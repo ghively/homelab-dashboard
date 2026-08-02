@@ -35,20 +35,19 @@ import { useEffect, useRef, useState } from "react";
 import { claimSlot, type Slot } from "@/components/canvasui/budget";
 
 /**
- * Canvas UI is OFF by default on the dashboard.
+ * Canvas UI is ON by default again.
  *
- * Not a retreat — a separation. These effects are an experimental Chrome origin
- * trial wrapped around 7,000 lines of vendored WebGL, and every round of
- * debugging them has used the actual dashboard as the test surface. That is
- * backwards: the product should not be the proving ground. /lab exists for
- * exactly that, mounts the components raw, and is unaffected by this switch.
+ * It was defaulted off while the experimental HTML-in-Canvas path could blank
+ * panels and crash the renderer. That path is now disabled at its own switch
+ * (probe.ts), so what remains is plain WebGL2 — no origin trial, no flag, no
+ * drawElementImage — which is the mode canvasui.dev itself ships and the mode
+ * that has rendered correctly in every browser tested here.
  *
- * So the dashboard renders its CSS glass — the design that has worked
- * throughout — until the effects are worth turning on, and turning them on is a
- * URL away rather than a deploy.
+ * That leaves nothing to protect the dashboard from, and the effects are the
+ * point. Turning them off stays one URL away.
  *
- *   ?fx=on   enable and remember
  *   ?fx=off  disable and remember
+ *   ?fx=on   re-enable and remember
  *
  * The choice persists in localStorage, so it survives navigation without
  * needing the parameter on every link.
@@ -61,11 +60,12 @@ export function effectsRequested(): boolean {
       window.localStorage.setItem("canvasui", param);
       return param === "on";
     }
-    return window.localStorage.getItem("canvasui") === "on";
+    // Default ON: only an explicit, remembered "off" suppresses effects.
+    return window.localStorage.getItem("canvasui") !== "off";
   } catch {
     // Private mode and blocked-storage contexts throw on localStorage access.
-    // Failing closed keeps the dashboard on its known-good rendering.
-    return false;
+    // Effects are safe without storage, so this only loses the preference.
+    return true;
   }
 }
 
