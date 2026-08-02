@@ -78,9 +78,12 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
    effectively opaque and the blur behind it did nothing. The design system's
    own --bg-glass sits at 0.85 for a solid window; these are the *glass*
    variants and need to let the ground through. */
-.cnv-surface.tr-subtle { background: oklch(0.19 0.02 265 / 0.62); }
-.cnv-surface.tr-medium { background: oklch(0.19 0.02 265 / 0.46); }
-.cnv-surface.tr-strong { background: oklch(0.19 0.02 265 / 0.30); }
+/* A LIGHT film over the ground, not a dark fill — this is the Obsidian theme's
+   treatment, and over the backdrop image it reads far softer than the previous
+   near-opaque dark glass. */
+.cnv-surface.tr-subtle { background: rgba(255, 255, 255, 0.045); }
+.cnv-surface.tr-medium { background: rgba(255, 255, 255, 0.06); }
+.cnv-surface.tr-strong { background: rgba(255, 255, 255, 0.085); }
 
 /* ── Backdrop blur (the glass effect) ────────────────────────────────── */
 /* Blur now carries saturation too. Saturating what shows through is what
