@@ -83,7 +83,11 @@ body::before {
        margins. Kept light, and stronger toward the bottom where the amber
        circuitry is brightest. */
     linear-gradient(rgba(11, 11, 14, 0.18), rgba(11, 11, 14, 0.42)),
-    url("/backdrop.webp") center / cover no-repeat fixed;
+    /* No `fixed` attachment: this pseudo-element is ALREADY position:fixed, so
+       it adds nothing, and on mobile it promotes the image to its own
+       compositing layer that many browsers rasterise at reduced resolution —
+       a common and very visible source of background blur. */
+    url("/backdrop.webp") center / cover no-repeat;
 }
 
 /* Everything else sits above the ambient field. */
@@ -103,19 +107,22 @@ body::before {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* Portrait wireframe-mesh wallpaper, stretched to fill the whole column.
-     `cover` cropped hard: the column is ~4.5:1 tall but the artwork is 1.78:1,
-     so covering scaled it until the height fit and threw away most of the
-     width — you only ever saw a narrow centre strip. `100% 100%` shows the
-     entire image instead. It distorts, but the artwork is abstract mesh with no
-     straight edges or faces, so the stretch is not readable.
+  /* Wallpaper is pre-cropped to a 1:3.7 strip matching this column's shape, at
+     the source's native pixels — see scripts/ notes. Two things were making it
+     look low-resolution:
 
-     The veil is stronger than the page backdrop's because nav text sits
-     directly on this rather than inside a glass panel. */
+     `100% 100%` squashed a 900x1599 image into a ~240x1080 column, compressing
+     it 2.5x more horizontally than vertically. The mesh smeared into vertical
+     streaks, which reads as blur rather than as distortion.
+
+     `cover` on the un-cropped portrait would instead have thrown away ~60% of
+     the width and kept only the dark centre band. Cropping at source solves
+     both: the aspect already matches, so cover neither stretches nor discards
+     anything meaningful. */
   position: relative;
   background:
     linear-gradient(rgba(11, 11, 14, 0.34), rgba(11, 11, 14, 0.52)),
-    url("/sidebar.webp") 0 0 / 100% 100% no-repeat,
+    url("/sidebar.webp") center / cover no-repeat,
     var(--dash-sidebar);
 }
 
