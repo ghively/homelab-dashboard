@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backdrop lab</title>
+<style>
+  :root {
+    --bg-dark:#16161b; --bg-mantle:#141418;
+    --neon-green:#00ff00; --neon-purple:#8000ff; --neon-cyan:#00f3ff;
+    --dot-red:#ff5f56; --dot-yellow:#ffbd2e; --dot-green:#27c93f;
+    --text:#e4e4ea; --dim:#8a8a92; --mute:#6c6c74;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.16);
+    --radius:10px;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{min-height:100vh;background:#0b0b0e;color:var(--text);font-family:var(--mono);font-size:14px}
+
+  /* ── L1 · colour ─────────────────────────────────────────── */
+  #colour{position:fixed;inset:0;z-index:0;pointer-events:none}
+  #colour.mesh{
+    background:
+      radial-gradient(60% 55% at 12% 18%, rgba(128,0,255,.62), transparent 62%),
+      radial-gradient(55% 50% at 88% 22%, rgba(0,243,255,.54), transparent 60%),
+      radial-gradient(50% 45% at 78% 86%, rgba(0,255,140,.40), transparent 60%),
+      radial-gradient(45% 42% at 20% 88%, rgba(255,0,128,.46), transparent 62%),
+      #0b0b0e;
+    background-size:180% 180%,170% 170%,175% 175%,165% 165%,100% 100%;
+    animation:drift 42s ease-in-out infinite alternate;
+  }
+  @keyframes drift{
+    0%  {background-position:0% 0%,100% 0%,100% 100%,0% 100%,0 0}
+    100%{background-position:35% 25%,60% 30%,55% 70%,40% 65%,0 0}
+  }
+  #colour.aurora{
+    background:
+      conic-gradient(from 210deg at 50% 40%,
+        rgba(255,0,0,.34), rgba(255,255,0,.26), rgba(0,255,0,.32),
+        rgba(0,255,255,.40), rgba(0,0,255,.34), rgba(255,0,255,.38), rgba(255,0,0,.34)),
+      #0b0b0e;
+  }
+  #colour.aurora::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(58% 52% at 50% 45%, transparent 8%, #0b0b0e 76%)}
+  #colour.circuit{
+    background:
+      radial-gradient(circle at 18% 22%, rgba(128,0,255,.48), transparent 46%),
+      radial-gradient(circle at 84% 30%, rgba(0,243,255,.42), transparent 48%),
+      radial-gradient(circle at 62% 88%, rgba(255,170,0,.30), transparent 46%),
+      repeating-linear-gradient(0deg, rgba(0,243,255,.10) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(90deg, rgba(128,0,255,.10) 0 1px, transparent 1px 64px),
+      #0a0a0d;
+    animation:pan 60s linear infinite;
+  }
+  @keyframes pan{0%{background-position:0 0,0 0,0 0,0 0,0 0}100%{background-position:0 0,0 0,0 0,0 640px,640px 0}}
+
+  /* ── L2 · dark splotches ─────────────────────────────────────
+     Low-frequency fractal noise, crushed to near-black and multiplied over the
+     colour. That is what makes it read as weathered texture instead of a clean
+     gradient — the colour gets eaten away in organic patches. */
+  #splotch{position:fixed;inset:0;z-index:0;pointer-events:none;mix-blend-mode:multiply;opacity:.75}
+  #splotch.blotch{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='4' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.04 0 0 0 0 0.04 0 0 0 0 0.05 -1.6 0 0 0 1.25'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23f)'/%3E%3C/svg%3E");
+    background-size:cover;
+  }
+  #splotch.clouds{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0022' numOctaves='6' seed='3'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.03 0 0 0 0 0.03 0 0 0 0 0.04 -2.2 0 0 0 1.6'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23f)'/%3E%3C/svg%3E");
+    background-size:cover;
+  }
+  #splotch.ink{
+    background-image:
+      radial-gradient(38% 30% at 22% 30%, rgba(0,0,0,.85), transparent 65%),
+      radial-gradient(30% 26% at 72% 20%, rgba(0,0,0,.75), transparent 62%),
+      radial-gradient(42% 34% at 60% 78%, rgba(0,0,0,.80), transparent 66%),
+      radial-gradient(26% 22% at 12% 74%, rgba(0,0,0,.70), transparent 60%),
+      radial-gradient(24% 20% at 92% 62%, rgba(0,0,0,.72), transparent 60%);
+    background-size:cover;
+  }
+
+  /* ── L3 · grain ──────────────────────────────────────────── */
+  #grain{position:fixed;inset:0;z-index:0;pointer-events:none;mix-blend-mode:overlay;opacity:.35}
+  #grain.on{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    background-size:220px 220px;
+  }
+
+  .veil{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+  .wrap{position:relative;z-index:1;padding:20px;display:flex;flex-direction:column;gap:14px;max-width:920px;margin:0 auto}
+  h1{font-size:1rem;font-weight:600;color:var(--neon-cyan);letter-spacing:.5px}
+  .hint{color:var(--dim);font-size:.78rem}
+  .grp{display:flex;flex-direction:column;gap:6px}
+  .lbl{font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);font-weight:600}
+  .picker{display:flex;gap:7px;flex-wrap:wrap}
+  .picker button{font:inherit;font-size:.78rem;font-weight:600;padding:7px 13px;border-radius:999px;cursor:pointer;
+    border:1px solid rgba(128,0,255,.3);background:rgba(0,0,0,.3);color:var(--neon-purple)}
+  .picker button.on{border-color:var(--neon-green);color:var(--neon-green);box-shadow:0 0 10px rgba(0,255,0,.35)}
+  .row{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:.74rem}
+  .row span:first-child{width:74px;flex:none}
+  input[type=range]{flex:1;min-width:120px;accent-color:var(--neon-green)}
+  .num{width:44px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text)}
+
+  .panel{background:rgba(255,255,255,.055);border:1px solid var(--line2);border-radius:var(--radius);
+    backdrop-filter:blur(14px) saturate(1.28);-webkit-backdrop-filter:blur(14px) saturate(1.28);
+    box-shadow:0 4px 14px rgba(0,0,0,.42);overflow:hidden}
+  .head{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg-mantle);border-bottom:1px solid var(--line)}
+  .dots{display:flex;gap:7px}
+  .dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .r{background:var(--dot-red)}.y{background:var(--dot-yellow)}.g{background:var(--dot-green)}
+  .title{flex:1;text-align:center;color:var(--neon-cyan);font-size:.82rem;font-weight:600}
+  .badge{font-size:.68rem;color:var(--neon-green);display:inline-flex;align-items:center;gap:6px}
+  .badge::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding:14px}
+  .metrics article{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:6px;padding:10px}
+  .metrics small{display:block;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:600}
+  .metrics strong{display:block;font-size:1.3rem;margin-top:3px;font-variant-numeric:tabular-nums}
+  #recipe{font-size:.72rem;color:var(--neon-green);background:rgba(0,255,0,.06);border:1px solid rgba(0,255,0,.2);
+    border-radius:8px;padding:10px 12px;word-break:break-word}
+  @media (prefers-reduced-motion:reduce){#colour{animation:none!important}}
+</style>
+</head>
+<body>
+<div id="colour" class="mesh"></div>
+<div id="splotch" class="blotch"></div>
+<div id="grain" class="on"></div>
+<div class="veil" id="veil"></div>
+
+<div class="wrap">
+  <h1>Backdrop lab — layered, all CSS</h1>
+  <p class="hint">Three stacked layers: colour, dark splotches, grain. Nothing here is an image — the splotches and grain are SVG fractal noise inlined as data URIs, so it stays sharp at any size and weighs nothing.</p>
+
+  <div class="grp"><span class="lbl">Colour</span>
+    <div class="picker" id="pColour">
+      <button data-v="mesh" class="on">Mesh</button>
+      <button data-v="aurora">Aurora</button>
+      <button data-v="circuit">Circuit</button>
+    </div>
+  </div>
+
+  <div class="grp"><span class="lbl">Dark splotches</span>
+    <div class="picker" id="pSplotch">
+      <button data-v="blotch" class="on">Blotch</button>
+      <button data-v="clouds">Clouds</button>
+      <button data-v="ink">Ink pools</button>
+      <button data-v="">None</button>
+    </div>
+  </div>
+
+  <div class="row"><span>Splotch</span><input id="sSplotch" type="range" min="0" max="100" value="75"><span class="num" id="nSplotch">75</span></div>
+  <div class="row"><span>Grain</span><input id="sGrain" type="range" min="0" max="100" value="35"><span class="num" id="nGrain">35</span></div>
+  <div class="row"><span>Veil</span><input id="sVeil" type="range" min="0" max="70" value="14"><span class="num" id="nVeil">14</span></div>
+
+  <section class="panel">
+    <div class="head"><div class="dots"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+      <div class="title">Sonarr</div><span class="badge">healthy</span></div>
+    <div class="metrics">
+      <article><small>Shows</small><strong>260</strong></article>
+      <article><small>Continuing</small><strong>68</strong></article>
+      <article><small>Ended</small><strong>192</strong></article>
+      <article><small>Monitored</small><strong>190</strong></article>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><div class="dots"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+      <div class="title">Emby</div><span class="badge">healthy</span></div>
+    <div class="metrics">
+      <article><small>Movies</small><strong>523</strong></article>
+      <article><small>TV items</small><strong>26,392</strong></article>
+      <article><small>Collections</small><strong>61</strong></article>
+    </div>
+  </section>
+
+  <div id="recipe"></div>
+</div>
+
+<script>
+  var colour = document.getElementById('colour');
+  var splotch = document.getElementById('splotch');
+  var grain = document.getElementById('grain');
+  var veil = document.getElementById('veil');
+
+  var state = { colour: 'mesh', splotch: 'blotch', sp: 75, gr: 35, vl: 14 };
+
+  function bind(pickerId, key, apply) {
+    document.querySelectorAll('#' + pickerId + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#' + pickerId + ' button').forEach(function (o) { o.classList.remove('on'); });
+        b.classList.add('on');
+        state[key] = b.dataset.v;
+        apply();
+        recipe();
+      });
+    });
+  }
+  bind('pColour', 'colour', function () { colour.className = state.colour; });
+  bind('pSplotch', 'splotch', function () { splotch.className = state.splotch; });
+
+  function slider(id, numId, key, apply) {
+    var s = document.getElementById(id), n = document.getElementById(numId);
+    s.addEventListener('input', function () { state[key] = +s.value; n.textContent = s.value; apply(); recipe(); });
+  }
+  slider('sSplotch', 'nSplotch', 'sp', function () { splotch.style.opacity = state.sp / 100; });
+  slider('sGrain', 'nGrain', 'gr', function () { grain.style.opacity = state.gr / 100; });
+  slider('sVeil', 'nVeil', 'vl', setVeil);
+
+  function setVeil() {
+    var t = state.vl / 100, b = Math.min(0.85, t + 0.22);
+    veil.style.background = 'linear-gradient(rgba(11,11,14,' + t.toFixed(2) + '),rgba(11,11,14,' + b.toFixed(2) + '))';
+  }
+
+  function recipe() {
+    document.getElementById('recipe').textContent =
+      'recipe: ' + state.colour + ' + ' + (state.splotch || 'no-splotch') +
+      ' · splotch ' + state.sp + ' · grain ' + state.gr + ' · veil ' + state.vl;
+  }
+
+  splotch.style.opacity = state.sp / 100;
+  grain.style.opacity = state.gr / 100;
+  setVeil(); recipe();
+</script>
+</body>
+</html>
