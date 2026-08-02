@@ -93,9 +93,20 @@ function runProbe(): Promise<ProbeResult> {
     // drawElementImage to capture and the probe would fail a working browser.
     const host = document.createElement("div");
     host.setAttribute("aria-hidden", "true");
+    // INSIDE the viewport, deliberately. The previous version parked this at
+    // left:-9999px, and Chrome does not paint what is outside the viewport — so
+    // there was nothing to rasterise and the probe reported an empty canvas on
+    // a browser that may well work. Hiding it by moving it off-screen is the
+    // one hiding technique that breaks a paint-based test.
+    //
+    // It is hidden by depth instead: full opacity and real layout, parked at
+    // the top-left corner behind everything, including the wallpaper at
+    // z-index -1. Occluded content is still painted; culled content is not.
+    // opacity:0 and visibility:hidden are avoided for the same reason as
+    // off-screen — they can skip the paint or zero out the pixels we read back.
     host.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:16px;height:16px;" +
-      "pointer-events:none;";
+      "position:fixed;top:0;left:0;width:16px;height:16px;" +
+      "pointer-events:none;z-index:-2147483647;";
 
     const canvas = document.createElement("canvas") as PaintableCanvas;
     canvas.width = SIZE;
