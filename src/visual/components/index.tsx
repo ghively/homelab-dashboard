@@ -19,7 +19,10 @@ import React from "react";
 import { z } from "zod";
 import {
   defineComponent,
+  reactive,
   tagSchemaId,
+  useStateField,
+  useTriggerAction,
   type ComponentRenderProps,
 } from "@openuidev/react-lang";
 import "../cyber-noir-visual-components-v4.css";
@@ -468,8 +471,10 @@ export const NodeGraph = defineComponent({
   description:
     "Network topology / dependency graph (service connections, infrastructure topology). " +
     "Nodes need {id, label, x?, y?} (coordinates in a ~800×430 space). Edges need {source, target, label?, value?}. " +
+    "Nodes are clickable — clicking one asks for that node's details. " +
     "For sequential pipeline/flow use Flow. For proportional flow use Sankey.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] }>) => {
+  component: function NodeGraphView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] }>) {
+    const triggerAction = useTriggerAction();
     if (!props.nodes?.length) return <Surface title={props.title ?? "Node Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
     return (
       <Surface title={props.title ?? "Network"} subtitle={props.subtitle} state={props.state}>
@@ -480,7 +485,12 @@ export const NodeGraph = defineComponent({
             return a && b ? <line key={i} x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
           })}
           {props.nodes.map((n) => (
-            <g key={n.id} transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}>
+            <g
+              key={n.id}
+              transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}
+              className="cnv-clickable"
+              onClick={() => triggerAction(`Show details for ${n.label}`)}
+            >
               <circle r="34" />
               <text textAnchor="middle" y="5">{n.label}</text>
             </g>
@@ -537,8 +547,10 @@ export const Kanban = defineComponent({
   description:
     "Board with columns grouped by item.group (CI stages, deployment statuses, task states). " +
     "Each Item needs {id, label, subtitle?, group}. Items are auto-grouped by their group field. " +
+    "Cards are clickable — clicking one asks for that item's details. " +
     "Use VisualTable for flat tabular data. Use RoomBoard for physical topology.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
+  component: function KanbanView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Board"} state={props.state}><NoData label="No items" /></Surface>;
     const groups = [...new Set(props.items.map((i) => i.group || "Active"))];
     return (
@@ -548,7 +560,11 @@ export const Kanban = defineComponent({
             <section key={g}>
               <h4>{g}</h4>
               {props.items.filter((i) => (i.group || "Active") === g).map((i) => (
-                <article key={i.id}><strong>{i.label}</strong><small>{i.subtitle}</small></article>
+                <article
+                  key={i.id}
+                  className="cnv-clickable"
+                  onClick={() => triggerAction(`Show details for ${i.label}`)}
+                ><strong>{i.label}</strong><small>{i.subtitle}</small></article>
               ))}
             </section>
           ))}
@@ -570,16 +586,22 @@ export const VisualTable = defineComponent({
   }),
   description:
     "Tabular list of records (containers, devices, adapters, configs). " +
-    "Each Item shows {label, subtitle, value, state}. Rows are read-only. " +
+    "Each Item shows {label, subtitle, value, state}. Rows are clickable — clicking one " +
+    "sends a follow-up asking for that entity's details; respond with a DetailPanel. " +
     "Use LogStream for raw logs. Use BarRank for ranked numeric comparison. " +
     "Use DetailPanel for a single entity's key-value details.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
+  component: function VisualTableView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Table"} state={props.state}><NoData label="No rows" /></Surface>;
     return (
       <Surface title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
           {props.items.map((i) => (
-            <article key={i.id}>
+            <article
+              key={i.id}
+              className="cnv-clickable"
+              onClick={() => triggerAction(`Show details for ${i.label}`)}
+            >
               <strong>{i.label}</strong>
               <small>{i.subtitle}</small>
               <span>{i.state ?? "healthy"}</span>
@@ -607,14 +629,20 @@ export const ArtworkWall = defineComponent({
     "Grid of poster/cover art (movie library, album wall, image gallery). " +
     "Each Item needs {id, label, subtitle?, image? (URL), progress?}. " +
     "Set square=true for album covers / square thumbnails. " +
+    "Items are clickable — clicking one asks for that title's details. " +
     "Use PlaybackSessions for currently-playing media with stream details.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean }>) => {
+  component: function ArtworkWallView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean }>) {
+    const triggerAction = useTriggerAction();
     if (!props.items?.length) return <Surface title={props.title ?? "Gallery"} state={props.state}><NoData label="No items" /></Surface>;
     return (
       <Surface title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
         <div className={props.square ? "cnv-albums" : "cnv-posters"}>
           {props.items.slice(0, 18).map((i) => (
-            <article key={i.id}>
+            <article
+              key={i.id}
+              className="cnv-clickable"
+              onClick={() => triggerAction(`Show details for ${i.label}`)}
+            >
               <div className="cnv-art" style={i.image ? { backgroundImage: `url(${i.image})` } : undefined}>
                 <b>{i.label}</b>
               </div>
@@ -1027,12 +1055,85 @@ export const Flow = defineComponent({
 
 // ── Exports ───────────────────────────────────────────────────
 
+// ── FilterDropdown — reactive filter that re-runs queries ────────────────────
+// The `reactive()` marker is what lets a $variable bind here; useStateField
+// writes back to the store, which re-evaluates every Query() referencing it.
+export const FilterDropdown = defineComponent({
+  name: "FilterDropdown",
+  props: z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    value: reactive(z.string().optional()),
+    options: z.array(z.object({ value: z.string(), label: z.string() })),
+  }),
+  description:
+    "Interactive dropdown filter. name is the $variable to bind — reference it as $<name> in a Query()'s args. " +
+    "When the user selects an option, every Query() referencing that $variable re-fetches automatically. " +
+    "value is the initial selection (optional). Each option: {value, label}. " +
+    "Place inside a Stack at the top of a dashboard to control the panels below.",
+  // No explicit ComponentRenderProps annotation here: reactive() changes the
+  // inferred prop type (value becomes a StateField, not a plain string), so a
+  // hand-written annotation would contradict it. Let defineComponent infer.
+  component: function FilterDropdownView({ props }) {
+    // No explicit type argument: useStateField infers T from the value and
+    // unwraps it via InferStateFieldValue. Forcing <string> would contradict
+    // the StateField that reactive() produces.
+    const field = useStateField(props.name, props.value);
+    return (
+      <div className="cnv-filter">
+        {props.label && <label>{props.label}</label>}
+        <select value={field.value ?? ""} onChange={(e) => field.setValue(e.target.value)}>
+          <option value="">All</option>
+          {props.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  },
+});
+
+// ── Section — grouping container with nested children ───────────────────────
+// The children union is deliberately tight. A union of everything would let the
+// model nest a whole dashboard inside a panel.
+export const Section = defineComponent({
+  name: "Section",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    children: z.array(z.union([
+      MetricStrip.ref,
+      Gauge.ref,
+      Donut.ref,
+      LineChart.ref,
+      MultiLine.ref,
+      BarRank.ref,
+      VisualTable.ref,
+      DetailPanel.ref,
+      Capacity.ref,
+      ArtworkWall.ref,
+    ])),
+  }),
+  description:
+    "Grouping container that renders a title and a vertical stack of child panels. " +
+    "Use to organize a dashboard into named regions. children accepts a tight set of display components: " +
+    "MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall. " +
+    "Do NOT nest Section, Kanban, or Stack inside a Section.",
+  component: ({ props, renderNode }) => (
+    <Surface title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
+      <div className="cnv-section">{renderNode(props.children)}</div>
+    </Surface>
+  ),
+});
+
 const allComponents = [
   MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank,
   Timeline, EventStream, LogStream, NodeGraph, Sankey,
   Kanban, VisualTable, ArtworkWall, PlaybackSessions,
   Capacity, SecurityPosture, MarkdownReader, KnowledgeGraph,
   Backlinks, DetailPanel, Callout, EmptyState, RoomBoard, Flow,
+  FilterDropdown, Section,
 ];
 
 export const homelabComponents = allComponents;
@@ -1049,5 +1150,8 @@ export const homelabGroup = {
     "  Event  = {id: string, at: string, title: string, detail?: string, image?: string, state?: VisualState}",
     "  Node   = {id: string, label: string, x?: number, y?: number, state?: VisualState, value?: number}",
     "  Edge   = {source: string, target: string, label?: string, value?: number, state?: VisualState}",
+    "Interactive components: FilterDropdown binds a $variable and re-runs any Query() using it. " +
+      "Section nests child panels under a title. VisualTable rows, Kanban cards, ArtworkWall items, " +
+      "and NodeGraph nodes are all clickable and send a follow-up asking for that entity's details.",
   ],
 };
