@@ -139,7 +139,7 @@ function LandingPage({
         The exerciser is gone from the product surface; the world tiles remain
         below as a way to browse adapters directly.
       */}
-      <header className="dash-hero dash-hero-chat cnv-surface tr-subtle bl-sm bg-gradient el-md">
+      <header className="dash-hero dash-hero-chat cnv-surface tr-medium bl-md bg-gradient el-md">
         <div>
           <h1>What do you want to see?</h1>
           <p>

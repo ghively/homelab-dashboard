@@ -107,7 +107,7 @@ export function Hero({ title, subtitle, metrics, accent }: HeroProps) {
     // flat styling, so the dashboard you actually navigate looked pre-redesign.
     // These are the same closed-enum classes the generated panels use.
     <header
-      className="dash-hero cnv-surface tr-subtle bl-sm bg-gradient el-md"
+      className="dash-hero cnv-surface tr-medium bl-md bg-gradient el-md"
       style={accent ? { borderColor: accent } : undefined}
     >
       <div>
@@ -155,7 +155,7 @@ export function WorldCard({
 }: WorldCardProps) {
   return (
     <button
-      className={`dash-world-card cnv-surface tr-subtle bl-sm el-sm state-${state}${
+      className={`dash-world-card cnv-surface tr-medium bl-md el-sm state-${state}${
         ["warning", "critical", "offline", "stale", "denied"].includes(String(state))
           ? " gl-state"
           : ""
@@ -243,9 +243,11 @@ export function VisualPanel({
       {...(subtitle ? { subtitle } : {})}
       state={state}
       surfaceStyle={{
-        translucency: "subtle",
-        blur: "sm",
-        elevation: "sm",
+        // Matches the glass card Gene picked: ~0.5 alpha, real blur, and enough
+        // elevation to lift off the ambient ground.
+        translucency: "medium",
+        blur: "md",
+        elevation: "md",
         ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
       }}
       {...(isFixture ? { className: "is-fixture" } : {})}
