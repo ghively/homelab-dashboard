@@ -181,6 +181,10 @@ export function GenerativeChat() {
                     library={library}
                     toolProvider={toolProvider}
                     isStreaming={false}
+                    // Drill-down: clicking a row/card/node sends its label back
+                    // as a follow-up so the model can answer with a detail view.
+                    // Only on settled messages — a live stream is still arriving.
+                    onAction={(event) => chat.sendMessage(event.humanFriendlyMessage)}
                   />
                 </div>
               ) : (
