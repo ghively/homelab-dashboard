@@ -78,6 +78,18 @@ export function probeHtmlInCanvas(): Promise<ProbeResult> {
   return cached;
 }
 
+/**
+ * Chrome ≥150 throws InvalidStateError "No cached paint record for element."
+ * when drawElementImage runs before the document's paint lifecycle has
+ * recorded the child — typical for the first frame after the content div
+ * moves into the canvas. That is a timing artifact, not a capability verdict:
+ * callers should re-request a paint and try again rather than declare the
+ * draw broken.
+ */
+export function isTransientDrawElementError(err: unknown): boolean {
+  return err instanceof Error && /no cached paint record/i.test(err.message);
+}
+
 function runProbe(): Promise<ProbeResult> {
   if (typeof document === "undefined") {
     return Promise.resolve({
@@ -165,17 +177,67 @@ function runProbe(): Promise<ProbeResult> {
     // The draw is only legal inside onpaint — that is the contract the vendored
     // components follow, so the probe has to follow it too or it would test a
     // different code path than the one that actually runs.
+    //
+    // One onpaint is NOT one fair chance. drawElementImage replays the paint
+    // record that the document's paint lifecycle captured for the canvas child
+    // (Chromium: PaintArtifactCompositor::GetCanvasChildPaintRecord). On the
+    // very first frame after this subtree is inserted that record can be
+    // missing (Chrome 150 throws InvalidStateError "No cached paint record
+    // for element.") or still empty. Both are transient, not verdicts, so the
+    // probe retries every frame until the timeout and only reports the last
+    // failure if no frame ever produces pixels.
+    let attempts = 0;
+    let lastFailure: ProbeResult | null = null;
+
+    // Wipe after every read, before the frame is committed to the compositor.
+    // onpaint runs in the document lifecycle before the commit
+    // (LocalFrameView::WillCommit → RunCanvasOnpaintSteps), so a canvas that
+    // is drawn, read and cleared inside one handler never presents a single
+    // magenta pixel — the depth-stacking above is a second layer of cover,
+    // not the mechanism.
+    const wipe = () => {
+      try {
+        ctx.reset?.();
+        ctx.clearRect(0, 0, SIZE, SIZE);
+      } catch {
+        // Nothing to do — the canvas is behind everything and 16px anyway.
+      }
+    };
+
+    const retry = (failure: ProbeResult) => {
+      lastFailure = failure;
+      attempts++;
+      wipe();
+      try {
+        canvas.requestPaint!();
+      } catch {
+        finish(failure);
+      }
+    };
+
     canvas.onpaint = () => {
+      if (settled) return;
       try {
         ctx.reset?.();
         ctx.drawElementImage!(swatch, 0, 0);
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // Transient on freshly inserted subtrees — the element has simply not
+        // been through a paint yet. Try again next frame.
+        if (/no cached paint record/i.test(message)) {
+          retry({
+            ok: false,
+            reason: "canvas-empty",
+            detail:
+              `No cached paint record after ${attempts + 1} frame(s) — the ` +
+              "browser never rasterised the probe element.",
+          });
+          return;
+        }
         finish({
           ok: false,
           reason: "draw-threw",
-          detail: `drawElementImage threw: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
+          detail: `drawElementImage threw: ${message}`,
         });
         return;
       }
@@ -206,17 +268,18 @@ function runProbe(): Promise<ProbeResult> {
       }
 
       if (opaque === 0) {
-        finish({
+        retry({
           ok: false,
           reason: "canvas-empty",
           detail:
             "The API accepted the draw but produced a fully transparent " +
-            "canvas — the element was never rasterised.",
+            `canvas on ${attempts + 1} frame(s) — the element was never ` +
+            "rasterised.",
         });
         return;
       }
       if (matching < opaque / 2) {
-        finish({
+        retry({
           ok: false,
           reason: "wrong-pixels",
           detail: `Canvas had ${opaque} opaque pixels but only ${matching} matched the source colour.`,
@@ -224,10 +287,13 @@ function runProbe(): Promise<ProbeResult> {
         return;
       }
 
+      wipe();
       finish({
         ok: true,
         reason: "supported",
-        detail: `${matching}/${opaque} pixels rasterised correctly.`,
+        detail: `${matching}/${opaque} pixels rasterised correctly after ${
+          attempts + 1
+        } frame(s).`,
       });
     };
 
@@ -245,13 +311,15 @@ function runProbe(): Promise<ProbeResult> {
     }
 
     window.setTimeout(() => {
-      finish({
-        ok: false,
-        reason: "paint-never-fired",
-        detail:
-          `onpaint did not fire within ${TIMEOUT_MS}ms. The API is exposed but ` +
-          "the browser never scheduled an element paint.",
-      });
+      finish(
+        lastFailure ?? {
+          ok: false,
+          reason: "paint-never-fired",
+          detail:
+            `onpaint did not fire within ${TIMEOUT_MS}ms. The API is exposed but ` +
+            "the browser never scheduled an element paint.",
+        },
+      );
     }, TIMEOUT_MS);
   });
 }
