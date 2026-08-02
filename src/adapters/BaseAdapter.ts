@@ -1,4 +1,5 @@
 import type { AdapterConfig, AdapterResult, AdapterState } from "./types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 export abstract class BaseAdapter {
   readonly name: string;
@@ -9,7 +10,7 @@ export abstract class BaseAdapter {
     this.config = {
       enabled: true,
       refreshIntervalMs: 30000,
-      timeoutMs: 5000,
+      timeoutMs: ADAPTER_TIMEOUT_MS,
       retryAttempts: 3,
       ...config,
     };

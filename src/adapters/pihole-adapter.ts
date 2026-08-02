@@ -3,6 +3,7 @@ import type { DataAdapter } from "./adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 interface _PiHoleSummary {
   queries: number;
@@ -42,7 +43,7 @@ export class PiHoleAdapter implements DataAdapter {
 
     try {
       const url = `${this.baseUrl}/admin/api.php?summary&auth=${this.apiKey}`;
-      const _response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      const _response = await fetch(url, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) });
       return {
         adapter: this.name,
         source: this.baseUrl,
@@ -73,7 +74,7 @@ export class PiHoleAdapter implements DataAdapter {
 
     try {
       const url = `${this.baseUrl}/admin/api.php?summary&auth=${this.apiKey}`;
-      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const response = await fetch(url, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) });
 
       if (!response.ok) {
         throw new Error(`Pi-hole API error: ${response.status}`);

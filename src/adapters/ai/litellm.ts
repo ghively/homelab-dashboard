@@ -6,6 +6,7 @@ import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const LITELLM_URL = process.env.LITELLM_URL || "http://gh-arm:4000";
 const LITELLM_API_KEY = process.env.LITELLM_API_KEY || "";
@@ -43,7 +44,7 @@ class LiteLLMAdapter implements DataAdapter {
     try {
       await fetch(`${LITELLM_URL}/v1/models`, {
         headers: authHeaders(),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // Unreachable — freshness still records the endpoint queried.
@@ -60,7 +61,7 @@ class LiteLLMAdapter implements DataAdapter {
     try {
       const modelsRes = await fetch(`${LITELLM_URL}/v1/models`, {
         headers: authHeaders(),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
       if (!modelsRes.ok) throw new Error(`HTTP ${modelsRes.status}`);
 

@@ -3,6 +3,7 @@
  * and standard response parsing.
  */
 import { ApiClientConfig } from "./types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 export interface AdapterResponse<T> {
   data: T;
@@ -19,7 +20,7 @@ export class HttpClient {
   constructor(config: ApiClientConfig) {
     this.baseURL = config.baseURL.replace(/\/$/, "");
     this.token = config.token || null;
-    this.timeout = config.timeout || 15000;
+    this.timeout = config.timeout || ADAPTER_TIMEOUT_MS;
   }
 
   /**

@@ -12,6 +12,7 @@ import type { DataAdapter } from "../adapter-base";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const SYNOLOGY_URL = process.env.SYNOLOGY_URL || "http://100.88.40.87:5000";
 // SYNOLOGY_USERNAME is accepted as well as SYNOLOGY_USER — both spellings are
@@ -69,7 +70,7 @@ class SynologyDSMAdapter implements DataAdapter {
   async health(): Promise<FreshnessInfo> {
     try {
       await fetch(`${SYNOLOGY_URL}/webapi/query.cgi?api=SYNO.API.Info&version=1&method=query`, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // Unreachable — freshness still records the endpoint queried.
@@ -100,7 +101,7 @@ class SynologyDSMAdapter implements DataAdapter {
       `&account=${encodeURIComponent(SYNOLOGY_USER)}` +
       `&passwd=${encodeURIComponent(SYNOLOGY_PASSWORD)}` +
       `&session=FileStation&format=sid`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`auth HTTP ${res.status}`);
     const body = (await res.json()) as { success?: boolean; data?: { sid?: string } };
     if (!body.success || !body.data?.sid) throw new Error("DSM authentication failed");
@@ -129,7 +130,7 @@ class SynologyDSMAdapter implements DataAdapter {
       const res = await fetch(
         `${SYNOLOGY_URL}/webapi/entry.cgi?api=SYNO.Storage.CGI.Storage&version=1` +
           `&method=load_info&_sid=${encodeURIComponent(sid)}`,
-        { signal: AbortSignal.timeout(10000) },
+        { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 

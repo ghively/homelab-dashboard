@@ -5,6 +5,7 @@
 import type { VisualQueryResult, VisualStateValue } from "@/adapters/types";
 import { getFixtureForState } from "@/adapters/fixtures";
 import { getAdapter } from "@/lib/adapter-runtime";
+import { classifyError } from "@/lib/adapter-http";
 import { WORLDS, type WorldId } from "./workspace-config";
 
 export interface AdapterEntry {
@@ -422,10 +423,18 @@ export async function queryAdapter(
       const result = await liveAdapter.query(view ? { query: view } : {});
       return { ...result, source: "live" };
     } catch (err) {
+      // Classify rather than blanket-`offline`. "Credentials rejected",
+      // "nothing answered within the timeout" and "the service returned 500"
+      // are three different problems with three different fixes, and a single
+      // OFFLINE badge for all of them tells the reader nothing actionable.
+      // The adapters that catch internally already do this via failureResult();
+      // this is the safety net for the ones that throw (every bridged adapter
+      // under src/lib/adapters/ does).
+      const c = classifyError(err);
       return {
         title: adapterName,
-        subtitle: "Live adapter failed — showing offline",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         source: "live",
         freshness: {
           adapter: adapterName,
@@ -434,8 +443,10 @@ export async function queryAdapter(
           stalenessSeconds: 0,
           cacheHit: false,
         },
-        metrics: [{ label: "Status", value: "OFFLINE", state: "offline" }],
-        summary: `Live adapter error: ${String(err)}`,
+        metrics: [
+          { label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state },
+        ],
+        summary: `${adapterName}: ${c.message}`,
       };
     }
   }

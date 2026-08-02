@@ -1,45 +1,42 @@
-// Hermes gateway adapter — service reachability probe.
+// Hermes gateway adapter.
 //
-// Hermes exposes no documented metrics API, so this adapter reports only what
-// it can actually observe: whether the configured endpoint answers, the HTTP
-// status it returns, and how long it took. Every value below is measured.
+// Two measurements, both real:
+//   1. The gateway's own HTTP surface answers /health (it does not answer "/",
+//      which is why the previous version reported "Responded 404" under a
+//      healthy badge — it was probing a route that does not exist).
+//   2. When HERMES_DASHBOARD_URL is also set, the dashboard's /api/status is
+//      the only place the gateway's *process* state and per-platform
+//      connection states are published, so the panel is enriched from there.
 //
-// The previous version returned a hardcoded inventory (session counts, tool
-// invocation totals, error rates) that the dashboard rendered as live data.
-// If a real metrics endpoint is added later, widen query() then — do not
-// reintroduce placeholder numbers.
+// The enrichment is strictly additive: if the dashboard is not configured or
+// not answering, the panel still reports the probe result rather than
+// inventing platform counts.
 
 import type { DataAdapter } from "../adapter-base";
-import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { ADAPTER_FANOUT_TIMEOUT_MS, fetchJson, makeFreshness } from "@/lib/adapter-http";
+import { probeHermesEndpoint } from "./probe";
 
 const HERMES_GATEWAY_URL = process.env.HERMES_GATEWAY_URL || "";
+const HERMES_DASHBOARD_URL = process.env.HERMES_DASHBOARD_URL || "";
 
-function makeFreshness(): FreshnessInfo {
-  return {
-    adapter: "hermes-gateway",
-    source: HERMES_GATEWAY_URL || "unconfigured",
-    queriedAt: new Date().toISOString(),
-    stalenessSeconds: 0,
-    cacheHit: false,
-  };
+interface GatewayStatus {
+  gateway_running?: boolean;
+  gateway_state?: string;
+  gateway_exit_reason?: string | null;
+  gateway_platforms?: Record<string, { state?: string; error_message?: string | null }>;
+  active_agents?: number;
 }
 
 class HermesGatewayAdapter implements DataAdapter {
   readonly name = "hermes-gateway";
-  readonly description = "Hermes gateway — service reachability.";
+  readonly description = "Hermes gateway — reachability and platform connection state.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    if (HERMES_GATEWAY_URL) {
-      try {
-        await fetch(HERMES_GATEWAY_URL, { signal: AbortSignal.timeout(5000) });
-      } catch {
-        // Unreachable — freshness still records the endpoint queried.
-      }
-    }
-    return makeFreshness();
+    return makeFreshness(this.name, HERMES_GATEWAY_URL || "unconfigured");
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -48,52 +45,56 @@ class HermesGatewayAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    if (!HERMES_GATEWAY_URL) {
-      return {
-        title: "Hermes gateway",
-        subtitle: "Endpoint not configured",
-        state: "empty",
-        freshness: makeFreshness(),
-        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
-        summary: "Set HERMES_GATEWAY_URL to probe this service.",
-      };
-    }
+    const probe = await probeHermesEndpoint({
+      adapter: this.name,
+      title: "Hermes gateway",
+      baseUrl: HERMES_GATEWAY_URL,
+      healthPath: "/health",
+      envVar: "HERMES_GATEWAY_URL",
+    });
 
-    const start = Date.now();
+    if (!HERMES_DASHBOARD_URL || probe.state === "empty") return probe;
+
+    // Best-effort enrichment on a shorter budget — this must never be the
+    // reason the panel goes slow or offline.
+    let status: GatewayStatus | null = null;
     try {
-      const res = await fetch(HERMES_GATEWAY_URL, { signal: AbortSignal.timeout(8000) });
-      const latency = Date.now() - start;
-
-      // Any HTTP response means the service is up and answering. A 404 at "/"
-      // just means there is no route there, which is normal for an API — it is
-      // not a fault, and reporting it as one filled the dashboard with warnings
-      // for services that were fine. Only a 5xx indicates the service itself is
-      // failing.
-      const ok = res.status < 500;
-
-      const metrics: Metric[] = [
-        { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
-        { label: "HTTP", value: res.status, state: ok ? "healthy" : "warning" },
-        { label: "Latency", value: latency, unit: "ms", state: latency > 2000 ? "warning" : "healthy" },
-      ];
-
-      return {
-        title: "Hermes gateway",
-        subtitle: HERMES_GATEWAY_URL,
-        state: ok ? "healthy" : "warning",
-        freshness: makeFreshness(),
-        metrics,
-        summary: `Responded ${res.status} in ${latency}ms`,
-      };
+      status = await fetchJson<GatewayStatus>(
+        `${HERMES_DASHBOARD_URL.replace(/\/$/, "")}/api/status`,
+        {},
+        ADAPTER_FANOUT_TIMEOUT_MS,
+      );
     } catch {
-      return {
-        title: "Hermes gateway",
-        subtitle: "Endpoint unreachable",
-        state: "offline",
-        freshness: makeFreshness(),
-        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
-      };
+      return probe;
     }
+
+    const platforms = Object.entries(status.gateway_platforms ?? {});
+    const connected = platforms.filter(([, p]) => (p.state ?? "").toLowerCase() === "connected").length;
+    const running = status.gateway_running === true && status.gateway_state === "running";
+
+    return {
+      ...probe,
+      state: !running ? "critical" : connected < platforms.length ? "warning" : probe.state,
+      subtitle: `gateway ${status.gateway_state ?? "unknown"} • ${connected}/${platforms.length} platforms connected`,
+      metrics: [
+        ...(probe.metrics ?? []),
+        { label: "Gateway State", value: status.gateway_state ?? "unknown", state: running ? "healthy" : "critical" },
+        {
+          label: "Platforms",
+          value: `${connected}/${platforms.length}`,
+          state: platforms.length > 0 && connected === platforms.length ? "healthy" : "warning",
+        },
+        { label: "Active Agents", value: status.active_agents ?? 0 },
+      ],
+      items: platforms.map(([platform, p]) => ({
+        id: `platform:${platform}`,
+        label: platform,
+        subtitle: p.error_message ? `${p.state} — ${p.error_message}` : (p.state ?? "unknown"),
+        value: p.state ?? "unknown",
+        state: ((p.state ?? "").toLowerCase() === "connected" ? "healthy" : "offline") as "healthy" | "offline",
+      })),
+      summary: `${probe.summary} · gateway ${status.gateway_state ?? "unknown"}, ${connected}/${platforms.length} platforms connected.`,
+    };
   }
 }
 

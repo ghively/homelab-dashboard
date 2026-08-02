@@ -190,6 +190,7 @@ function GateDiagnostics() {
 
 export default function Lab() {
   const [supported, setSupported] = useState<boolean | null>(null);
+  const [probeReason, setProbeReason] = useState<string | null>(null);
 
   useEffect(() => {
     // The FUNCTIONAL probe, not `typeof drawElementImage === "function"`. The
@@ -198,7 +199,9 @@ export default function Lab() {
     // while the panels rendered nothing.
     let alive = true;
     void probeHtmlInCanvas().then((r) => {
-      if (alive) setSupported(r.ok);
+      if (!alive) return;
+      setSupported(r.ok);
+      setProbeReason(r.reason);
     });
     return () => {
       alive = false;
@@ -228,17 +231,40 @@ export default function Lab() {
           {supported === true && "HTML-in-Canvas RASTERISES here — verified by reading pixels back, not by feature detection. The effects below additionally refract the live content behind them."}
           {supported === false && (
             <>
-              <strong>HTML-in-Canvas did not produce pixels — the effects still run.</strong>
+              <strong>
+                {probeReason === "disabled"
+                  ? "HTML-in-Canvas is switched OFF here — the effects still run."
+                  : "HTML-in-Canvas did not produce pixels — the effects still run."}
+              </strong>
               <br />
-              This is the reduced mode, not a failure: the components pass the API&rsquo;s
-              availability to the shader as a uniform and have a full branch for its absence,
-              so they still render over the live DOM content. What is missing is content
-              refraction — the effect cannot bend the pixels behind it.
+              {probeReason === "disabled" ? (
+                <>
+                  This is our choice, not your browser&rsquo;s. Driving the API crashed Chrome
+                  with STATUS_BREAKPOINT — a renderer CHECK failure, meaning the browser
+                  aborted itself — so it is disabled by default and no dashboard is worth a
+                  crash. The effects run on plain WebGL2 instead, which is the mode
+                  canvasui.dev itself ships. What is missing is content refraction: the
+                  effect cannot bend the pixels behind it.
+                  {" "}Add <code>?hic=on</code> to opt back in, at the risk of that crash.
+                </>
+              ) : (
+                <>
+                  This is the reduced mode, not a failure: the components pass the API&rsquo;s
+                  availability to the shader as a uniform and have a full branch for its
+                  absence, so they still render over the live DOM content. What is missing is
+                  content refraction — the effect cannot bend the pixels behind it.
+                </>
+              )}
               <br />
-              The reason below distinguishes &ldquo;the flag is off&rdquo; from &ldquo;the flag
-              is on but the draw fails&rdquo;, which look identical from outside and need
-              opposite fixes. If it is off: open <code>chrome://flags/#canvas-draw-element</code>,
-              set it to Enabled, and relaunch — Chromium browsers only.
+              {probeReason !== "disabled" && (
+                <>
+                  The reason below distinguishes &ldquo;the flag is off&rdquo; from &ldquo;the
+                  flag is on but the draw fails&rdquo;, which look identical from outside and
+                  need opposite fixes. If it is off: open{" "}
+                  <code>chrome://flags/#canvas-draw-element</code>, set it to Enabled, and
+                  relaunch — Chromium browsers only.
+                </>
+              )}
             </>
           )}
         </div>
