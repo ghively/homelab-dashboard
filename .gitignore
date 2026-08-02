@@ -30,3 +30,4 @@ knowledge.db-wal
 
 # Docker
 .docker/
+.design-export/
