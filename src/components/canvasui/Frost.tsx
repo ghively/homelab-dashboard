@@ -816,7 +816,16 @@ export function createFrost(
 
   syncCanvasSize();
 
-  if (htmlInCanvas) captureContent();
+  // NOT `if (htmlInCanvas) captureContent()`. drawElementImage is only legal
+  // while the browser is painting the canvas — that is the whole reason the
+  // API is driven through requestPaint/onpaint. Called directly here it threw
+  // "Only immediate children of the <canvas> element can be passed to
+  // DrawElementImage" on every construction, because outside a paint the
+  // canvas subtree is not treated as paintable fallback content. Frost was the
+  // only one of the seven components doing this, and the only one that failed.
+  //
+  // Dropping the call costs nothing: syncCanvasSize() immediately above already
+  // calls requestPaint(), which schedules onpaint, which is captureContent.
 
   function uploadContent() {
     if (!htmlInCanvas || !contentDirty) return;
