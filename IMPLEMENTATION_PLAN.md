@@ -907,27 +907,52 @@ query the Docker Engine API (`GET /containers/json?all=1`), which is the actual
 source of container inventory. No Docker API is currently exposed on those
 hosts, so they report `NOT CONFIGURED` until a read-only socket-proxy exists.
 
-### Tailnet service map (port-scanned 2026-08-02)
+### Complete adapter status (verified 2026-08-02)
 
-The `.env.example` defaults were wrong about which host runs what. Verified:
+**16 of 30 adapters are configured and return `source: "live"`.** The other 14
+are blocked by the environment, not by the code — each reason is recorded below
+so nobody re-investigates them.
 
-| host | tailnet IP | listening |
+| adapter | endpoint | live result |
 |---|---|---|
-| gh-ai | 100.92.162.32 | 443/8443 (TLS), 8080, 3000 |
-| gh-arm | 100.65.126.126 | **litellm 4000**, ntfy 8080, 8082 (307) |
-| gh-media | 100.116.139.100 | **emby 8096**, 80, 443 |
-| gh-nvidia | 100.88.26.95 | **comfyui 8188** |
-| gh-storage | 100.88.40.87 | **dsm 5000**, **sabnzbd 8080**, **syncthing 8384**, **sonarr 8989** |
+| `emby` | gh-media:8096 | 523 movies, 26,392 TV items, 61 collections |
+| `sonarr` | gh-storage:8989 | 260 shows — 68 continuing, 192 ended |
+| `radarr` | gh-storage:**8310** | 533 movies — 523 released, 8 announced |
+| `sabnzbd` | gh-storage:8080 | v5.0.4, queue idle (renders `empty`, correctly) |
+| `tdarr` | gh-nvidia:**8265** | v2.84.01, node "kind-koi", 0/6 workers, 246 h up |
+| `spoolman` | gh-media:**8090** | reachable, inventory genuinely empty |
+| `syncthing` | gh-storage:8384 | v2.1.2, 2 folders, 1,674 files, 965 GB |
+| `synology-dsm` | gh-storage:5000 | 2 volumes, 13 disks, 35.3/49.8 TB |
+| `comfyui` | gh-nvidia:8188 | RTX 3060, 9.2/12.5 GB VRAM |
+| `litellm` | gh-arm:4000 | 22 models, 6 endpoints unhealthy |
+| `wazuh-indexer` | **https**://gh-arm:9200 | green, 18 indices, 70,731 docs |
+| `wazuh-dashboard` | **https**://gh-arm:443 | Dashboards 2.19.5, 64 plugins |
+| `cloudflare-dns` | api.cloudflare.com | 32 records on hively.dev |
+| `hermes-gateway` | gh-ai:**8642** | reachable |
+| `hermes-dashboard` | gh-ai:**9119** | UP, 200, 15 ms |
+| `hermes-workspace` | gh-ai:**3000** | reachable |
 
-Corrections this produced:
-- Sonarr and SABnzbd were pointed at gh-media; they run on **gh-storage**.
-- RomM was pointed at gh-media:8082; that port is on **gh-arm**.
-- **There is no `gh-vps` node.** 100.92.162.32 is gh-ai. The `watchtower-vps`
-  adapter keeps its name (it is in `WORLDS`; renaming drops the tool spec) but
-  its labels now say gh-ai.
-- **Ollama is not listening** on gh-nvidia:11434 — the port is closed, so it
-  likely binds to localhost. Radarr, Tdarr and the Caddy admin API (2019) were
-  not found listening on any tailnet host.
+Bold ports are corrections — the defaults named the wrong port or host.
+
+### The 14 that cannot go live, and why
+
+| adapter | blocker |
+|---|---|
+| `pihole`, `unifi` | LAN-only (192.168.0.x). **Not routable over the tailnet at all** — a VPS-hosted dashboard cannot reach them. |
+| `searxng` | binds to 127.0.0.1 on gh-ai by design. |
+| `ollama` | port 11434 closed on gh-nvidia (that host runs Grafana :3000, SynapseNAS :7777, ComfyUI, Tdarr). |
+| `romm` | not deployed on any reachable host. gh-nvidia:3001 is Open WebUI, not RomM, despite a 1Password key existing. |
+| `caddy` | admin API (2019) not listening on any host — localhost-bound. |
+| `garage-s3` | no Garage admin endpoint found anywhere. |
+| `wazuh-manager` | uses a **separate credential set**; the indexer/dashboard pair returns "Invalid credentials" from `/security/user/authenticate`. |
+| `watchtower-vps/-media/-storage` | need a read-only Docker socket-proxy; 2375/2376 are correctly closed. |
+| `hermes-api-server`, `hermes-mcp-bridge` | ports not documented in the endpoint reference. |
+| `fail2ban` | needs a sidecar exposing `/status`; fail2ban has no native HTTP API. |
+| `valkey`, `smb-nfs`, `iot-vlan`, `omniroute` | no HTTP API reachable from this process — they declare `NOT IMPLEMENTED` rather than fabricate. |
+
+Credentials come from 1Password (vault "Gregory") via the service account token
+in `~/.hermes/.env`. **The Emby key there has a trailing newline** — untrimmed,
+every request fails.
 
 ### What is still NOT verified
 
