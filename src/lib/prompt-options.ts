@@ -35,6 +35,7 @@ export const promptOptions: PromptOptions = {
     "Always pass live data via Query() — never hardcode or mock values. Each service has an adapter that returns the data the panel needs. Literal numbers in your output are always wrong unless the user explicitly gave them.",
     "Pick by data shape, not by service name: Gauge for a single bounded % (disk, battery, CPU); Donut for shares of a whole (media by type, spend by model); BarRank for ranked comparison (top items by size/count); LineChart for one time-series; MultiLine for 2–4 series compared; Timeline for timestamped events; EventStream for a high-volume alert feed; NodeGraph for topology; Sankey for a left-to-right pipeline; Kanban for work items grouped into columns; VisualTable for a row list; ArtworkWall for image grids; PlaybackSessions for active streams; Capacity for storage pools; SecurityPosture for severity matrices.",
     "For numeric summaries (CPU, memory, counts, pass/fail) use MetricStrip — it renders compact KPI rows.",
+    "Media visual hierarchy — when Query() returns image-bearing media items, prefer ArtworkWall over VisualTable. Use layout \"feature\" for one visually dominant recent collection, layout \"rail\" for resumable or sequential browsing, and layout \"grid\" for balanced library scanning. Pair active streams with PlaybackSessions and keep operational counts in MetricStrip. Charts must render returned series only; never synthesize points.",
     "Auto-refresh: for live status panels (active streams, queue depth, alerts, CPU/memory) pass a 30–60 second refreshInterval as the 4th Query() argument so the panel re-fetches. For historical or static data (library size over time, spend by month, past events) OMIT the interval — it should not poll.",
     serviceGuideText,
     "Interactivity — filters: use FilterDropdown to let the user narrow results. Set name to a $variable (e.g. \"range\"), then reference that $variable in the Query() args of the panels it controls. Selecting an option re-fetches those queries automatically — no extra wiring.",
@@ -72,6 +73,15 @@ sessions = PlaybackSessions(sessData)
 sessData = Query("emby", {view: "sessions", range: $range}, {state: "healthy", items: []}, 30)
 recent = ArtworkWall(recentData)
 recentData = Query("emby", {view: "recent-movies", range: $range}, {state: "healthy", items: []})`,
+    `Example — Cinematic media dashboard:
+
+root = DashboardGrid("Media", "Live library and playback", null, null, null, null, [nowPlaying, recent, continueWatching])
+sessionData = Query("emby", {view: "sessions"}, {state: "healthy", items: []}, 30)
+nowPlaying = PlaybackSessions(null, 12, null, sessionData.title, sessionData.subtitle, sessionData.state, sessionData.items)
+recentData = Query("emby", {view: "recent-movies"}, {state: "healthy", items: []})
+recent = ArtworkWall(null, 12, null, recentData.title, recentData.subtitle, recentData.state, recentData.items, false, "feature")
+resumeData = Query("emby", {view: "continue-watching"}, {state: "healthy", items: []})
+continueWatching = ArtworkWall(null, 12, null, resumeData.title, resumeData.subtitle, resumeData.state, resumeData.items, false, "rail")`,
     `Example — Nested layout with Sections:
 
 root = Stack([header, cols])
