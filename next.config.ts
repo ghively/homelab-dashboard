@@ -10,12 +10,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  typescript: {
-    // Phase 11 dashboard composition compiles clean.
-    // Pre-existing errors in sibling phases (4 media, 6 hermes, 9 network)
-    // are tracked separately; ignore them during build.
-    ignoreBuildErrors: true,
-  },
+  // ignoreBuildErrors was set here while ~144 type errors were outstanding.
+  // Those are fixed, so the build type-checks again. Do not re-enable it to
+  // get a red build green — it hid a real crash (tdarr referencing an
+  // undefined `job` in a .map callback) for as long as it was on.
 };
 
 export default nextConfig;
