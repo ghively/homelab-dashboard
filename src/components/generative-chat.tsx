@@ -105,6 +105,19 @@ export function useGenerativeChat(): UseGenerativeChat {
             }
           }
 
+          // A stream can complete with nothing in `content`: some models put
+          // everything in `reasoning_content` (which is deliberately ignored
+          // here), and a refusal or filter can end the stream empty. Pushing
+          // that as a message renders a blank bubble with no explanation, which
+          // is indistinguishable from a UI bug. Surface it as an error instead.
+          if (!accumulated.trim()) {
+            setError(
+              "The model returned no dashboard code. Try rephrasing, or naming the adapters you want.",
+            );
+            setStreamedResponse("");
+            return;
+          }
+
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: accumulated },

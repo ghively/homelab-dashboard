@@ -728,3 +728,10 @@ html, body {
 .dash-empty-filter-actions button:hover {
   border-color: var(--dash-accent);
 }
+
+/* Quick Access filters are real <button>s now, not decorative spans, so they
+   need the button reset. `.dash-tag.active` above already covers the styling. */
+button.dash-tag {
+  cursor: pointer;
+  font: inherit;
+}
