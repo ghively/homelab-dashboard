@@ -36,3 +36,5 @@ knowledge.db-wal
 # Docker
 .docker/
 .design-export/
+.worktrees/
+.superpowers/
