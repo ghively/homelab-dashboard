@@ -401,11 +401,20 @@ function enrichFixture(
 // wrong data, with no error.
 export async function queryAdapter(
   adapterName: string,
-  state: VisualStateValue = "healthy",
+  state: VisualStateValue | null = null,
   view?: string,
 ): Promise<VisualQueryResult | null> {
   const entry = ADAPTER_INVENTORY.find((a) => a.name === adapterName);
   if (!entry) return null;
+
+  // An EXPLICIT state is a request for that fixture — it is how the state
+  // exerciser asks "what does `critical` look like?". Preferring the live
+  // adapter here answered the wrong question and, worse, turned a preview grid
+  // into 32 real network calls (a Synology DSM login takes ~5s, so the landing
+  // page hung for the better part of a minute). null means "prefer live".
+  if (state !== null) {
+    return { ...worldSpecificFixture(adapterName, entry.world, state), source: "fixture" };
+  }
 
   const liveAdapter = getAdapter(adapterName);
   if (liveAdapter) {
@@ -432,13 +441,18 @@ export async function queryAdapter(
   }
 
   // No live adapter registered — service is unconfigured, fall back to fixture.
-  return { ...worldSpecificFixture(adapterName, entry.world, state), source: "fixture" };
+  // `state` is null on this path (an explicit state returned above), so show
+  // the healthy sample.
+  return {
+    ...worldSpecificFixture(adapterName, entry.world, state ?? "healthy"),
+    source: "fixture",
+  };
 }
 
 // Query all adapters for a world.
 export async function queryWorld(
   world: WorldId,
-  state: VisualStateValue = "healthy",
+  state: VisualStateValue | null = null,
 ): Promise<{ adapter: string; result: VisualQueryResult }[]> {
   const worldConfig = WORLDS.find((w) => w.id === world);
   if (!worldConfig) return [];

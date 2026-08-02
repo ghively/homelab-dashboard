@@ -74,9 +74,13 @@ class LiteLLMAdapter implements DataAdapter {
       let unhealthy: LiteLLMHealthEntry[] = [];
       let healthKnown = false;
       try {
+        // /health makes LiteLLM probe every configured upstream, so it can take
+        // many seconds — it was 8.2s here and dominated the whole fleet rollup.
+        // The model list is the primary data; endpoint health is a bonus, and a
+        // timeout is already treated as "health unknown" rather than an error.
         const healthRes = await fetch(`${LITELLM_URL}/health`, {
           headers: authHeaders(),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(2500),
         });
         if (healthRes.ok) {
           const h = (await healthRes.json()) as {

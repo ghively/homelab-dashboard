@@ -19,6 +19,11 @@ const SYNOLOGY_URL = process.env.SYNOLOGY_URL || "http://100.88.40.87:5000";
 const SYNOLOGY_USER = process.env.SYNOLOGY_USER || process.env.SYNOLOGY_USERNAME || "";
 const SYNOLOGY_PASSWORD = process.env.SYNOLOGY_PASSWORD || "";
 
+/** Cached DSM session id — see login(). */
+let cachedSid: string | undefined;
+let cachedSidExpiry = 0;
+const SID_TTL_MS = 10 * 60 * 1000;
+
 function makeFreshness(source: string): FreshnessInfo {
   return {
     adapter: "synology-dsm",
@@ -72,8 +77,24 @@ class SynologyDSMAdapter implements DataAdapter {
     return makeFreshness(SYNOLOGY_URL);
   }
 
-  /** DSM requires a session id (sid) before any Storage call. */
+  /**
+   * DSM requires a session id (sid) before any Storage call.
+   *
+   * The sid is cached: a fresh login costs ~4s, and this adapter is queried
+   * once per world-rollup, so re-authenticating every time made the landing
+   * page crawl. DSM sessions outlive this TTL comfortably; on expiry the
+   * Storage call fails and the next attempt logs in again.
+   */
   private async login(): Promise<string> {
+    const now = Date.now();
+    if (cachedSid && now < cachedSidExpiry) return cachedSid;
+    const sid = await this.authenticate();
+    cachedSid = sid;
+    cachedSidExpiry = now + SID_TTL_MS;
+    return sid;
+  }
+
+  private async authenticate(): Promise<string> {
     const url =
       `${SYNOLOGY_URL}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login` +
       `&account=${encodeURIComponent(SYNOLOGY_USER)}` +
