@@ -11,23 +11,18 @@
  * - GET /System/Info (server info)
  */
 
-import { z } from "zod";
 import type {
   VisualData,
   VisualQueryResult,
   FreshnessInfo,
   Metric,
   Item,
-  Event,
 } from "../core/contracts";
-import { VisualStateSchema } from "../core/contracts";
 import type {
   EmbyItem,
   EmbyLibrary,
   EmbySession,
-  EmbyTask,
   EmbyServerInfo,
-  EmbyItemType,
 } from "./types";
 
 /**
@@ -83,9 +78,8 @@ export class EmbyAdapter {
    * Health check - fetch server info.
    */
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
     try {
-      const info = await this.fetch<EmbyServerInfo>("/System/Info");
+      const _info = await this.fetch<EmbyServerInfo>("/System/Info");
       return {
         timestamp: new Date().toISOString(),
         source: `Emby:${this.baseUrl}/System/Info`,

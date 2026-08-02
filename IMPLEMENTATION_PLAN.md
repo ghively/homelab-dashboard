@@ -66,6 +66,8 @@ that a module existing is not evidence that it works.
   them against real endpoints needs credentials and network reach.
 - **Drill-down click-through is unexercised.** Rows render and are declared
   clickable, but no browser session was available to click one.
+- **Three services are validated live** (comfyui, litellm, synology-dsm); the
+  other 27 are not. See the Phase 6 section for details.
 - **`.github/workflows/ci.yml`.** Jobs are named `build` and `lint` to match
   `main`'s required status checks. Do not rename them without updating the
   branch protection rule — the repo previously had protection requiring checks
@@ -850,8 +852,9 @@ Verified by driving the running app against the real LiteLLM proxy on gh-arm.
 - [x] **Translucency, blur, gradients, and a 12-column grid.** DashboardGrid
       emits `cnv-grid` with `col-4`/`col-6`/`col-8`/`col-12` children;
       surfaceStyle emits `tr-medium`, `bl-md`, `gl-state`.
-- [x] **`npm run build` and `npm run lint` pass.** Lint went 68 errors -> 0 and
-      CI no longer suppresses it with `|| true`. 68 warnings remain, not gating.
+- [x] **`npm run build` and `npm run lint` pass.** Lint is fully clean — 0
+      errors and 0 warnings, down from 153 problems. `--max-warnings 0` keeps it
+      that way and CI no longer suppresses it with `|| true`.
 
 ### Live-service validation
 

@@ -59,7 +59,7 @@ export class SearXNGAdapter implements DataAdapter {
     };
   }
 
-  async query(params?: { query?: string }): Promise<VisualQueryResult> {
+  async query(_params?: { query?: string }): Promise<VisualQueryResult> {
     const fixtureState = getFixtureState();
     if (fixtureState) {
       return getFixtureForState(this.name, fixtureState);

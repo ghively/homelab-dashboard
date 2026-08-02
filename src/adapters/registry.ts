@@ -40,7 +40,7 @@ export async function healthCheckAll(): Promise<Record<string, { healthy: boolea
           latencyMs,
           freshness,
         };
-      } catch (err) {
+      } catch {
         results[name] = {
           healthy: false,
           latencyMs: Date.now() - start,

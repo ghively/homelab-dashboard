@@ -9,16 +9,13 @@
  * - GET /api?mode=warnings (server warnings)
  */
 
-import { z } from "zod";
 import type {
   VisualData,
   VisualQueryResult,
   FreshnessInfo,
   Metric,
   Item,
-  Event,
 } from "../core/contracts";
-import { VisualStateSchema } from "../core/contracts";
 import type {
   SabQueue,
   SabHistory,
@@ -80,9 +77,8 @@ export class SabnzbdAdapter {
    * Health check - fetch server status.
    */
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
     try {
-      const status = await this.fetch<SabServerStatus>(this.getUrl("server_stats"));
+      const _status = await this.fetch<SabServerStatus>(this.getUrl("server_stats"));
       return {
         timestamp: new Date().toISOString(),
         source: `SABnzbd:${this.baseUrl}/api?mode=server_stats`,
