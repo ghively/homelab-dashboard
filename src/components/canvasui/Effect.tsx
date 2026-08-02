@@ -6,9 +6,12 @@
  * Three things have to line up before an effect may render, and each has a
  * different fallback consequence:
  *
- *  1. The browser must support HTML-in-Canvas. It is a Chrome origin trial
- *     (`chrome://flags/#canvas-draw-element`); everywhere else the components
- *     render their children untouched.
+ *  1. HTML-in-Canvas must actually RASTERISE — see probe.ts. This deliberately
+ *     does not ask whether `drawElementImage` exists: enabling the Chrome flag
+ *     exposes the method before the draw necessarily works, and the vendored
+ *     components swallow the resulting exception, so a nominal check made
+ *     turning the flag ON blank out the panels. The probe draws a known colour
+ *     and reads the pixels back.
  *  2. A WebGL context slot must be free — see budget.ts for why that is capped.
  *  3. prefers-reduced-motion must not be set. These effects are continuous
  *     animation; honouring that preference is not optional.
@@ -22,7 +25,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { supportsHtmlInCanvas } from "@/components/canvasui/Glass";
+import { probeHtmlInCanvas } from "@/components/canvasui/probe";
 import { claimSlot, type Slot } from "@/components/canvasui/budget";
 
 export function useEffectGate(priority = false): boolean {
@@ -32,17 +35,16 @@ export function useEffectGate(priority = false): boolean {
   useEffect(() => {
     let alive = true;
 
-    // Deferred to a microtask: the checks touch browser APIs, so they cannot
-    // run during render, and setting state synchronously inside an effect is
-    // what react-hooks flags as a cascading-render risk.
-    void Promise.resolve().then(() => {
-      if (!alive) return;
+    // Async because the probe needs a real paint frame to complete. The slot is
+    // claimed only after it resolves, so a browser that cannot rasterise never
+    // consumes one of the capped WebGL contexts.
+    void probeHtmlInCanvas().then((result) => {
+      if (!alive || !result.ok) return;
 
       const reduced =
         typeof window !== "undefined" &&
         window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      if (reduced || !supportsHtmlInCanvas()) return;
+      if (reduced) return;
 
       const s = claimSlot(priority);
       if (!s.granted) return;
