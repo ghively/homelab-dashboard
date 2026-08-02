@@ -12,7 +12,10 @@ import {
   getNativeMode,
   getNativeModeServer,
 } from "@/components/canvasui/native-mode";
-import { recordDrawFailure } from "@/components/canvasui/probe";
+import {
+  isTransientDrawElementError,
+  recordDrawFailure,
+} from "@/components/canvasui/probe";
 
 export interface GlassOptions {
   /** Lens shape. */
@@ -312,16 +315,35 @@ export function createGlass(
   );
 
   let contentDirty = false;
+  let transientDrawRetries = 0;
   let wake = () => {};
 
   if (htmlInCanvas) {
     paintable.onpaint = () => {
+      // The div can LEAVE the canvas while this instance is still wired up:
+      // React commits the DOM move before the outgoing instance's effect
+      // cleanup runs, and Chrome dispatches onpaint from the frame view with
+      // no visibility check (LocalFrameView::RunCanvasOnpaintSteps), so a
+      // stale handler can fire on a transition frame. That frame is not an
+      // error — drawing through it throws "Only immediate children of the
+      // <canvas> element…". Skip it; the replacement instance re-evaluates
+      // htmlInCanvas against the real DOM.
+      if (content.parentElement !== source) return;
       try {
         sourceCtx!.reset();
         sourceCtx!.drawElementImage!(content, 0, 0);
+        transientDrawRetries = 0;
         contentDirty = true;
         wake();
       } catch (err) {
+        // The first frames after the content moves into the canvas may not
+        // have a paint record yet ("No cached paint record for element.").
+        // Ask for another paint instead of reporting a phantom failure.
+        if (isTransientDrawElementError(err) && transientDrawRetries < 10) {
+          transientDrawRetries++;
+          paintable.requestPaint?.();
+          return;
+        }
         // Was `catch {}`. Swallowing this is why enabling the Chrome
         // flag blanked the panels instead of falling back: the draw
         // threw every frame, contentDirty never flipped, and the
