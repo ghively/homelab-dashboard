@@ -735,3 +735,35 @@ button.dash-tag {
   cursor: pointer;
   font: inherit;
 }
+
+/* ── Chat-first landing ──────────────────────────────────────── */
+/* The generative chat is the product, not a widget inside a sub-tab. This gives
+   it the weight of a primary surface: a large prompt, a roomy input, and the
+   generated dashboard rendering directly beneath it. */
+.dash-hero-chat h1 {
+  font-size: 28px;
+  margin: 0 0 6px;
+}
+
+.dash-hero-chat p {
+  max-width: 62ch;
+}
+
+.dash-generative-chat {
+  margin-bottom: 28px;
+}
+
+/* The ask box is the main call to action on the page. */
+.dash-generative-chat .dash-ai-input-wrap input {
+  padding: 16px 18px;
+  font-size: 15px;
+}
+
+.dash-generative-chat .dash-ai-input-wrap button {
+  padding: 16px 28px;
+}
+
+/* Generated dashboards need room to breathe under the prompt. */
+.dash-chat-rendered {
+  margin-top: 10px;
+}
