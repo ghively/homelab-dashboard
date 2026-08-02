@@ -1071,3 +1071,136 @@ svg .cnv-clickable:focus-visible circle {
   stroke-width: 3;
   filter: drop-shadow(0 0 6px var(--neon-green));
 }
+
+/* ── Generated media layouts ────────────────────────────────────────── */
+.cnv-posters {
+  align-items: start;
+}
+.cnv-posters-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+}
+.cnv-media-tile {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(8, 8, 12, 0.34);
+  transform: translateZ(0);
+  transition: transform var(--dur-fast) var(--ease-out-quart), border-color var(--dur-fast) var(--ease-out-quart), box-shadow var(--dur-fast) var(--ease-out-quart);
+}
+.cnv-media-art {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+.cnv-albums .cnv-media-art { aspect-ratio: 1; }
+.cnv-media-meta {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(16, 16, 23, 0.96), rgba(7, 7, 10, 0.98));
+}
+.cnv-media-meta strong,
+.cnv-media-meta small,
+.cnv-playback-info strong,
+.cnv-playback-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cnv-media-meta small { color: var(--cnv-muted); }
+.cnv-media-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cnv-media-badge,
+.cnv-playback-state {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--cnv-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cnv-posters-layout-rail {
+  display: flex;
+  grid-template-columns: none;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.cnv-posters-layout-rail .cnv-media-tile {
+  flex: 0 0 min(42vw, 180px);
+  scroll-snap-align: start;
+}
+.cnv-posters-layout-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(118px, 0.7fr));
+}
+.cnv-posters-layout-feature .cnv-media-tile-feature {
+  grid-row: span 2;
+}
+.cnv-posters-layout-feature .cnv-media-tile-feature .cnv-media-art {
+  aspect-ratio: 16 / 9;
+}
+.cnv-posters-layout-feature .cnv-media-tile-feature .cnv-media-meta {
+  background: linear-gradient(180deg, rgba(20, 20, 30, 0.86), rgba(5, 5, 8, 0.98));
+}
+.cnv-playback article {
+  grid-template-columns: 70px minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: hidden;
+}
+.cnv-playback-art {
+  width: 70px;
+  height: 100%;
+  min-height: 104px;
+  aspect-ratio: 2 / 3 !important;
+  border-radius: 7px;
+}
+.cnv-playback-info {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+}
+.cnv-playback-status {
+  display: flex;
+  align-self: start;
+  flex-direction: column;
+  align-items: end;
+  gap: 5px;
+}
+.cnv-playback-state.is-active { color: var(--cnv-healthy); border-color: color-mix(in srgb, var(--cnv-healthy) 45%, transparent); }
+.cnv-playback-state.is-paused { color: var(--cnv-warning); border-color: color-mix(in srgb, var(--cnv-warning) 45%, transparent); }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .cnv-media-tile.cnv-clickable:hover {
+    transform: translateY(-3px);
+    border-color: rgba(0, 243, 255, 0.48);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.36);
+  }
+}
+@media (max-width: 520px) {
+  .cnv-posters-layout-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnv-posters-layout-feature { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnv-posters-layout-feature .cnv-media-tile-feature { grid-column: span 2; grid-row: auto; }
+  .cnv-posters-layout-feature .cnv-media-tile-feature .cnv-media-art { aspect-ratio: 16 / 10; }
+  .cnv-playback article { grid-template-columns: 58px minmax(0, 1fr); }
+  .cnv-playback-art { width: 58px; min-height: 92px; }
+  .cnv-playback-status { grid-column: 2; flex-direction: row; align-items: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cnv-media-tile { transform: none; transition: none; }
+}
