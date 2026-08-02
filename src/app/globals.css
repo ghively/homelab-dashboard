@@ -251,8 +251,21 @@ body { background: transparent; }
 /* ── Main Content ───────────────────────────────────────────── */
 .dash-main {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 24px 32px;
+}
+
+/* The chat owns its own scrolling and its own edges: the composer docks to the
+   bottom of the viewport and the thread scrolls behind it, which cannot work
+   while the parent is also a scroll container with padding. Scoped with :has()
+   rather than a prop on DashboardShell, so the shell stays unaware of what it
+   is hosting and every other page keeps the padded, scrolling main it wants. */
+.dash-main:has(> .chat-shell) {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Demo Data Banner ───────────────────────────────────────── */
@@ -1325,4 +1338,390 @@ button.dash-tag {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   background: rgba(255, 255, 255, 0.03);
+}
+
+/* ═══ Chat-first home ═══════════════════════════════════════════
+   The home page is a conversation, not a dashboard with a search box bolted
+   on. Everything this product does starts with a sentence, so the sentence
+   gets the centre of the screen until there is something better to put there.
+
+   Two states, one layout. Empty: the composer sits mid-page under the title,
+   and the whole viewport reads as an invitation. Active: the composer docks to
+   the bottom and the thread takes the space, because from then on the
+   generated content is the point. */
+
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;                       /* lets .chat-scroll actually scroll */
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-neutral) transparent;
+}
+
+/* ── Empty state ─────────────────────────────────────────────
+   Centred vertically, but biased slightly above the midpoint: optical centre
+   sits higher than geometric centre, and a block pinned to true 50% reads as
+   if it has sagged. */
+.chat-shell.is-empty .chat-scroll {
+  display: grid;
+  place-items: center;
+  padding: 4vh 24px 8vh;
+}
+
+.chat-welcome {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.chat-welcome-mark {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--neon-green);
+  /* The glow is the only place on this screen where the accent is allowed to
+     bloom. Everything else stays hairline, so this reads as the source. */
+  filter: drop-shadow(0 0 14px rgba(0, 255, 0, 0.45));
+  animation: chat-mark-pulse 4s ease-in-out infinite;
+}
+
+@keyframes chat-mark-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
+
+.chat-welcome h1 {
+  font-size: clamp(1.5rem, 3.4vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--text-primary);
+}
+
+.chat-welcome-sub {
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  max-width: 52ch;
+  text-wrap: balance;
+}
+
+/* ── Composer ────────────────────────────────────────────────
+   One bordered well containing the textarea and its action bar, so the whole
+   thing reads as a single control rather than a field with a button beside it.
+   Focus lights the well, not the textarea, for the same reason. */
+.chat-composer {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--border-neutral);
+  border-radius: 16px;
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+  transition:
+    border-color var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-fast) var(--ease-out-quart),
+    background var(--dur-fast) var(--ease-out-quart);
+  overflow: hidden;
+  text-align: left;
+}
+
+.chat-composer:focus-within {
+  border-color: rgba(0, 255, 0, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.25), 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.chat-composer textarea {
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.6;
+  padding: 15px 17px 6px;
+  max-height: 200px;
+}
+
+.chat-composer textarea::placeholder { color: var(--text-mute); }
+
+.chat-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 10px 17px;
+}
+
+.chat-composer-hint {
+  color: var(--text-mute);
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+}
+
+/* Hidden on touch, where there is no Enter key to speak of and the hint is
+   just noise taking a line. */
+@media (pointer: coarse) {
+  .chat-composer-hint { display: none; }
+}
+
+.chat-composer-hint kbd {
+  font: inherit;
+  border: 1px solid var(--border-neutral);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--text-dim);
+}
+
+.chat-send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(0, 255, 0, 0.4);
+  background: rgba(0, 255, 0, 0.11);
+  color: var(--neon-green);
+  border-radius: 9px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    border-color var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.chat-send:hover:not(:disabled) {
+  background: rgba(0, 255, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Disabled rather than hidden: a control that vanishes when the field is empty
+   makes the layout twitch as you type the first character. */
+.chat-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-neutral);
+  color: var(--text-mute);
+  background: none;
+}
+
+.chat-send.is-stop {
+  border-color: rgba(255, 95, 86, 0.45);
+  background: rgba(255, 95, 86, 0.12);
+  color: var(--dot-red);
+}
+
+.chat-stop-glyph {
+  width: 9px;
+  height: 9px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+/* ── Suggestions ─────────────────────────────────────────────
+   Rows, not chips. A chip has to be short enough to fit, which pushes every
+   prompt toward something too generic to demonstrate anything. */
+.chat-suggestions {
+  width: 100%;
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.chat-suggestions-label {
+  color: var(--text-mute);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 0 4px 8px;
+}
+
+.chat-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background var(--dur-fast) var(--ease-out-quart);
+}
+
+.chat-suggestion:hover,
+.chat-suggestion:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  outline: none;
+}
+
+.chat-suggestion strong {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.chat-suggestion:hover strong { color: var(--neon-green); }
+.chat-suggestion small { color: var(--text-mute); font-size: 0.76rem; }
+
+/* ── Thread ──────────────────────────────────────────────────
+   The same max-width as the composer, so the conversation and the control that
+   drives it share one column and the eye never has to re-find the measure. */
+.chat-thread {
+  width: min(860px, 100%);
+  margin: 0 auto;
+  padding: 26px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.chat-msg { display: flex; flex-direction: column; gap: 8px; }
+
+.chat-msg-role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-mute);
+}
+
+.chat-msg-assistant .chat-msg-role { color: var(--neon-green); }
+
+/* The user's own words sit in a bubble; the assistant's answer does not. A
+   generated dashboard is full-width content, and boxing it would put a frame
+   around something that already has its own panels. */
+.chat-msg-user .chat-msg-text {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--border-neutral);
+  border-radius: 12px;
+  padding: 10px 14px;
+  max-width: 90%;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.chat-rendered { display: flex; flex-direction: column; gap: 14px; }
+
+.chat-streaming-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  animation: chat-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes chat-blink {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1; }
+}
+
+.chat-error {
+  width: min(860px, 100%);
+  margin: 12px auto;
+  border: 1px solid rgba(255, 95, 86, 0.4);
+  background: rgba(255, 95, 86, 0.08);
+  color: var(--dot-red);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  font-size: 0.82rem;
+}
+
+/* ── Docked composer ─────────────────────────────────────────
+   A gradient rather than a hard edge, so the thread fades under the dock
+   instead of being sliced by a line. */
+.chat-dock {
+  flex: none;
+  padding: 12px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(to top, rgba(11, 11, 14, 0.92) 55%, transparent);
+}
+
+.chat-dock .chat-composer { width: min(860px, 100%); margin-top: 0; }
+
+.chat-clear {
+  background: none;
+  border: 0;
+  color: var(--text-mute);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.chat-clear:hover { color: var(--neon-green); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-welcome-mark,
+  .chat-streaming-dot { animation: none; }
+  .chat-send:hover:not(:disabled) { transform: none; }
+}
+
+/* ── Sidebar primary action ──────────────────────────────────
+   Deliberately not a nav row. Starting a new dashboard is the most frequent
+   thing anyone does here, and as the first item in a list of destinations it
+   read as one — the accent border and fill mark it as an action instead. */
+.dash-new {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 14px 12px 6px;
+  padding: 9px 12px;
+  border: 1px solid rgba(0, 255, 0, 0.34);
+  background: rgba(0, 255, 0, 0.09);
+  color: var(--neon-green);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.dash-new:hover {
+  background: rgba(0, 255, 0, 0.17);
+  transform: translateY(-1px);
+}
+
+.dash-new-icon { font-size: 1rem; line-height: 1; }
+
+.dash-nav-label {
+  color: var(--text-mute);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 10px 16px 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-new:hover { transform: none; }
 }

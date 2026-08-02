@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import {
   DashboardShell,
   Hero,
-  WorldCard,
   QuickTags,
   VisualPanel,
   MetricStrip,
@@ -14,9 +13,6 @@ import {
   useFleetData,
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
-import { GlyphRain } from "@/components/canvasui/GlyphRain";
-import { useEffectGate } from "@/components/canvasui/Effect";
-import { DecryptText } from "@/components/decrypt-text";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
@@ -115,123 +111,36 @@ export default function Home() {
 // ── Landing Page (Visual OS Home) ────────────────────────────
 
 
-/**
- * The landing hero, wrapped in glyph rain.
- *
- * This is hand-rolled rather than the shared <Hero> because the chat-first
- * landing needs different copy and metrics. That divergence is exactly why the
- * rain added to <Hero> never appeared here — <Hero> is only used by the world
- * views and the AI workspace.
- */
-function LandingHero({
-  overall,
-}: {
-  overall: { state: string; healthy: number; total: number } | undefined;
-}) {
-  const rain = useEffectGate(true);
-
-  const inner = (
-    <header className="dash-hero dash-hero-chat cnv-surface tr-medium bl-md bg-gradient el-md">
-      <div>
-        <h1>
-          <DecryptText text="What do you want to see?" duration={1100} />
-        </h1>
-        <p>
-          Describe a dashboard in plain language — it is generated live from{" "}
-          {overall ? `${overall.healthy}/${overall.total} reporting adapters` : "your adapters"}.
-        </p>
-      </div>
-      {overall && (
-        <div className="dash-hero-metrics">
-          <div className={`dash-hero-metric state-${overall.state}`}>
-            <small>Fleet</small>
-            <strong>{overall.state}</strong>
-          </div>
-        </div>
-      )}
-    </header>
-  );
-
-  if (!rain) return inner;
-
-  return (
-    <GlyphRain
-      className="dash-hero-rain"
-      charset="0123456789ABCDEFｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ"
-      cell={13}
-      color={[0, 0.62, 0.42]}
-      headColor={[0.1, 1, 0.55]}
-      speed={0.14}
-      density={0.055}
-      glow={1.15}
-      trail={0.86}
-      stir={0.35}
-      dim={0.72}
-    >
-      {inner}
-    </GlyphRain>
-  );
-}
-
 function LandingPage({
   fixtureState,
-  onWorldSelect,
 }: {
   fixtureState: VisualStateValue | null;
   onWorldSelect: (w: WorldId) => void;
 }) {
-  const { data, loading } = useFleetData(fixtureState);
-
-  const worldStates = useMemo(() => {
-    if (!data) return {};
-    return Object.fromEntries(data.worlds.map((w) => [w.id, w]));
-  }, [data]);
-
+  const { data } = useFleetData(fixtureState);
   const overall = data?.overall;
 
+  /*
+    The home page IS the conversation.
+
+    It previously opened on a hero, then the chat, then a grid of world tiles —
+    so the one thing this product does was the third thing on the page, below
+    two blocks explaining that it existed. Everything here is generated from a
+    sentence, so the sentence gets the screen.
+
+    The worlds did not disappear; they moved to the sidebar, which is where
+    navigation belongs and where it stays reachable from inside a conversation
+    rather than only from the top of the home page. Fleet health rides along as
+    the composer's subtitle, so the context survives without costing a section.
+  */
   return (
-    <>
-      {/*
-        The chat IS the product. This page used to open on a grid of world tiles
-        with a State Fixture Exerciser underneath — a dev harness — while the
-        generative chat sat inside the "AI" world, two clicks away. The one
-        thing the system exists to do was the hardest thing to find.
-
-        Order is now: ask -> generated dashboard -> fleet status as context.
-        The exerciser is gone from the product surface; the world tiles remain
-        below as a way to browse adapters directly.
-      */}
-      <LandingHero overall={overall} />
-
-      <GenerativeChat />
-
-      <div className="dash-section-header">
-        <h2>Fleet</h2>
-        <small>
-          {loading ? "Checking adapters…" : "Click a world to browse its adapters directly"}
-        </small>
-      </div>
-
-      <div className="dash-world-grid">
-        {WORLDS.map((w) => {
-          const ws = worldStates[w.id];
-          return (
-            <WorldCard
-              key={w.id}
-              icon={w.icon}
-              label={w.label}
-              tagline={w.tagline}
-              adapterCount={w.adapters.length}
-              state={ws?.state ?? "loading"}
-              healthy={ws?.healthy ?? 0}
-              total={ws?.total ?? w.adapters.length}
-              accent={w.accent}
-              onClick={() => onWorldSelect(w.id)}
-            />
-          );
-        })}
-      </div>
-    </>
+    <GenerativeChat
+      subtitle={
+        overall
+          ? `Live from ${overall.healthy}/${overall.total} reporting adapters · fleet ${overall.state}`
+          : undefined
+      }
+    />
   );
 }
 
