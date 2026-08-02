@@ -689,3 +689,42 @@ html, body {
 .dash-drawer-fixture {
   color: #ffc266;
 }
+
+/* ── Empty filter state ──────────────────────────────────────── */
+/* Shown when a saved view or tag filters everything out. Without this the grid
+   just renders blank, which reads as a broken page rather than "nothing to
+   report" — and "Alerts" on a healthy world hits this constantly. */
+.dash-empty-filter {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  border: 1px dashed var(--dash-line);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--dash-muted);
+}
+
+.dash-empty-filter strong {
+  color: var(--dash-text);
+  font-size: 15px;
+}
+
+.dash-empty-filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dash-empty-filter-actions button {
+  background: transparent;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  padding: 7px 14px;
+  color: var(--dash-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dash-empty-filter-actions button:hover {
+  border-color: var(--dash-accent);
+}

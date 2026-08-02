@@ -206,6 +206,35 @@ function LandingPage({
 
 // ── World View (generic workspace) ───────────────────────────
 
+/**
+ * Does a panel match a quick-tag? Matches the adapter name, its title/subtitle,
+ * and its metric labels.
+ *
+ * Shared so the AI Workspace and the world views filter identically. The AI
+ * Workspace previously rendered QuickTags but mapped over the unfiltered list,
+ * so clicking a tag there highlighted it and changed nothing.
+ */
+function matchesTag(
+  adapter: string,
+  result: { title?: string; subtitle?: string; metrics?: Array<{ label: string }> },
+  tag: string,
+): boolean {
+  const haystack = `${adapter} ${result.title ?? ""} ${result.subtitle ?? ""} ${(result.metrics ?? [])
+    .map((m) => m.label)
+    .join(" ")}`.toLowerCase();
+  return haystack.includes(tag.toLowerCase());
+}
+
+// States that mean "something needs attention". `empty` and `loading` are
+// deliberately excluded — an idle panel is not an alert.
+const ALERT_STATES = ["warning", "critical", "offline", "stale", "denied"];
+
+// Worst-first ordering for the Detail view, so problems lead.
+const STATE_RANK: Record<string, number> = {
+  offline: 0, critical: 1, denied: 2, warning: 3, stale: 4,
+  loading: 5, empty: 6, healthy: 7,
+};
+
 function WorldView({
   world,
   fixtureState,
@@ -239,13 +268,26 @@ function WorldView({
 
   const filteredResults = useMemo(() => {
     if (!data) return [];
-    if (!activeTag) return data.results;
-    // Simple tag-based filter: show adapters whose name or data matches the tag
-    return data.results.filter(({ adapter, result }) => {
-      const haystack = `${adapter} ${result.title} ${result.subtitle ?? ""} ${(result.metrics ?? []).map((m) => m.label).join(" ")}`.toLowerCase();
-      return haystack.includes(activeTag.toLowerCase());
-    });
-  }, [data, activeTag]);
+    let results = data.results;
+
+    // The saved-view buttons used to be decorative: `savedView` only drove which
+    // button looked active, and the list below never consulted it, so "Health
+    // Only" and "Alerts" rendered exactly the same panels as "Overview".
+    if (savedView === "health") {
+      results = results.filter(({ result }) => result.state === "healthy");
+    } else if (savedView === "alerts") {
+      results = results.filter(({ result }) => ALERT_STATES.includes(String(result.state)));
+    } else if (savedView === "detail") {
+      // Detail sorts worst-first so problems lead, rather than filtering.
+      results = [...results].sort(
+        (a, b) =>
+          (STATE_RANK[String(a.result.state)] ?? 9) - (STATE_RANK[String(b.result.state)] ?? 9),
+      );
+    }
+
+    if (!activeTag) return results;
+    return results.filter(({ adapter, result }) => matchesTag(adapter, result, activeTag));
+  }, [data, activeTag, savedView]);
 
   return (
     <>
@@ -276,6 +318,32 @@ function WorldView({
         <div className="dash-loading">
           <div className="dash-loading-spinner" />
           Loading {worldConfig.label}...
+        </div>
+      ) : filteredResults.length === 0 ? (
+        // Now that the saved views actually filter, an empty result is a normal
+        // outcome — "Alerts" on a healthy world is the common case. Say why the
+        // grid is empty and offer the way out, rather than rendering nothing.
+        <div className="dash-empty-filter">
+          <strong>
+            {savedView === "alerts"
+              ? `Nothing needs attention in ${worldConfig.label}.`
+              : savedView === "health"
+                ? `No healthy adapters in ${worldConfig.label}.`
+                : `No adapters match this filter.`}
+          </strong>
+          <small>
+            {activeTag ? `Filtered by tag "${activeTag}".` : null}
+            {activeTag && savedView !== "overview" ? " " : null}
+            {savedView !== "overview" ? `View: ${savedView}.` : null}
+          </small>
+          <div className="dash-empty-filter-actions">
+            {activeTag && (
+              <button onClick={() => onTagClick(activeTag)}>Clear tag</button>
+            )}
+            {savedView !== "overview" && (
+              <button onClick={() => onSaveView("overview")}>Show all</button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="dash-adapter-grid">
@@ -345,14 +413,16 @@ function AIWorkspace({
         </div>
       ) : (
         <div className="dash-adapter-grid">
-          {data.results.map(({ adapter, result }) => (
-            <AdapterResultCard
-              key={adapter}
-              adapterName={adapter}
-              result={result}
-              onItemClick={(item) => onEntityClick(item, adapter, result.source)}
-            />
-          ))}
+          {data.results
+            .filter(({ adapter, result }) => !activeTag || matchesTag(adapter, result, activeTag))
+            .map(({ adapter, result }) => (
+              <AdapterResultCard
+                key={adapter}
+                adapterName={adapter}
+                result={result}
+                onItemClick={(item) => onEntityClick(item, adapter, result.source)}
+              />
+            ))}
         </div>
       )}
     </>
