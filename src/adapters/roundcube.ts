@@ -21,7 +21,7 @@ export class RoundcubeAdapter extends BaseAdapter {
     this.password = password || process.env.ROUNDCUBE_PASSWORD || "";
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.username || !this.password) {
       throw new Error("ROUNDCUBE_USERNAME and ROUNDCUBE_PASSWORD not configured");
     }
@@ -54,7 +54,7 @@ export class RoundcubeAdapter extends BaseAdapter {
     const mailboxes = mailboxesResponse.data?.list || [];
 
     // Get INBOX message count
-    const inbox = mailboxes.find((m: any) => m.id === "INBOX") || { messages: 0, unseen: 0 };
+    const inbox = mailboxes.find((m: { id?: string }) => m.id === "INBOX") || { messages: 0, unseen: 0 };
 
     // List recent messages
     const messagesResponse = await client.get("/?_task=mail&_action=list", {
@@ -75,9 +75,10 @@ export class RoundcubeAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { healthy?: unknown };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
+    if (!d.healthy) return "critical";
     return "healthy";
   }
 }

@@ -19,14 +19,17 @@ export class SMBNFSAdapter extends BaseAdapter {
     this.mountPoints = config.mountPoints || ["/mnt", "/media"];
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     try {
+      // A lazy require keeps the node-only child_process out of any bundle that
+      // merely imports this module; a top-level import would break client builds.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { exec } = require("child_process");
       const sshBase = this.sshKey
         ? `ssh -i ${this.sshKey} -o StrictHostKeyChecking=no ${this.host}`
         : `ssh -o StrictHostKeyChecking=no ${this.host}`;
 
-      const mountData: any = {
+      const mountData: { mounts: Array<Record<string, unknown>>; [k: string]: unknown } = {
         mounts: [],
         healthy: true,
       };
@@ -34,7 +37,7 @@ export class SMBNFSAdapter extends BaseAdapter {
       for (const mount of this.mountPoints) {
         try {
           const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-            exec(`${sshBase} "df -h ${mount}"`, (error: any, stdout: string, stderr: string) => {
+            exec(`${sshBase} "df -h ${mount}"`, (error: Error | null, stdout: string, stderr: string) => {
               if (error) reject(error);
               else resolve({ stdout, stderr });
             });

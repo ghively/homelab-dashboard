@@ -2,6 +2,13 @@ import { BaseAdapter } from "./BaseAdapter";
 import type { AdapterResult, AdapterState } from "./types";
 import axios from "axios";
 
+/** Fields of a Home Assistant state object this adapter reads. */
+interface HAEntity {
+  entity_id: string;
+  state?: string;
+  attributes?: Record<string, unknown>;
+}
+
 /**
  * Home Assistant adapter - entities, devices, rooms, energy data
  */
@@ -18,7 +25,7 @@ export class HomeAssistantAdapter extends BaseAdapter {
     this.token = token;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.token) {
       throw new Error("HOME_ASSISTANT_TOKEN not configured");
     }
@@ -46,19 +53,19 @@ export class HomeAssistantAdapter extends BaseAdapter {
 
     // Entity categorization
     const entityCategories = {
-      lights: entities.filter((e: any) =>
+      lights: entities.filter((e: HAEntity) =>
         e.entity_id.startsWith("light.")
       ).length,
-      switches: entities.filter((e: any) =>
+      switches: entities.filter((e: HAEntity) =>
         e.entity_id.startsWith("switch.")
       ).length,
-      sensors: entities.filter((e: any) =>
+      sensors: entities.filter((e: HAEntity) =>
         e.entity_id.startsWith("sensor.") || e.entity_id.startsWith("binary_sensor.")
       ).length,
-      climate: entities.filter((e: any) =>
+      climate: entities.filter((e: HAEntity) =>
         e.entity_id.startsWith("climate.")
       ).length,
-      media_players: entities.filter((e: any) =>
+      media_players: entities.filter((e: HAEntity) =>
         e.entity_id.startsWith("media_player.")
       ).length,
     };
@@ -69,7 +76,7 @@ export class HomeAssistantAdapter extends BaseAdapter {
       devices: devices.length,
       rooms: areas.length,
       categories: entityCategories,
-      sampleEntities: entities.slice(0, 10).map((e: any) => ({
+      sampleEntities: entities.slice(0, 10).map((e: HAEntity) => ({
         id: e.entity_id,
         state: e.state,
         attributes: {
@@ -79,10 +86,11 @@ export class HomeAssistantAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { entities?: unknown; healthy?: unknown };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
-    if (data.entities === 0) return "warning";
+    if (!d.healthy) return "critical";
+    if (d.entities === 0) return "warning";
     return "healthy";
   }
 }

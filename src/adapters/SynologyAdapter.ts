@@ -8,7 +8,7 @@ export interface SynologyConfig extends AdapterConfig {
 }
 
 interface DSMResponse {
-  data: any;
+  data: unknown;
   success: boolean;
 }
 
@@ -37,7 +37,7 @@ export class SynologyAdapter extends BaseAdapter {
     this.baseUrl = `http://${config.host}:5000/webapi`;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     try {
       await this.login();
 
@@ -60,7 +60,7 @@ export class SynologyAdapter extends BaseAdapter {
     }
   }
 
-  private async request(api: string, method: string, params: any = {}): Promise<DSMResponse> {
+  private async request(api: string, method: string, params: Record<string, string | number | boolean | null | undefined> = {}): Promise<DSMResponse> {
     const formData = new URLSearchParams();
     formData.append("api", api);
     formData.append("method", method);
@@ -79,7 +79,7 @@ export class SynologyAdapter extends BaseAdapter {
   }
 
   private async login(): Promise<void> {
-    const { username, password } = this.config as any;
+    const { username, password } = this.config as unknown as { username?: string; password?: string };
     const result = await this.request("SYNO.API.Auth", "Login", {
       account: username,
       passwd: password,
@@ -99,17 +99,17 @@ export class SynologyAdapter extends BaseAdapter {
 
   private async getVolumes(): Promise<VolumeInfo[]> {
     const result = await this.request("SYNO.Storage.Volume", "list", { session: this.sid });
-    return result.data?.volumes || [];
+    return (result.data as { volumes?: VolumeInfo[] } | undefined)?.volumes || [];
   }
 
   private async getDisks(): Promise<DiskInfo[]> {
     const result = await this.request("SYNO.Storage.Disk", "list", { session: this.sid });
-    return result.data?.disks || [];
+    return (result.data as { disks?: DiskInfo[] } | undefined)?.disks || [];
   }
 
-  private async getSMARTInfo(): Promise<Record<string, any>> {
+  private async getSMARTInfo(): Promise<Record<string, unknown>> {
     const disks = await this.getDisks();
-    const smart: Record<string, any> = {};
+    const smart: Record<string, unknown> = {};
 
     for (const disk of disks) {
       try {
@@ -117,7 +117,7 @@ export class SynologyAdapter extends BaseAdapter {
           disk_id: disk.id,
           session: this.sid,
         });
-        smart[disk.id] = result.data?.smart_info || {};
+        smart[disk.id] = (result.data as { smart_info?: unknown } | undefined)?.smart_info || {};
       } catch {
         smart[disk.id] = { error: "SMART info unavailable" };
       }

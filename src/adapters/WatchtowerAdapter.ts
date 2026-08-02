@@ -28,7 +28,7 @@ export class WatchtowerAdapter extends BaseAdapter {
     this.apiKey = config.apiKey;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     try {
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -38,7 +38,7 @@ export class WatchtowerAdapter extends BaseAdapter {
       }
 
       const allContainers: WatchtowerContainer[] = [];
-      const hostStatus: Record<string, any> = {};
+      const hostStatus: Record<string, { healthy?: boolean; [k: string]: unknown }> = {};
 
       for (const host of this.hosts) {
         try {
@@ -83,7 +83,7 @@ export class WatchtowerAdapter extends BaseAdapter {
         stoppedContainers: stopped.length,
         updatesAvailable: updateAvailable.length,
         hostCount: this.hosts.length,
-        healthyHosts: Object.values(hostStatus).filter((h: any) => h.healthy).length,
+        healthyHosts: Object.values(hostStatus).filter((h) => (h as { healthy?: boolean }).healthy).length,
         hostStatus,
         byImage,
         updateCandidates: updateAvailable.map((c) => ({

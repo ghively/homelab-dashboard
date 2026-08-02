@@ -15,7 +15,7 @@ export abstract class BaseAdapter {
     };
   }
 
-  protected abstract fetchData(): Promise<any>;
+  protected abstract fetchData(): Promise<unknown>;
 
   async fetch(): Promise<AdapterResult> {
     if (!this.config.enabled) {
@@ -71,10 +71,11 @@ export abstract class BaseAdapter {
     };
   }
 
-  protected deriveState(data: any): AdapterState {
-    if (!data) return "empty";
-    if (data.healthy === false) return "critical";
-    if (data.warning) return "warning";
+  protected deriveState(data: unknown): AdapterState {
+    if (!data || typeof data !== "object") return "empty";
+    const d = data as { healthy?: unknown; warning?: unknown };
+    if (d.healthy === false) return "critical";
+    if (d.warning) return "warning";
     return "healthy";
   }
 }

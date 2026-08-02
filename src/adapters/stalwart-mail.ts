@@ -18,7 +18,7 @@ export class StalwartMailAdapter extends BaseAdapter {
     this.adminToken = adminToken;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.adminToken) {
       throw new Error("STALWART_ADMIN_TOKEN not configured");
     }
@@ -58,11 +58,12 @@ export class StalwartMailAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { healthy?: unknown; queue?: { failed?: number } };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
-    if (data.queue.failed > 10) return "critical";
-    if (data.queue.failed > 0) return "warning";
+    if (!d.healthy) return "critical";
+    if ((d.queue?.failed ?? 0) > 10) return "critical";
+    if ((d.queue?.failed ?? 0) > 0) return "warning";
     return "healthy";
   }
 }
