@@ -1,149 +1,163 @@
-import { BaseAdapter } from "./BaseAdapter";
-import type { AdapterState } from "./types";
-import axios from "axios";
+// Telegram adapter — bot identity, delivery mode and update backlog.
+//
+// Everything here comes from the Telegram Bot API for the configured token:
+//   GET /getMe           → bot identity and the permissions it was granted
+//   GET /getWebhookInfo  → webhook vs long-poll, backlog, last delivery error
+//
+// WHY getUpdates IS NOT CALLED
+// ----------------------------
+// The previous version fetched /getUpdates on every query. That is not a
+// read-only call: Telegram allows exactly one getUpdates consumer per token,
+// and issuing a second one returns 409 Conflict *and* disrupts whichever
+// process is legitimately polling — on this host, the Hermes gateway bot. It
+// also confirms updates, so a dashboard refresh could silently consume a
+// message the real bot had not processed yet. getWebhookInfo reports the same
+// backlog (`pending_update_count`) without touching the queue, so that is what
+// this panel reads.
 
-/**
- * Telegram Bot adapter - messaging and bot integration
- */
-export class TelegramAdapter extends BaseAdapter {
-  private botToken: string;
-  private pollingActive = false;
-  private updateCount = 0;
+import type { DataAdapter } from "./adapter-base";
+import type { FreshnessInfo, Metric, VisualQueryResult } from "./types";
+import { getFixtureState } from "./registry";
+import { getFixtureForState } from "./fixtures";
+import {
+  ADAPTER_FANOUT_TIMEOUT_MS,
+  AdapterHttpError,
+  failureResult,
+  fetchJson,
+  makeFreshness,
+  notConfiguredResult,
+} from "@/lib/adapter-http";
 
-  constructor(
-    botToken: string = process.env.TELEGRAM_BOT_TOKEN || ""
-  ) {
-    super("telegram");
-    this.botToken = botToken;
+const TOKEN_ENV = "TELEGRAM_BOT_TOKEN";
+
+/** Backlog above this means the consumer has probably stopped consuming. */
+const BACKLOG_WARN = 25;
+
+interface TelegramUser {
+  id?: number;
+  is_bot?: boolean;
+  first_name?: string;
+  username?: string;
+  can_join_groups?: boolean;
+  can_read_all_group_messages?: boolean;
+  supports_inline_queries?: boolean;
+}
+
+interface WebhookInfo {
+  url?: string;
+  has_custom_certificate?: boolean;
+  pending_update_count?: number;
+  ip_address?: string;
+  last_error_date?: number;
+  last_error_message?: string;
+  max_connections?: number;
+  allowed_updates?: string[];
+}
+
+interface TgEnvelope<T> {
+  ok: boolean;
+  result?: T;
+  description?: string;
+}
+
+export class TelegramAdapter implements DataAdapter {
+  readonly name = "telegram";
+  readonly description = "Telegram bot — identity, delivery mode and update backlog.";
+  readonly category = "home" as const;
+
+  async health(): Promise<FreshnessInfo> {
+    return makeFreshness(this.name, process.env[TOKEN_ENV] ? "api.telegram.org" : "unconfigured");
   }
 
-  protected async fetchData(): Promise<unknown> {
-    if (!this.botToken) {
-      throw new Error("TELEGRAM_BOT_TOKEN not configured");
-    }
+  async query(): Promise<VisualQueryResult> {
+    const fixtureStateValue = getFixtureState();
+    if (fixtureStateValue) return getFixtureForState(this.name, fixtureStateValue);
 
-    const client = axios.create({
-      baseURL: `https://api.telegram.org/bot${this.botToken}`,
-      headers: { "Content-Type": "application/json" },
-      timeout: this.config.timeoutMs,
-    });
+    const token = process.env[TOKEN_ENV];
+    if (!token) return notConfiguredResult(this.name, "Telegram", TOKEN_ENV);
 
-    // Get bot info
-    const meResponse = await client.get("/getMe");
-    const bot = meResponse.data?.result;
+    // Never put the token in `source` — it appears in freshness metadata and
+    // in the failure panel's Endpoint metric.
+    const source = "api.telegram.org";
+    const api = `https://api.telegram.org/bot${token}`;
+    const start = Date.now();
 
-    if (!bot) {
-      throw new Error("Failed to get bot info - invalid token?");
-    }
-
-    // Get webhook info
-    const webhookResponse = await client.get("/getWebhookInfo");
-    const webhook = webhookResponse.data?.result;
-
-    // Fetch recent updates (manual poll)
-    const updatesResponse = await client.get("/getUpdates", {
-      params: { limit: 5, timeout: 0 },
-    });
-    const recentUpdates = updatesResponse.data?.result?.length || 0;
-
-    return {
-      healthy: true,
-      bot: {
-        id: bot.id,
-        firstName: bot.first_name,
-        username: bot.username,
-        isBot: bot.is_bot,
-      },
-      webhook: {
-        url: webhook?.url || null,
-        hasCustomCertificate: webhook?.has_custom_certificate || false,
-        pendingUpdateCount: webhook?.pending_update_count || 0,
-      },
-      polling: {
-        active: this.pollingActive,
-        updateCount: this.updateCount,
-      },
-      recentUpdates,
-    };
-  }
-
-  protected override deriveState(data: unknown): AdapterState {
-    const d = (data ?? {}) as { healthy?: unknown; webhook?: { pendingUpdateCount?: number } };
-    if (!data) return "offline";
-    if (!d.healthy) return "critical";
-    if ((d.webhook?.pendingUpdateCount ?? 0) > 100) return "warning";
-    return "healthy";
-  }
-
-  /**
-   * Start long polling for updates
-   */
-  async startPolling(onUpdate?: (update: unknown) => void): Promise<void> {
-    if (this.pollingActive) {
-      return;
-    }
-
-    const client = axios.create({
-      baseURL: `https://api.telegram.org/bot${this.botToken}`,
-      headers: { "Content-Type": "application/json" },
-      timeout: 30000,
-    });
-
-    let offset = 0;
-
-    this.pollingActive = true;
-
-    const poll = async () => {
-      if (!this.pollingActive) return;
-
-      try {
-        const response = await client.get("/getUpdates", {
-          params: { offset, timeout: 30 },
-        });
-
-        const updates = response.data?.result || [];
-
-        for (const update of updates) {
-          this.updateCount++;
-          offset = update.update_id + 1;
-
-          if (onUpdate) {
-            onUpdate(update);
-          }
-        }
-      } catch {
-        // Silently retry on error
+    try {
+      const me = await fetchJson<TgEnvelope<TelegramUser>>(`${api}/getMe`);
+      if (!me.ok || !me.result) {
+        // A well-formed rejection (ok:false) is a credential problem, and
+        // Telegram answers it with 401 — but be explicit rather than relying
+        // on the status alone.
+        throw new AdapterHttpError(source, 401, me.description ?? "getMe returned ok:false");
       }
+      const bot = me.result;
 
-      // Continue polling
-      setTimeout(poll, 1000);
-    };
+      const hook = await fetchJson<TgEnvelope<WebhookInfo>>(
+        `${api}/getWebhookInfo`,
+        {},
+        ADAPTER_FANOUT_TIMEOUT_MS,
+      ).catch(() => null);
+      const webhook = hook?.result;
 
-    poll();
-  }
+      const usingWebhook = Boolean(webhook?.url);
+      const backlog = webhook?.pending_update_count ?? 0;
+      const lastError = webhook?.last_error_message;
+      const lastErrorAt = webhook?.last_error_date
+        ? new Date(webhook.last_error_date * 1000).toISOString()
+        : null;
 
-  /**
-   * Stop polling
-   */
-  stopPolling(): void {
-    this.pollingActive = false;
-  }
+      const metrics: Metric[] = [
+        { label: "Bot", value: bot.username ? `@${bot.username}` : (bot.first_name ?? "unknown") },
+        { label: "Bot ID", value: bot.id ?? "unknown" },
+        { label: "Delivery", value: usingWebhook ? "webhook" : "long polling" },
+        ...(usingWebhook && webhook?.url ? [{ label: "Webhook", value: webhook.url }] : []),
+        {
+          label: "Pending Updates",
+          value: backlog,
+          state: backlog > BACKLOG_WARN ? "warning" : "healthy",
+        },
+        {
+          label: "Last Error",
+          value: lastError ?? "none",
+          state: lastError ? "warning" : "healthy",
+        },
+        { label: "Group Messages", value: bot.can_read_all_group_messages ? "readable" : "privacy mode" },
+        { label: "Inline Queries", value: bot.supports_inline_queries ? "enabled" : "disabled" },
+      ];
 
-  /**
-   * Send a text message
-   */
-  async sendMessage(chatId: number | string, text: string): Promise<unknown> {
-    const client = axios.create({
-      baseURL: `https://api.telegram.org/bot${this.botToken}`,
-      headers: { "Content-Type": "application/json" },
-      timeout: this.config.timeoutMs,
-    });
+      const state: VisualQueryResult["state"] =
+        lastError || backlog > BACKLOG_WARN ? "warning" : "healthy";
 
-    const response = await client.post("/sendMessage", {
-      chat_id: chatId,
-      text,
-    });
-
-    return response.data?.result;
+      return {
+        title: "Telegram — Bot",
+        subtitle: `@${bot.username ?? "?"} • ${usingWebhook ? "webhook" : "long polling"} • ${backlog} pending`,
+        state,
+        freshness: makeFreshness(this.name, source, start),
+        metrics,
+        ...(lastError && lastErrorAt
+          ? {
+              events: [
+                {
+                  id: "telegram:last-error",
+                  at: lastErrorAt,
+                  title: "Last delivery error",
+                  detail: lastError,
+                  state: "warning" as const,
+                },
+              ],
+            }
+          : {}),
+        summary:
+          `Telegram bot @${bot.username ?? "?"} (id ${bot.id ?? "?"}) is authenticated. ` +
+          `Delivery is via ${usingWebhook ? `webhook ${webhook?.url}` : "long polling"}, ` +
+          `${backlog} update(s) pending${lastError ? `, last error: ${lastError}` : ", no delivery errors"}. ` +
+          `This panel does not call getUpdates, which would conflict with the bot's own poller.`,
+      };
+    } catch (err) {
+      return failureResult(this.name, "Telegram", source, err, start);
+    }
   }
 }
+
+const adapter = new TelegramAdapter();
+export { adapter as default };

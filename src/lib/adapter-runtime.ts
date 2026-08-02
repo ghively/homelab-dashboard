@@ -51,6 +51,7 @@ import blackbox from "@/adapters/ops/blackbox-adapter";
 import uptimeKuma from "@/adapters/ops/uptime-kuma-adapter";
 import nodeExporter from "@/adapters/infra/node-exporter-adapter";
 import tailscale from "@/adapters/infra/tailscale-adapter";
+import { registerWorldAdapters } from "@/lib/registration";
 import openwebui from "@/adapters/ai/openwebui";
 import langfuse from "@/adapters/ai/langfuse";
 
@@ -332,6 +333,9 @@ export function initAdapters(): void {
   registerSearxng();
   registerEnvGated();
   registerCloudflare();
+  // Per-world modules under src/lib/registration/. Runs last so a world
+  // module can override an earlier registration for the same adapter name.
+  registerWorldAdapters(registry);
 }
 
 export function getAdapter(name: string): DataAdapter | undefined {

@@ -11,6 +11,7 @@ import {
   SavedViews,
   useWorldData,
   useFleetData,
+  type FleetData,
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
@@ -36,6 +37,16 @@ export default function Home() {
   const [drawerSource, setDrawerSource] = useState<"live" | "fixture" | "offline" | undefined>();
   const [savedView, setSavedView] = useState("overview");
 
+  // Fetched once here rather than inside LandingPage, because the shell needs
+  // it too: the DEMO DATA banner is a claim about the whole fleet, and the only
+  // thing that knows whether any adapter is live is the fleet endpoint.
+  const { data: fleet, loading: fleetLoading } = useFleetData(fixtureState);
+  const dataSource: "fixture" | "live" | "unknown" = fleetLoading || !fleet
+    ? "unknown"
+    : fleet.overall.live > 0
+      ? "live"
+      : "fixture";
+
   if (activeWorld === "home") {
     return (
       <DashboardShell
@@ -44,12 +55,9 @@ export default function Home() {
         onNewChat={() => setChatKey((k) => k + 1)}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
+        dataSource={dataSource}
       >
-        <LandingPage
-          key={chatKey}
-          fixtureState={fixtureState}
-          onWorldSelect={setActiveWorld}
-        />
+        <LandingPage key={chatKey} fleet={fleet} />
       </DashboardShell>
     );
   }
@@ -65,6 +73,7 @@ export default function Home() {
         }}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
+        dataSource={dataSource}
       >
         <AIWorkspace
           fixtureState={fixtureState}
@@ -93,6 +102,7 @@ export default function Home() {
       onWorldChange={setActiveWorld}
       fixtureState={fixtureState}
       onFixtureChange={setFixtureState}
+      dataSource={dataSource}
     >
       <WorldView
         world={activeWorld}
@@ -121,14 +131,8 @@ export default function Home() {
 // ── Landing Page (Visual OS Home) ────────────────────────────
 
 
-function LandingPage({
-  fixtureState,
-}: {
-  fixtureState: VisualStateValue | null;
-  onWorldSelect: (w: WorldId) => void;
-}) {
-  const { data } = useFleetData(fixtureState);
-  const overall = data?.overall;
+function LandingPage({ fleet }: { fleet: FleetData | null }) {
+  const overall = fleet?.overall;
 
   /*
     The home page IS the conversation.
