@@ -108,19 +108,23 @@ export type Event = z.infer<typeof EventSchema>;
  * VisualData is the unified shape all adapters produce.
  * Every component in the manifest consumes this schema.
  */
+// NOTE on optional-vs-default: these were `.default([])`, which makes the field
+// OPTIONAL on parse input but REQUIRED on the inferred output type. Adapters
+// construct these objects directly rather than parsing them, so every adapter
+// was forced to spell out `series: [], nodes: [], edges: []` or fail to compile
+// — which none of them did. `.optional()` matches how the type is actually used.
+// Runtime `.parse()` callers lose the [] default; no caller parses this schema.
 export const VisualDataSchema = z.object({
   title: z.string().optional(),
   subtitle: z.string().optional(),
   state: VisualStateSchema.default("healthy"),
-  density: z.enum(["compact", "comfortable", "immersive"]).default(
-    "comfortable"
-  ),
-  metrics: z.array(MetricSchema).default([]),
-  items: z.array(ItemSchema).default([]),
-  series: z.array(SeriesSchema).default([]),
-  nodes: z.array(NodeSchema).default([]),
-  edges: z.array(EdgeSchema).default([]),
-  events: z.array(EventSchema).default([]),
+  density: z.enum(["compact", "comfortable", "immersive"]).optional(),
+  metrics: z.array(MetricSchema).optional(),
+  items: z.array(ItemSchema).optional(),
+  series: z.array(SeriesSchema).optional(),
+  nodes: z.array(NodeSchema).optional(),
+  edges: z.array(EdgeSchema).optional(),
+  events: z.array(EventSchema).optional(),
   summary: z.string().optional(),
   updatedAt: z.string().optional(),
   markdown: z.string().optional(),
