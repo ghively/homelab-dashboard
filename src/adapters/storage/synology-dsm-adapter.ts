@@ -14,7 +14,9 @@ import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 
 const SYNOLOGY_URL = process.env.SYNOLOGY_URL || "http://100.88.40.87:5000";
-const SYNOLOGY_USER = process.env.SYNOLOGY_USER || "";
+// SYNOLOGY_USERNAME is accepted as well as SYNOLOGY_USER — both spellings are
+// in circulation and silently reading neither is a painful way to fail.
+const SYNOLOGY_USER = process.env.SYNOLOGY_USER || process.env.SYNOLOGY_USERNAME || "";
 const SYNOLOGY_PASSWORD = process.env.SYNOLOGY_PASSWORD || "";
 
 function makeFreshness(source: string): FreshnessInfo {

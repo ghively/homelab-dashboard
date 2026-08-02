@@ -853,11 +853,34 @@ Verified by driving the running app against the real LiteLLM proxy on gh-arm.
 - [x] **`npm run build` and `npm run lint` pass.** Lint went 68 errors -> 0 and
       CI no longer suppresses it with `|| true`. 68 warnings remain, not gating.
 
-### What is NOT verified
+### Live-service validation
 
-- **No adapter has been run against a live service.** All 30 were checked
-  structurally (every displayed value derives from a parsed response) and
-  against dead hosts. Real endpoints need credentials and network reach.
+Three adapters have now been run against the real services and returned correct
+data:
+
+| adapter | result |
+|---|---|
+| `comfyui` | 1 device, NVIDIA RTX 3060, 9.2 GB / 12.5 GB VRAM, queue empty |
+| `litellm` | 22 models across the proxy |
+| `synology-dsm` | 2 volumes, 13 disks, 35.3 TB / 49.8 TB used. Correctly reported `warning`: `volume_2` is full (15.3/15.3 TB) and DSM flags it `attention`. Real drive models and per-disk temperatures. |
+
+For contrast, the mock `synology-dsm` this replaced claimed 3 volumes, 8 disks
+and 32 TB. It was wrong in every particular — which is the case for treating
+"a module exists" as evidence that it works.
+
+**Watchtower was coded against an API that does not exist.** The three
+`watchtower-*` adapters queried `/v1/containers`; Watchtower has no such
+endpoint (its HTTP API is a token-gated `POST /v1/update` plus optional
+`/v1/metrics`), verified by probing the live hosts — every path 404s. They now
+query the Docker Engine API (`GET /containers/json?all=1`), which is the actual
+source of container inventory. No Docker API is currently exposed on those
+hosts, so they report `NOT CONFIGURED` until a read-only socket-proxy exists.
+
+### What is still NOT verified
+
+- **27 of 30 adapters have not touched a live service.** They are verified
+  structurally and against dead hosts only. `ollama`, `sonarr`, `radarr` and
+  `caddy` are not routable from the dev machine; the rest need credentials.
 - **Drill-down click-through was not exercised.** VisualTable/Kanban rows are
   declared clickable and the components render; actually clicking one needs a
   browser session, which was not available.
