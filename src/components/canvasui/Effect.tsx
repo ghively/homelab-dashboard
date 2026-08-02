@@ -34,6 +34,41 @@
 import { useEffect, useRef, useState } from "react";
 import { claimSlot, type Slot } from "@/components/canvasui/budget";
 
+/**
+ * Canvas UI is OFF by default on the dashboard.
+ *
+ * Not a retreat — a separation. These effects are an experimental Chrome origin
+ * trial wrapped around 7,000 lines of vendored WebGL, and every round of
+ * debugging them has used the actual dashboard as the test surface. That is
+ * backwards: the product should not be the proving ground. /lab exists for
+ * exactly that, mounts the components raw, and is unaffected by this switch.
+ *
+ * So the dashboard renders its CSS glass — the design that has worked
+ * throughout — until the effects are worth turning on, and turning them on is a
+ * URL away rather than a deploy.
+ *
+ *   ?fx=on   enable and remember
+ *   ?fx=off  disable and remember
+ *
+ * The choice persists in localStorage, so it survives navigation without
+ * needing the parameter on every link.
+ */
+export function effectsRequested(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const param = new URLSearchParams(window.location.search).get("fx");
+    if (param === "on" || param === "off") {
+      window.localStorage.setItem("canvasui", param);
+      return param === "on";
+    }
+    return window.localStorage.getItem("canvasui") === "on";
+  } catch {
+    // Private mode and blocked-storage contexts throw on localStorage access.
+    // Failing closed keeps the dashboard on its known-good rendering.
+    return false;
+  }
+}
+
 let webgl2: boolean | null = null;
 
 /**
@@ -67,6 +102,9 @@ export function useEffectGate(priority = false): boolean {
     // react-hooks flags as a cascading-render risk.
     void Promise.resolve().then(() => {
       if (!alive) return;
+
+      // Opt-in first: cheapest check, and the one most likely to say no.
+      if (!effectsRequested()) return;
 
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduced || !supportsWebGL2()) return;
