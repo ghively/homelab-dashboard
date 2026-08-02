@@ -179,20 +179,34 @@ export function Metrics({
 }) {
   return (
     <div className="cnv-metrics">
-      {metrics.slice(0, 6).map((m, i) => (
-        <article key={i}>
-          <small>{m.label}</small>
-          <strong>
-            {m.value}
-            {m.unit}
-          </strong>
-          {m.trend != null && (
-            <span>
-              {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
-            </span>
-          )}
-        </article>
-      ))}
+      {metrics.slice(0, 6).map((m, i) => {
+        // The cyber-noir dashboard theme shows a gradient fill track under any
+        // bounded value. Derived from unit === "%" rather than added as a prop,
+        // so this costs nothing in the prompt and needs no schema change.
+        const pct =
+          m.unit === "%" && typeof m.value === "number"
+            ? Math.max(0, Math.min(100, m.value))
+            : null;
+        return (
+          <article key={i}>
+            <small>{m.label}</small>
+            <strong>
+              {m.value}
+              {m.unit}
+            </strong>
+            {m.trend != null && (
+              <span>
+                {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
+              </span>
+            )}
+            {pct !== null && (
+              <div className="cnv-track" aria-hidden="true">
+                <i style={{ width: pct + "%" }} />
+              </div>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }

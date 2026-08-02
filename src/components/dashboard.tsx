@@ -25,6 +25,23 @@ export function DashboardShell({
   onFixtureChange,
   dataSource = "fixture",
 }: ShellProps) {
+  const [clock, setClock] = useState("");
+  useEffect(() => {
+    const tick = () =>
+      setClock(
+        new Date().toLocaleString(undefined, {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
+      );
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="dash-root">
       <aside className="dash-sidebar">
@@ -76,6 +93,17 @@ export function DashboardShell({
         </div>
       </aside>
       <main className="dash-main">
+        {/* Waybar-style prompt bar, from the cyber-noir dashboard theme. The
+            clock is client-only and rendered after mount so server and client
+            markup match — a live time in SSR output hydrates mismatched. */}
+        <div className="dash-waybar">
+          <span className="dash-waybar-host">gh-ai</span>
+          <span className="dash-waybar-prompt">
+            <span className="p">gene@gh-ai:~$</span> dashboard --live{" "}
+            <span className="dash-cursor" aria-hidden="true">▊</span>
+          </span>
+          <span className="dash-waybar-clock">{clock}</span>
+        </div>
         {dataSource === "fixture" && (
           <div className="dash-demo-banner" role="status">
             <span className="dash-demo-banner-icon">◈</span>
