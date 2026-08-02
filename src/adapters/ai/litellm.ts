@@ -1,51 +1,54 @@
-// LiteLLM adapter — models, routing, spend, cache.
+// LiteLLM adapter — model registry and endpoint health.
 // Host: gh-arm (192.168.0.156 or Tailscale 100.65.126.126)
-// API: /health, /models, spend/usage, cache performance
+// API: GET /v1/models (OpenAI-compatible), GET /health (per-endpoint status)
 
 import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { Item, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 
-interface LiteLLMModel {
-  model_name: string;
-  provider: string;
-  rpm_limit: number;
-  tpm_limit: number;
+const LITELLM_URL = process.env.LITELLM_URL || "http://gh-arm:4000";
+const LITELLM_API_KEY = process.env.LITELLM_API_KEY || "";
+
+interface LiteLLMModelEntry {
+  id: string;
+  owned_by?: string;
 }
 
-interface LiteLLMSpend {
-  total_spend: number;
-  total_tokens: number;
-  cost_per_token: number;
-  top_models: Array<{ model: string; spend: number }>;
+interface LiteLLMHealthEntry {
+  model?: string;
+  error?: string;
+}
+
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "litellm",
+    source: LITELLM_URL,
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
+  };
+}
+
+function authHeaders(): Record<string, string> {
+  return LITELLM_API_KEY ? { Authorization: `Bearer ${LITELLM_API_KEY}` } : {};
 }
 
 class LiteLLMAdapter implements DataAdapter {
   readonly name = "litellm";
-  readonly description = "Model routing proxy with spend tracking.";
+  readonly description = "Model routing proxy across providers.";
   readonly category = "ai" as const;
 
-  async health() {
-    const start = Date.now();
+  async health(): Promise<FreshnessInfo> {
     try {
-      // TODO: Real health check: GET http://gh-arm:8000/health
-      return {
-        adapter: this.name,
-        source: "litellm-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
-    } catch (err) {
-      return {
-        adapter: this.name,
-        source: "litellm-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
+      await fetch(`${LITELLM_URL}/v1/models`, {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      // Unreachable — freshness still records the endpoint queried.
     }
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -54,76 +57,92 @@ class LiteLLMAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
-    const start = Date.now();
-
     try {
-      // TODO: Fetch from LiteLLM API:
-      // - GET http://gh-arm:8000/models (model list)
-      // - GET http://gh-arm:8000/spend (spend data)
-      // - Cache metrics from prometheus if exposed
+      const modelsRes = await fetch(`${LITELLM_URL}/v1/models`, {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!modelsRes.ok) throw new Error(`HTTP ${modelsRes.status}`);
 
-      // Mock data for now.
-      const models: LiteLLMModel[] = [
-        { model_name: "gpt-5.2", provider: "zai", rpm_limit: 10000, tpm_limit: 2000000 },
-        { model_name: "claude-3.7", provider: "anthropic", rpm_limit: 5000, tpm_limit: 1000000 },
-        { model_name: "llama-3.3-70b", provider: "ollama", rpm_limit: 2000, tpm_limit: 500000 },
-        { model_name: "qwen-2.5", provider: "zai", rpm_limit: 15000, tpm_limit: 3000000 },
-      ];
+      const parsed = (await modelsRes.json()) as { data?: LiteLLMModelEntry[] };
+      const models = parsed.data ?? [];
 
-      const spend: LiteLLMSpend = {
-        total_spend: 12.45,
-        total_tokens: 8500000,
-        cost_per_token: 0.00000146,
-        top_models: [
-          { model: "gpt-5.2", spend: 8.32 },
-          { model: "claude-3.7", spend: 3.13 },
-          { model: "llama-3.3-70b", spend: 0.0 },
-          { model: "qwen-2.5", spend: 1.0 },
-        ],
-      };
+      // /health needs an admin key and is absent on some deployments. A non-OK
+      // response means "health unknown", not a failed query — the model list is
+      // still real data.
+      let healthy: LiteLLMHealthEntry[] = [];
+      let unhealthy: LiteLLMHealthEntry[] = [];
+      let healthKnown = false;
+      try {
+        const healthRes = await fetch(`${LITELLM_URL}/health`, {
+          headers: authHeaders(),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (healthRes.ok) {
+          const h = (await healthRes.json()) as {
+            healthy_endpoints?: LiteLLMHealthEntry[];
+            unhealthy_endpoints?: LiteLLMHealthEntry[];
+          };
+          healthy = h.healthy_endpoints ?? [];
+          unhealthy = h.unhealthy_endpoints ?? [];
+          healthKnown = true;
+        }
+      } catch {
+        // Health endpoint unavailable.
+      }
 
-      const items: Item[] = models.map((m) => ({
-        id: m.model_name,
-        label: m.model_name,
-        subtitle: `${m.provider} · ${m.rpm_limit} RPM / ${m.tpm_limit.toLocaleString()} TPM`,
-        meta: { provider: m.provider, rpm_limit: m.rpm_limit, tpm_limit: m.tpm_limit },
-      }));
+      const providers = new Set(models.map((m) => m.owned_by).filter(Boolean));
 
       const metrics: Metric[] = [
-        { label: "Registered Models", value: models.length, state: "healthy" },
-        { label: "Total Spend (7d)", value: `$${spend.total_spend.toFixed(2)}`, unit: "$", state: "healthy" },
-        { label: "Total Tokens (7d)", value: (spend.total_tokens / 1_000_000).toFixed(2), unit: "M tokens", state: "healthy" },
-        { label: "Avg Cost/M", value: `$${(spend.cost_per_token * 1_000_000).toFixed(4)}`, unit: "$/M", state: "healthy" },
+        { label: "Models", value: models.length, state: "healthy" },
+        { label: "Providers", value: providers.size, state: "healthy" },
+      ];
+      if (healthKnown) {
+        metrics.push(
+          { label: "Healthy Endpoints", value: healthy.length, state: "healthy" },
+          {
+            label: "Unhealthy",
+            value: unhealthy.length,
+            state: unhealthy.length > 0 ? "warning" : "healthy",
+          },
+        );
+      }
+
+      const items: Item[] = [
+        ...unhealthy.map((e, i) => ({
+          id: `unhealthy-${i}`,
+          label: e.model ?? "unknown",
+          subtitle: e.error ? String(e.error).slice(0, 120) : "unhealthy",
+          state: "warning" as const,
+          group: "unhealthy",
+        })),
+        ...models.map((m) => ({
+          id: m.id,
+          label: m.id,
+          subtitle: m.owned_by ?? "",
+          state: "healthy" as const,
+          group: "models",
+        })),
       ];
 
       return {
-        title: "LiteLLM — Model Routing & Spend",
-        subtitle: "Unified proxy with cost tracking",
-        state: "healthy",
-        freshness: {
-          adapter: this.name,
-          source: "litellm-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
+        title: "LiteLLM — Model Proxy",
+        subtitle: healthKnown
+          ? `${models.length} models • ${unhealthy.length} unhealthy`
+          : `${models.length} models`,
+        state: unhealthy.length > 0 ? "warning" : "healthy",
+        freshness: makeFreshness(),
         metrics,
         items,
+        summary: `${models.length} models across ${providers.size} providers`,
       };
-    } catch (err) {
+    } catch {
       return {
-        title: "LiteLLM — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical",
-        freshness: {
-          adapter: this.name,
-          source: "litellm-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
+        title: "LiteLLM — Model Proxy",
+        subtitle: "Proxy unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

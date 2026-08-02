@@ -1,22 +1,40 @@
-// ComfyUI adapter — workflows, queue, GPU, generation history.
+// ComfyUI adapter — queue depth, VRAM, recent generations.
 // Host: gh-nvidia (192.168.0.10 or Tailscale)
-// API: /system_stats, /queue, /history, GPU/VRAM
+// API: GET /system_stats (devices/VRAM), GET /queue (running + pending)
 
 import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { Event, Item, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 
-interface ComfyQueueItem {
-  prompt_id: string;
-  number: number;
-  node_left: number;
-  node_finished: number;
+const COMFYUI_URL = process.env.COMFYUI_URL || "http://gh-nvidia:8188";
+
+interface ComfyDevice {
+  name?: string;
+  type?: string;
+  vram_total?: number;
+  vram_free?: number;
 }
 
-interface ComfyHistoryItem {
-  prompt_id: string;
-  outputs: Record<string, { images: Array<{ filename: string; subfolder: string; type: string }> }>;
+interface ComfySystemStats {
+  system?: { comfyui_version?: string; python_version?: string };
+  devices?: ComfyDevice[];
+}
+
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "comfyui",
+    source: COMFYUI_URL,
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
+  };
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${bytes} B`;
 }
 
 class ComfyUIAdapter implements DataAdapter {
@@ -24,26 +42,13 @@ class ComfyUIAdapter implements DataAdapter {
   readonly description = "Diffusion workflow executor on gh-nvidia.";
   readonly category = "ai" as const;
 
-  async health() {
-    const start = Date.now();
+  async health(): Promise<FreshnessInfo> {
     try {
-      // TODO: Real health check: GET http://gh-nvidia:8188/system_stats
-      return {
-        adapter: this.name,
-        source: "comfyui-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
-    } catch (err) {
-      return {
-        adapter: this.name,
-        source: "comfyui-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
+      await fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(5000) });
+    } catch {
+      // Unreachable — freshness still records the endpoint queried.
     }
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -52,93 +57,76 @@ class ComfyUIAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
-    const start = Date.now();
-
     try {
-      // TODO: Fetch from ComfyUI API:
-      // - GET http://gh-nvidia:8188/system_stats (queue info, system status)
-      // - GET http://gh-nvidia:8188/history (generation history)
-      // - GET http://gh-nvidia:8188/view (current running prompt)
-      // - GPU metrics from nvidia-smi
+      const [statsRes, queueRes] = await Promise.all([
+        fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${COMFYUI_URL}/queue`, { signal: AbortSignal.timeout(8000) }),
+      ]);
+      if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
 
-      // Mock data for now.
-      const queue: ComfyQueueItem[] = [
-        { prompt_id: "queue-001", number: 1, node_left: 5, node_finished: 2 },
-        { prompt_id: "queue-002", number: 2, node_left: 12, node_finished: 0 },
-      ];
+      const stats = (await statsRes.json()) as ComfySystemStats;
+      const devices = stats.devices ?? [];
 
-      const history: ComfyHistoryItem[] = [
-        {
-          prompt_id: "hist-001",
-          outputs: {
-            "1": {
-              images: [{ filename: "image_00001.png", subfolder: "", type: "output" }],
-            },
-          },
-        },
-        {
-          prompt_id: "hist-002",
-          outputs: {
-            "2": {
-              images: [{ filename: "image_00002.png", subfolder: "", type: "output" }],
-            },
-          },
-        },
-      ];
+      // ComfyUI returns queue entries as positional tuples; only the count and
+      // the prompt id (index 1) are relied on here.
+      let running: unknown[] = [];
+      let pending: unknown[] = [];
+      if (queueRes.ok) {
+        const q = (await queueRes.json()) as {
+          queue_running?: unknown[];
+          queue_pending?: unknown[];
+        };
+        running = q.queue_running ?? [];
+        pending = q.queue_pending ?? [];
+      }
 
-      const items: Item[] = queue.map((q) => ({
-        id: q.prompt_id,
-        label: `Queue #${q.number}`,
-        subtitle: `${q.node_finished}/${q.node_left + q.node_finished} nodes done`,
-        progress: q.node_finished / (q.node_left + q.node_finished),
-        state: "loading" as const,
-      }));
-
-      const events: Event[] = history.map((h, i) => ({
-        id: h.prompt_id,
-        at: new Date(Date.now() - (i + 1) * 300_000).toISOString(),
-        title: "Generation Complete",
-        detail: h.prompt_id,
-        state: "healthy" as const,
-      }));
+      const vramTotal = devices.reduce((acc, d) => acc + (d.vram_total ?? 0), 0);
+      const vramFree = devices.reduce((acc, d) => acc + (d.vram_free ?? 0), 0);
+      const vramUsed = vramTotal - vramFree;
 
       const metrics: Metric[] = [
-        { label: "Queue Size", value: queue.length, state: queue.length > 5 ? "warning" : "healthy" as const },
-        { label: "Active Generations", value: queue.filter((q) => q.node_finished > 0).length, state: "healthy" as const },
-        { label: "History Size", value: history.length, state: "healthy" as const },
-        { label: "GPU Temp", value: 72, unit: "°C", state: "healthy" as const },
-        { label: "VRAM Used", value: 18.4, unit: "GB", state: "warning" as const },
+        { label: "Running", value: running.length, state: running.length > 0 ? "warning" : "healthy" },
+        { label: "Pending", value: pending.length, state: pending.length > 0 ? "warning" : "healthy" },
+        { label: "Devices", value: devices.length, state: "healthy" },
       ];
+      if (vramTotal > 0) {
+        metrics.push(
+          { label: "VRAM Used", value: formatBytes(vramUsed) },
+          { label: "VRAM Total", value: formatBytes(vramTotal) },
+        );
+      }
 
+      const items: Item[] = devices.map((d, i) => ({
+        id: `dev-${i}`,
+        label: d.name ?? d.type ?? `device ${i}`,
+        subtitle:
+          d.vram_total != null
+            ? `${formatBytes((d.vram_total ?? 0) - (d.vram_free ?? 0))} / ${formatBytes(d.vram_total)}`
+            : (d.type ?? ""),
+        ...(d.vram_total ? { progress: 1 - (d.vram_free ?? 0) / d.vram_total } : {}),
+        state: "healthy" as const,
+        group: "devices",
+      }));
+
+      const busy = running.length + pending.length;
       return {
         title: "ComfyUI — Diffusion Workflows",
-        subtitle: "Image generation queue on gh-nvidia",
-        state: "healthy" as const,
-        freshness: {
-          adapter: this.name,
-          source: "comfyui-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
+        subtitle: `${running.length} running • ${pending.length} pending`,
+        state: busy > 0 ? "warning" : "healthy",
+        freshness: makeFreshness(),
         metrics,
         items,
-        events,
+        summary: stats.system?.comfyui_version
+          ? `ComfyUI ${stats.system.comfyui_version}, ${busy} job(s) in flight`
+          : `${busy} job(s) in flight`,
       };
-    } catch (err) {
+    } catch {
       return {
-        title: "ComfyUI — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical" as const,
-        freshness: {
-          adapter: this.name,
-          source: "comfyui-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" as const }],
+        title: "ComfyUI — Diffusion Workflows",
+        subtitle: "API unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

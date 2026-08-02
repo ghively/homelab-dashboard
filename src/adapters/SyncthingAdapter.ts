@@ -16,7 +16,7 @@ export class SyncthingAdapter extends BaseAdapter {
     this.apiKey = config.apiKey;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     try {
       const headers = {
         "X-API-Key": this.apiKey,
@@ -34,7 +34,7 @@ export class SyncthingAdapter extends BaseAdapter {
       const status = await statusResponse.json();
       const connections = await connectionsResponse.json();
 
-      const folders: any[] = [];
+      const folders: Array<{ id?: string; status?: string; [k: string]: unknown }> = [];
       const foldersResponse = await fetch(`${this.baseUrl}/config/folders`, { headers });
       if (foldersResponse.ok) {
         const folderConfig = await foldersResponse.json();
@@ -70,8 +70,11 @@ export class SyncthingAdapter extends BaseAdapter {
     }
   }
 
-  private checkHealth(connections: any, folders: any[]): boolean {
-    const connected = Object.values(connections.connections || {}).filter((c: any) => c.connected).length;
-    return connected > 0 && folders.every((f: any) => f.status === "idle");
+  private checkHealth(
+    connections: { connections?: Record<string, { connected?: boolean }> },
+    folders: Array<{ status?: string; [k: string]: unknown }>,
+  ): boolean {
+    const connected = Object.values(connections.connections || {}).filter((c) => (c as { connected?: boolean }).connected).length;
+    return connected > 0 && folders.every((f) => f.status === "idle");
   }
 }

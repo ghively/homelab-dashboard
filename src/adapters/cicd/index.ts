@@ -12,6 +12,16 @@ import { HttpClient } from "../base-client";
 import { credentials } from "../onepassword";
 import type { VisualQueryResult } from "../types";
 
+/** Shape of the /runners entries this adapter reads. */
+interface GitLabRunner {
+  id?: number | string;
+  description?: string;
+  status?: string;
+  active?: boolean;
+  runner_type?: string;
+  version?: string;
+}
+
 /**
  * GitLab Runner on gh-ai (Tailscale: 100.92.162.32)
  * Named "hermes-vps-runner" in GitLab, currently deregistered
@@ -39,7 +49,7 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
   async health() {
     const now = new Date().toISOString();
     try {
-      const { data: runners } = await this.client.get<any[]>("/runners");
+      const { data: runners } = await this.client.get<GitLabRunner[]>("/runners");
       return {
         adapter: this.name,
         source: this.host,
@@ -57,7 +67,7 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
     const now = new Date().toISOString();
 
     try {
-      const { data: runners } = await this.client.get<any[]>("/runners");
+      const { data: runners } = await this.client.get<GitLabRunner[]>("/runners");
 
       // Filter for gh-ai runner (deregistered, but track for cleanup)
       const aiRunner = runners.find((r) => r.description?.includes("hermes-vps"));
@@ -79,9 +89,9 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
           version: aiRunner?.version,
         },
         metrics: aiRunner ? [
-          { label: "Status", value: aiRunner.status, unit: "", state: aiRunner.status === "online" ? "healthy" : "warning" },
+          { label: "Status", value: aiRunner.status ?? "unknown", unit: "", state: aiRunner.status === "online" ? "healthy" : "warning" },
           { label: "Active", value: aiRunner.active ? "yes" : "no", unit: "" },
-          { label: "Type", value: aiRunner.runner_type, unit: "" },
+          { label: "Type", value: aiRunner.runner_type ?? "unknown", unit: "" },
         ] : [
           { label: "Status", value: "deregistered", unit: "", state: "critical" },
         ],

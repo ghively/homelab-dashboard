@@ -20,14 +20,23 @@ import { homelabGroup, homelabSchemaComponents } from "@/visual/schemas";
  * Uses the openui base library (already React-renderer-agnostic when its
  * renderers aren't invoked) plus our homelab schema-only components.
  */
+/**
+ * Names defined by both sets — currently LineChart and Callout.
+ *
+ * Must be filtered here for the same reason as in src/lib/library.ts: emitting
+ * both put two contradictory signatures for the same component name into the
+ * system prompt, so the model had no way to know which to emit. Keep this
+ * filter in sync with library.ts — the prompt must describe exactly the
+ * components the renderer can resolve.
+ */
+const homelabNames = new Set(homelabSchemaComponents.map((c) => c.name));
+
+const baseComponents = Object.values(openuiLibrary.components).filter(
+  (c) => !homelabNames.has(c.name),
+);
+
 export const promptLibrary = createLibrary({
   root: openuiLibrary.root,
-  componentGroups: [
-    ...(openuiLibrary.componentGroups ?? []),
-    homelabGroup,
-  ],
-  components: [
-    ...Object.values(openuiLibrary.components),
-    ...homelabSchemaComponents,
-  ],
+  componentGroups: [...(openuiLibrary.componentGroups ?? []), homelabGroup],
+  components: [...baseComponents, ...homelabSchemaComponents],
 });

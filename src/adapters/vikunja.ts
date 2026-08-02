@@ -18,7 +18,7 @@ export class VikunjaAdapter extends BaseAdapter {
     this.token = token;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.token) {
       throw new Error("VIKUNJA_TOKEN not configured");
     }
@@ -43,8 +43,8 @@ export class VikunjaAdapter extends BaseAdapter {
     const tasks = tasksResponse.data || [];
 
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((t: any) => t.done).length;
-    const highPriorityTasks = tasks.filter((t: any) => t.priority >= 3 && !t.done).length;
+    const completedTasks = tasks.filter((t: { done?: boolean }) => t.done).length;
+    const highPriorityTasks = tasks.filter((t: { priority?: number; done?: boolean }) => (t.priority ?? 0) >= 3 && !t.done).length;
 
     return {
       healthy: true,
@@ -55,7 +55,7 @@ export class VikunjaAdapter extends BaseAdapter {
         pending: totalTasks - completedTasks,
         highPriority: highPriorityTasks,
       },
-      sampleProjects: projects.slice(0, 5).map((p: any) => ({
+      sampleProjects: projects.slice(0, 5).map((p: Record<string, unknown>) => ({
         id: p.id,
         title: p.title,
         isArchived: p.is_archived,
@@ -63,10 +63,11 @@ export class VikunjaAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { healthy?: unknown; tasks?: { highPriority?: number } };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
-    if (data.tasks.highPriority > 5) return "warning";
+    if (!d.healthy) return "critical";
+    if ((d.tasks?.highPriority ?? 0) > 5) return "warning";
     return "healthy";
   }
 }

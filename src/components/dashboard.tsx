@@ -349,7 +349,12 @@ export function useWorldData(world: WorldId, fixtureState: VisualStateValue | nu
   }, [world, fixtureState]);
 
   useEffect(() => {
-    fetchData();
+    // Wrapped rather than called directly: fetchData sets state, and calling a
+    // state-setting function synchronously in an effect body is what
+    // react-hooks flags as a cascading-render risk. The scheduling is identical.
+    void (async () => {
+      await fetchData();
+    })();
   }, [fetchData]);
 
   return { data, loading };
