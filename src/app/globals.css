@@ -82,7 +82,7 @@ body::before {
        ~16/255 luminance, so a heavy veil would only crush the colour out of the
        margins. Kept light, and stronger toward the bottom where the amber
        circuitry is brightest. */
-    linear-gradient(rgba(11, 11, 14, 0.34), rgba(11, 11, 14, 0.60)),
+    linear-gradient(rgba(11, 11, 14, 0.18), rgba(11, 11, 14, 0.42)),
     url("/backdrop.webp") center / cover no-repeat fixed;
 }
 
@@ -114,7 +114,7 @@ body::before {
      directly on this rather than inside a glass panel. */
   position: relative;
   background:
-    linear-gradient(rgba(11, 11, 14, 0.58), rgba(11, 11, 14, 0.72)),
+    linear-gradient(rgba(11, 11, 14, 0.34), rgba(11, 11, 14, 0.52)),
     url("/sidebar.webp") 0 0 / 100% 100% no-repeat,
     var(--dash-sidebar);
 }
