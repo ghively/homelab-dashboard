@@ -1,174 +1,163 @@
-// Garage S3 object storage adapter
+// Garage S3 object storage adapter — cluster status and bucket inventory.
+//
+// Uses the Garage *admin* API, not the S3 data API. The S3 endpoint requires
+// SigV4 request signing, which is why the previous version — which held S3
+// access/secret keys and never used them — returned a hardcoded bucket list
+// and object counts that the dashboard rendered as live data.
+//
+// Admin API: GET /v1/status, GET /v1/bucket?list, both bearer-authenticated
+// with the admin token (garage.toml `admin.admin_token`).
+
 import type { DataAdapter } from "./adapter-base";
-import type { FreshnessInfo, VisualQueryResult } from "./types";
+import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
 
-type HealthCheck = FreshnessInfo;
+const GARAGE_ADMIN_URL = process.env.GARAGE_ADMIN_URL || "";
+const GARAGE_ADMIN_TOKEN = process.env.GARAGE_ADMIN_TOKEN || "";
 
-interface GarageBucket {
-  id: string;
-  name: string;
-  size: number;
-  objects: number;
-  quotas?: {
-    maxSize: number;
-    maxObjects: number;
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "garage-s3",
+    source: GARAGE_ADMIN_URL || "unconfigured",
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
   };
 }
 
-interface GarageClusterInfo {
-  layoutVersion: number;
-  nodeCount: number;
-  healthyNodes: number;
-  storageCapacity: number;
-  storageUsed: number;
+interface GarageNode {
+  id?: string;
+  hostname?: string;
+  isUp?: boolean;
+  role?: { capacity?: number | null; zone?: string } | null;
+}
+
+interface GarageStatus {
+  layoutVersion?: number;
+  nodes?: GarageNode[];
+}
+
+interface GarageBucket {
+  id?: string;
+  globalAliases?: string[];
 }
 
 class GarageS3Adapter implements DataAdapter {
   readonly name = "garage-s3";
-  readonly description = "Garage distributed S3-compatible object storage";
+  readonly description = "Garage S3 object storage — cluster nodes and buckets.";
   readonly category = "ops" as const;
 
-  private endpoint: string;
-  private accessKey: string;
-  private secretKey: string;
-
-  constructor(endpoint: string = process.env.GARAGE_ENDPOINT || "http://localhost:3900", accessKey: string = process.env.GARAGE_ACCESS_KEY || "", secretKey: string = process.env.GARAGE_SECRET_KEY || "") {
-    this.endpoint = endpoint;
-    this.accessKey = accessKey;
-    this.secretKey = secretKey;
+  private headers(): Record<string, string> {
+    return GARAGE_ADMIN_TOKEN ? { Authorization: `Bearer ${GARAGE_ADMIN_TOKEN}` } : {};
   }
 
-  async health(): Promise<HealthCheck> {
-    const start = Date.now();
-    try {
-      // Try to list buckets to verify connectivity
-      const response = await fetch(`${this.endpoint}/`, {
-        method: "GET",
-        signal: AbortSignal.timeout(5000),
-      });
-
-      return {
-        adapter: this.name,
-        source: "garage-api",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-        cacheHit: false,
-      };
-    } catch (error) {
-      return {
-        adapter: this.name,
-        source: "garage-api",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-        cacheHit: false,
-      };
+  async health(): Promise<FreshnessInfo> {
+    if (GARAGE_ADMIN_URL) {
+      try {
+        await fetch(`${GARAGE_ADMIN_URL}/v1/status`, {
+          headers: this.headers(),
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch {
+        // Unreachable — freshness still records the endpoint queried.
+      }
     }
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
-    const fixtureState = getFixtureState();
-    if (fixtureState) {
-      return getFixtureForState(this.name, fixtureState);
+    const fixtureStateValue = getFixtureState();
+    if (fixtureStateValue) {
+      return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
-    const start = Date.now();
-    try {
-      // Simulated bucket data - in production, use AWS SDK for S3
-      const clusterInfo: GarageClusterInfo = {
-        layoutVersion: 5,
-        nodeCount: 3,
-        healthyNodes: 3,
-        storageCapacity: 1024 * 1024 * 1024 * 1000, // 1 TB
-        storageUsed: 1024 * 1024 * 1024 * 250, // 250 GB
+    if (!GARAGE_ADMIN_URL || !GARAGE_ADMIN_TOKEN) {
+      return {
+        title: "Garage S3",
+        subtitle: "Admin API not configured",
+        state: "empty",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
+        summary:
+          "Set GARAGE_ADMIN_URL and GARAGE_ADMIN_TOKEN. S3 access keys alone cannot query cluster state.",
       };
+    }
 
-      const buckets: GarageBucket[] = [
+    try {
+      const [statusRes, bucketsRes] = await Promise.all([
+        fetch(`${GARAGE_ADMIN_URL}/v1/status`, {
+          headers: this.headers(),
+          signal: AbortSignal.timeout(8000),
+        }),
+        fetch(`${GARAGE_ADMIN_URL}/v1/bucket?list`, {
+          headers: this.headers(),
+          signal: AbortSignal.timeout(8000),
+        }),
+      ]);
+      if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
+
+      const status = (await statusRes.json()) as GarageStatus;
+      const nodes = status.nodes ?? [];
+      const up = nodes.filter((n) => n.isUp);
+      const buckets: GarageBucket[] = bucketsRes.ok ? await bucketsRes.json() : [];
+
+      const capacity = nodes.reduce((a, n) => a + (n.role?.capacity ?? 0), 0);
+
+      const metrics: Metric[] = [
+        { label: "Nodes", value: nodes.length, state: "healthy" },
         {
-          id: "bucket-1",
-          name: "backups",
-          size: 1024 * 1024 * 1024 * 150, // 150 GB
-          objects: 12500,
-          quotas: {
-            maxSize: 1024 * 1024 * 1024 * 200, // 200 GB
-            maxObjects: 50000,
-          },
-        },
-        {
-          id: "bucket-2",
-          name: "media",
-          size: 1024 * 1024 * 1024 * 75, // 75 GB
-          objects: 8200,
-        },
-        {
-          id: "bucket-3",
-          name: "logs",
-          size: 1024 * 1024 * 25, // 25 MB
-          objects: 1500,
+          label: "Nodes Up",
+          value: up.length,
+          state: up.length === nodes.length ? "healthy" : "warning",
         },
       ];
+      if (bucketsRes.ok) {
+        metrics.push({ label: "Buckets", value: buckets.length, state: "healthy" });
+      }
+      if (capacity > 0) {
+        metrics.push({ label: "Capacity", value: `${(capacity / 1e12).toFixed(1)} TB` });
+      }
+      if (status.layoutVersion != null) {
+        metrics.push({ label: "Layout Version", value: status.layoutVersion });
+      }
 
-      const totalSize = buckets.reduce((sum, b) => sum + b.size, 0);
-      const totalObjects = buckets.reduce((sum, b) => sum + b.objects, 0);
-      const storageUsage = (clusterInfo.storageUsed / clusterInfo.storageCapacity) * 100;
+      const items: Item[] = [
+        ...nodes.map((n, i) => ({
+          id: n.id ?? `node-${i}`,
+          label: n.hostname ?? n.id?.slice(0, 12) ?? `node ${i}`,
+          subtitle: [n.isUp ? "up" : "down", n.role?.zone].filter(Boolean).join(" • "),
+          state: n.isUp ? ("healthy" as const) : ("critical" as const),
+          group: "nodes",
+        })),
+        ...buckets.map((b, i) => ({
+          id: b.id ?? `bucket-${i}`,
+          label: b.globalAliases?.[0] ?? b.id?.slice(0, 16) ?? `bucket ${i}`,
+          subtitle: b.id ? b.id.slice(0, 16) : "",
+          state: "healthy" as const,
+          group: "buckets",
+        })),
+      ];
 
+      const allUp = nodes.length > 0 && up.length === nodes.length;
       return {
-        title: "Garage S3",
-        subtitle: "Distributed object storage",
-        state: clusterInfo.healthyNodes === clusterInfo.nodeCount ? "healthy" : "warning",
-        freshness: {
-          adapter: this.name,
-          source: "garage-api",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [
-          { label: "Storage Used", value: `${storageUsage.toFixed(1)}%`, unit: "%", state: storageUsage > 90 ? "warning" : "healthy" },
-          { label: "Capacity", value: this.formatBytes(clusterInfo.storageCapacity), state: "healthy" },
-          { label: "Used", value: this.formatBytes(clusterInfo.storageUsed), state: "healthy" },
-          { label: "Buckets", value: buckets.length, state: "healthy" },
-          { label: "Objects", value: totalObjects, state: "healthy" },
-          { label: "Nodes", value: `${clusterInfo.healthyNodes}/${clusterInfo.nodeCount}`, state: "healthy" },
-        ],
-        items: buckets.map((b) => {
-          const quota = b.quotas ? `${this.formatBytes(b.quotas.maxSize)} / ${b.quotas.maxObjects} objects` : "Unlimited";
-          const sizeQuota = b.quotas ? (b.size / b.quotas.maxSize) * 100 : 0;
-
-          return {
-            id: b.id,
-            label: b.name,
-            subtitle: `${b.objects} objects • ${this.formatBytes(b.size)}`,
-            value: quota,
-            state: sizeQuota > 90 ? "warning" : "healthy",
-          };
-        }),
+        title: "Garage S3 — Object Storage",
+        subtitle: `${up.length}/${nodes.length} nodes up • ${buckets.length} buckets`,
+        state: allUp ? "healthy" : "warning",
+        freshness: makeFreshness(),
+        metrics,
+        items,
+        summary: `${up.length} of ${nodes.length} nodes up`,
       };
-    } catch (error) {
+    } catch {
       return {
-        title: "Garage S3",
-        subtitle: error instanceof Error ? error.message : "Unknown error",
-        state: "critical",
-        freshness: {
-          adapter: this.name,
-          source: "garage-api",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
+        title: "Garage S3 — Object Storage",
+        subtitle: "Admin API unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
-  }
-
-  private formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   }
 }
 

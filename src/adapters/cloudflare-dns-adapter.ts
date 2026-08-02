@@ -17,7 +17,7 @@ interface CloudflareDNSRecord {
   modified_on: string;
 }
 
-class CloudflareDNSAdapter implements DataAdapter {
+export class CloudflareDNSAdapter implements DataAdapter {
   readonly name = "cloudflare-dns";
   readonly description = "Cloudflare DNS records and configuration management";
   readonly category = "network" as const;
@@ -25,7 +25,13 @@ class CloudflareDNSAdapter implements DataAdapter {
   private apiToken: string;
   private zoneId: string;
 
-  constructor(apiToken: string = "[REDACTED]", zoneId: string = "[REDACTED]") {
+  // Defaults come from the environment. The previous defaults were the literal
+  // strings "[REDACTED]", which made the module impossible to configure without
+  // editing it — every request went out with a placeholder bearer token.
+  constructor(
+    apiToken: string = process.env.CLOUDFLARE_DNS_API_KEY || "",
+    zoneId: string = process.env.CLOUDFLARE_DNS_ZONE_ID || "",
+  ) {
     this.apiToken = apiToken;
     this.zoneId = zoneId;
   }

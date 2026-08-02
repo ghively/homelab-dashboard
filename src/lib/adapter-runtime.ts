@@ -24,6 +24,24 @@ import watchtowerVps from "@/adapters/storage/watchtower-vps-adapter";
 import watchtowerMedia from "@/adapters/storage/watchtower-media-adapter";
 import watchtowerStorage from "@/adapters/storage/watchtower-storage-adapter";
 import { SearXNGAdapter } from "@/adapters/searxng-adapter";
+import { CloudflareDNSAdapter } from "@/adapters/cloudflare-dns-adapter";
+import ollama from "@/adapters/ai/ollama";
+import litellm from "@/adapters/ai/litellm";
+import comfyui from "@/adapters/ai/comfyui";
+import caddy from "@/adapters/storage/caddy-adapter";
+import spoolman from "@/adapters/storage/spoolman-adapter";
+import syncthing from "@/adapters/storage/syncthing-adapter";
+import synologyDsm from "@/adapters/storage/synology-dsm-adapter";
+import garageS3 from "@/adapters/garage-s3-adapter";
+import fail2ban from "@/adapters/Fail2banAdapter";
+import wazuhManager from "@/adapters/security/wazuh-manager-adapter";
+import wazuhIndexer from "@/adapters/security/wazuh-indexer-adapter";
+import wazuhDashboard from "@/adapters/security/wazuh-dashboard-adapter";
+import hermesGateway from "@/adapters/hermes/hermes-gateway";
+import hermesDashboard from "@/adapters/hermes/hermes-dashboard";
+import hermesApiServer from "@/adapters/hermes/hermes-api-server";
+import hermesMcpBridge from "@/adapters/hermes/hermes-mcp-bridge";
+import hermesWorkspace from "@/adapters/hermes/hermes-workspace";
 
 const registry = new Map<string, DataAdapter>();
 let initialized = false;
@@ -222,6 +240,46 @@ function registerSearxng(): void {
   registry.set("searxng", new SearXNGAdapter("searxng", url));
 }
 
+/**
+ * Env-gated registration for the remaining DataAdapter modules.
+ *
+ * Each entry names the env var that must be set for the service to count as
+ * configured. Without it the adapter stays out of the registry and
+ * queryAdapter() serves a labelled fixture, which is what the plan requires for
+ * an unconfigured service.
+ */
+const ENV_GATED: Array<[name: string, envVar: string, adapter: DataAdapter]> = [
+  ["ollama", "OLLAMA_URL", ollama],
+  ["litellm", "LITELLM_URL", litellm],
+  ["comfyui", "COMFYUI_URL", comfyui],
+  ["caddy", "CADDY_ADMIN_URL", caddy],
+  ["spoolman", "SPOOLMAN_URL", spoolman],
+  ["syncthing", "SYNCTHING_URL", syncthing],
+  ["synology-dsm", "SYNOLOGY_URL", synologyDsm],
+  ["garage-s3", "GARAGE_ADMIN_URL", garageS3],
+  ["fail2ban", "FAIL2BAN_API_URL", fail2ban],
+  ["wazuh-manager", "WAZUH_MANAGER_URL", wazuhManager],
+  ["wazuh-indexer", "WAZUH_INDEXER_URL", wazuhIndexer],
+  ["wazuh-dashboard", "WAZUH_DASHBOARD_URL", wazuhDashboard],
+  ["hermes-gateway", "HERMES_GATEWAY_URL", hermesGateway],
+  ["hermes-dashboard", "HERMES_DASHBOARD_URL", hermesDashboard],
+  ["hermes-api-server", "HERMES_API_SERVER_URL", hermesApiServer],
+  ["hermes-mcp-bridge", "HERMES_MCP_BRIDGE_URL", hermesMcpBridge],
+  ["hermes-workspace", "HERMES_WORKSPACE_URL", hermesWorkspace],
+];
+
+function registerEnvGated(): void {
+  for (const [name, envVar, adapter] of ENV_GATED) {
+    if (process.env[envVar]) registry.set(name, adapter);
+  }
+}
+
+/** Cloudflare needs both a token and a zone id before it can query anything. */
+function registerCloudflare(): void {
+  if (!process.env.CLOUDFLARE_DNS_API_KEY || !process.env.CLOUDFLARE_DNS_ZONE_ID) return;
+  registry.set("cloudflare-dns", new CloudflareDNSAdapter());
+}
+
 export function initAdapters(): void {
   if (initialized) return;
   initialized = true;
@@ -235,6 +293,8 @@ export function initAdapters(): void {
   registerUnifi();
   registerWatchtowers();
   registerSearxng();
+  registerEnvGated();
+  registerCloudflare();
 }
 
 export function getAdapter(name: string): DataAdapter | undefined {

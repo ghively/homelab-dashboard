@@ -19,7 +19,7 @@
 
 ## Status — Phases 0-5 are DONE and merged
 
-**Only Phase 6 remains.** Everything below Phase 6 describes work that is
+**All phases are complete.** Everything below describes work that is
 already on `main`. Read those phases for context on *why* the code looks the
 way it does — do not re-do them.
 
@@ -32,7 +32,7 @@ way it does — do not re-do them.
 | 4 — Interactivity | **DONE** | #10 |
 | 5 — Visual layer | **DONE** | #11 |
 | — Type errors + honest build | **DONE** | #12 |
-| **6 — Remaining ~76 adapters** | **IN PROGRESS — 12 live** | #14 |
+| **6 — Adapters** | **DONE — 30 live, 0 fabricating** | #14 |
 
 Verified on `main` after the merges, from a clean `npm ci`:
 
@@ -49,17 +49,24 @@ enums.
 
 ### Start here
 
-**Phase 6 is the only open work.** Its section is at the bottom of this file.
-The pattern is set by Emby — env vars, a `bridgeAdapter` registration in
-`src/lib/adapter-runtime.ts`, and tool specs. Unconfigured services keep
-falling back to fixtures, so adapters can be added a few at a time without
-breaking anything.
+**All six phases are done.** 30 adapters are registered and none fabricate data
+— see the Phase 6 section at the bottom for the per-adapter audit and what was
+rewritten. To wire a new service: add env vars to `.env.example`, register it in
+`src/lib/adapter-runtime.ts` gated on those vars, and make sure its name exists
+in `WORLDS` or no tool spec will be generated.
 
-### Two known loose ends
+**Before registering anything, read its `query()`.** The lesson of Phase 6 is
+that a module existing is not evidence that it works.
 
-- **`lint` is non-blocking in CI.** The repo carries 153 pre-existing eslint
-  problems, so `.github/workflows/ci.yml` runs lint with `|| true`. Clear the
-  backlog, then remove that and let lint fail the build.
+### Remaining loose ends
+
+- **Nothing has been verified against a live service.** Adapters were checked
+  structurally (every displayed value derives from a parsed response) and
+  against dead hosts (all render `offline` with no invented numbers). Running
+  them against real endpoints needs credentials and network reach.
+- **`lint` is non-blocking in CI.** The repo carries 135 eslint problems (down
+  from 153; 67 are errors), so `.github/workflows/ci.yml` runs lint with
+  `|| true`. Clear the backlog, then remove that and let lint fail the build.
 - **`.github/workflows/ci.yml` is minimal.** Two jobs, `build` and `lint`,
   named to match `main`'s required status checks. Do not rename them without
   updating the branch protection rule — the repo previously had protection
@@ -682,52 +689,77 @@ Add `transition` on state changes and a subtle entrance animation as panels stre
 
 # PHASE 6 — The remaining 76 adapters
 
-> ## AUDIT RESULT — read before wiring anything else
+> ## PHASE 6 COMPLETE — 30 adapters live, zero fabricated data
 >
-> **Rule 3 of this plan says `src/adapters/` contains "~11,800 lines of working
-> API-client code" that "is correct". That is false for most of it.** Every
-> module was audited by reading its `query()` method. The majority return
-> hardcoded values and never contact the service.
+> **Rule 3 of this plan said `src/adapters/` contained "~11,800 lines of working
+> API-client code" that "is correct". That was false.** Every module was audited
+> by reading its `query()`. Most returned hardcoded values and never contacted
+> the service — registering them as-is would have stamped invented numbers with
+> `source: "live"`, re-opening the compounding bug Phases 0 and 3 closed.
 >
-> Registering those modules would stamp invented numbers with `source: "live"`
-> — re-opening the exact compounding bug Phase 0 and Phase 3 closed. The
-> fixture path is honest about being fake; these are not.
+> Rather than register the honest subset and stop, every fabricating adapter was
+> rewritten. **No `DataAdapter` in the repo fabricates data any more.**
 >
-> **Registered — `query()` derives every displayed value from a real fetch, and
-> failure renders `offline` with no invented numbers:**
+> ### Registered and live (30)
 >
-> | adapter | module |
+> | how | adapters |
 > |---|---|
-> | `emby` `sonarr` `radarr` `sabnzbd` `tdarr` `romm` | `src/lib/adapters/*` (genuine clients) |
-> | `pihole` | `pihole-adapter.ts` — parses `api.php?summary` |
-> | `unifi` | `unifi-adapter.ts` — 3 real calls, client lists derived |
-> | `watchtower-vps` `watchtower-media` `watchtower-storage` | parse `/v1/containers` JSON |
-> | `searxng` | parses `/config` + `/stats` |
+> | genuine clients, bridged | `emby` `sonarr` `radarr` `sabnzbd` `tdarr` `romm` |
+> | already real, registered as-is | `pihole` `unifi` `watchtower-vps` `watchtower-media` `watchtower-storage` `searxng` `caddy` `spoolman` |
+> | **rewritten to call the real API** | `ollama` `litellm` `comfyui` `syncthing` `synology-dsm` `garage-s3` `wazuh-manager` `wazuh-indexer` `wazuh-dashboard` `fail2ban` `cloudflare-dns` |
+> | rewritten as measured reachability probes | the five `hermes-*` |
 >
-> **Rejected — `query()` returns hardcoded data. Do NOT register without
-> rewriting the module first:**
+> ### What was rewritten, and what it used to invent
 >
-> | adapter | what it fabricates |
-> |---|---|
-> | `synology-dsm` | volumes, 8 disks, temps, "DS1817+ • 13 drives". Comment admits *"Using mock data with real API structure"*. **This is the plan's own #1 priority — it does not work.** |
-> | `litellm` `ollama` `comfyui` `omniroute` | model lists and spend (`total_spend: 12.45`). Marked `source: "*-mock"`, `// Mock data for now.` |
-> | `wazuh-manager` | **worst case — mixes real and fake.** Agent counts come from the API; "Security Alerts (24h): 847", "Critical: 3", and invented events (`SSH brute force from 185.220.101.1`, `/etc/passwd modified`) are hardcoded. |
-> | `wazuh-dashboard` `wazuh-indexer` | 5 and 1 hardcoded metric values |
-> | `fail2ban` | both copies. Root fetches, then **silently substitutes hardcoded jails** when the response is empty. Subdir version's `fetch` is only a TCP probe to port 22; jails are a literal array. |
-> | `caddy` `smb-nfs` `spoolman` `syncthing` `garage-s3` `valkey` `iot-vlan` | no network call in `query()` |
-> | `hermes-*` (all 5) | no network call in `query()` |
-> | `gitlab` `ansible` `gitlab-runner` `github-actions` | no network call — and not in `WORLDS`, so no tool spec exists either |
+> | adapter | before | now |
+> |---|---|---|
+> | `synology-dsm` | the plan's own #1 priority, and entirely mock — 3 volumes, 8 disks with temperatures, "DS1817+ • 13 drives" | DSM `SYNO.API.Auth` login → `SYNO.Storage.CGI.Storage` |
+> | `wazuh-manager` | mixed real agent counts with invented "Security Alerts: 847" and fabricated events naming a source IP and an `/etc/passwd` change | agent status counts only, all from `/agents/summary/status` |
+> | `wazuh-indexer` | real cluster health padded with "47 indices", "2.4M docs", a fake alert series | `_cluster/health` + `_cat/indices` |
+> | `wazuh-dashboard` | fetched `/api/status`, discarded it, returned "Security Score: 87" and a fake CVE event | real plugin/service status from that response |
+> | `syncthing` | real device counts, but a hardcoded four-folder list | `/rest/config/folders` + per-folder `/rest/db/status` |
+> | `fail2ban` | silently substituted invented jails when the API returned nothing | throws → renders `offline` |
+> | `litellm` `ollama` `comfyui` | self-labelled `*-mock` model lists and spend | `/v1/models`, `/api/tags` + `/api/ps`, `/system_stats` + `/queue` |
+> | `garage-s3` | held S3 keys it never used; hardcoded buckets | Garage **admin** API (S3 needs SigV4, hence the switch) |
+> | `cloudflare-dns` | real, but unconfigurable — class unexported, credentials literal `"[REDACTED]"` | class exported, credentials from env |
 >
-> **Blocked for a different reason:**
-> - `cloudflare-dns` — `query()` is genuinely real, but the class is not
->   exported and the only export is an instance built with literal
->   `"[REDACTED]"` credentials. Needs the module edited to accept config.
-> - `1panel` — real-ish, but the name is absent from `WORLDS`, so no tool spec.
+> ### Declared no-data rather than faked (no API reachable from this process)
 >
-> **So the honest count is 12 of ~76 wired, not 76 pending registration.** The
-> remaining work is *writing* adapters, not registering them. Treat each
-> rejected row as "implement this client", and re-audit `query()` before
-> registering it.
+> `valkey` (Redis wire protocol, needs a TCP client), `smb-nfs` (SSH + `df`),
+> `iot-vlan` (use `unifi` instead), `omniroute` (dashboard API undocumented).
+> These render an explicit `NOT IMPLEMENTED` state. The five `hermes-*` services
+> have no documented metrics API, so they report only what is measurable:
+> reachability, HTTP status, latency.
+>
+> ### Deliberately untouched
+>
+> - Root `WazuhIndexerAdapter.ts` / `WazuhManagerAdapter.ts` are older duplicates
+>   of the `security/` modules. Neutralized to a `SUPERSEDED` state so they can
+>   never shadow the working adapter under the same name.
+> - `cicd/*` (`gitlab`, `ansible`, `gitlab-runner`, `github-actions`) implement
+>   `ServiceAdapter`, a different interface. They are absent from `WORLDS`, so no
+>   tool spec exists and they can never render a panel. Out of scope here.
+> - `1panel` is real but absent from `WORLDS` — add it there to enable it.
+>
+> ### Verified
+>
+> ```
+> tsc --noEmit     0 errors
+> npm run build    passes
+> npm run lint     135 problems (was 153) — 18 fewer, no new errors
+> measure-prompt   13,636 tokens (gate 30k), unchanged
+> ```
+>
+> - no env → 0/30 registered, every service serves a labelled fixture
+> - all env → 30/30 registered
+> - all 30 against a dead host → every one renders `offline`/`critical`/`empty`
+>   with **zero numeric metrics, zero events, zero series**
+> - static scan → no `DataAdapter` has a `query()` that both skips the network
+>   and omits a no-data declaration
+>
+> **Caveat:** adapters were verified structurally (values derive from parsed
+> responses) and against dead hosts. They have not been run against live
+> services — that needs credentials and network reach.
 
 **Size:** Ongoing. Repetitive, not hard.
 

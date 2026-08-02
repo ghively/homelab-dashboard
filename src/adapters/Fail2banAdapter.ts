@@ -59,11 +59,13 @@ class Fail2banAdapter implements DataAdapter {
         }
       }
 
-      if (jails.length === 0) {
-        jails = [
-          { jail: "sshd", banned: 3, totalBanned: 127, currentlyFailed: 0, totalFailed: 3421, file: "/var/log/auth.log" },
-          { jail: "nginx-limit-req", banned: 0, totalBanned: 12, currentlyFailed: 0, totalFailed: 89, file: "/var/log/nginx/error.log" },
-        ];
+      // No hardcoded fallback here. The previous version substituted two
+      // invented jails (sshd with 127 historical bans, nginx-limit-req with 12)
+      // whenever FAIL2BAN_API_URL was unset or the response was empty — so an
+      // unreachable service silently rendered fabricated ban counts as live
+      // security data. An empty list is the honest answer.
+      if (!FAIL2BAN_API_URL) {
+        throw new Error("FAIL2BAN_API_URL not configured");
       }
 
       const totalBanned = jails.reduce((acc, j) => acc + j.banned, 0);
