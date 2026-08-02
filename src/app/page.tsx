@@ -18,6 +18,10 @@ import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
 export default function Home() {
   const [activeWorld, setActiveWorld] = useState<WorldId | "home">("home");
+  // Remounts the chat, which is how the conversation is cleared. Chat state
+  // lives inside GenerativeChat, so bumping its key is both the simplest reset
+  // and the one that cannot leave a half-cleared thread behind.
+  const [chatKey, setChatKey] = useState(0);
   const [fixtureState, setFixtureState] = useState<VisualStateValue | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [drawerEntity, setDrawerEntity] = useState<{
@@ -37,10 +41,12 @@ export default function Home() {
       <DashboardShell
         activeWorld={activeWorld}
         onWorldChange={setActiveWorld}
+        onNewChat={() => setChatKey((k) => k + 1)}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
       >
         <LandingPage
+          key={chatKey}
           fixtureState={fixtureState}
           onWorldSelect={setActiveWorld}
         />
@@ -53,6 +59,10 @@ export default function Home() {
       <DashboardShell
         activeWorld={activeWorld}
         onWorldChange={setActiveWorld}
+        onNewChat={() => {
+          setChatKey((k) => k + 1);
+          setActiveWorld("home");
+        }}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
       >
