@@ -38,10 +38,10 @@ const metrics = [
 ];
 
 const items = [
-  { id: "1", label: "Severance", subtitle: "Apple TV+ · continuing", value: 19, state: "healthy" },
-  { id: "2", label: "The Bear", subtitle: "FX · continuing", value: 42, state: "healthy" },
-  { id: "3", label: "True Detective", subtitle: "HBO · ended", value: 30, state: "stale" },
-  { id: "4", label: "Mr. Robot", subtitle: "USA · ended", value: 45, state: "healthy" },
+  { id: "1", label: "Severance", subtitle: "Apple TV+ · continuing", image: "/media-demo/severance.svg", progress: 0.62, state: "healthy", meta: { year: 2025, quality: "4K HDR" } },
+  { id: "2", label: "The Bear", subtitle: "FX · continuing", image: "/media-demo/bear.svg", progress: 0.42, state: "healthy", meta: { year: 2025, quality: "4K" } },
+  { id: "3", label: "Dune", subtitle: "Max · continuing", image: "/media-demo/dune.svg", progress: 0.78, state: "stale", meta: { year: 2024, quality: "4K HDR" } },
+  { id: "4", label: "Foundation", subtitle: "Apple TV+ · continuing", image: "/media-demo/foundation.svg", progress: 0.31, state: "healthy", meta: { year: 2025, quality: "4K HDR" } },
 ];
 
 const series = [

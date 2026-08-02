@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img">
+  <title>Abstract galactic orbit cover</title>
+  <defs><radialGradient id="g"><stop stop-color="#bdfcff"/><stop offset=".14" stop-color="#6b4cff"/><stop offset=".55" stop-color="#170d35"/><stop offset="1" stop-color="#050509"/></radialGradient></defs>
+  <rect width="600" height="900" fill="#050509"/>
+  <circle cx="300" cy="430" r="270" fill="url(#g)"/>
+  <g fill="none" stroke="#d8fbff" opacity=".48"><ellipse cx="300" cy="430" rx="255" ry="74" stroke-width="8"/><ellipse cx="300" cy="430" rx="110" ry="270" stroke-width="5" transform="rotate(38 300 430)"/></g>
+  <circle cx="410" cy="340" r="18" fill="#ffcb66"/>
+</svg>

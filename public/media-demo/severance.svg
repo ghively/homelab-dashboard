@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img">
+  <title>Abstract divided office cover</title>
+  <rect width="600" height="900" fill="#071015"/>
+  <path d="M0 0h280v900H0z" fill="#00e5ff" opacity=".3"/>
+  <path d="M320 0h280v900H320z" fill="#ff2bb5" opacity=".28"/>
+  <g fill="none" stroke="#d9ffff" stroke-width="8" opacity=".62"><path d="M80 160h440M80 300h440M80 440h440M80 580h440M80 720h440"/><path d="M300 90v720"/></g>
+  <circle cx="300" cy="450" r="76" fill="#09090e" stroke="#9dffef" stroke-width="10"/>
+</svg>
