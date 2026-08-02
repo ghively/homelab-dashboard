@@ -15,9 +15,11 @@
  * exists for the cases where that is not practical.
  */
 
-import { Agent } from "undici";
-
-let insecureAgent: Agent | undefined;
+// undici is imported lazily, INSIDE the function, not at module scope.
+// A top-level import makes this module unloadable in a browser bundle (undici
+// pulls node:net), and module-scope imports are hoisted regardless of whether
+// the function is ever called. Bundlers only ever see this on the server path.
+let insecureAgent: unknown;
 
 /**
  * Returns fetch options carrying a dispatcher that skips certificate
@@ -28,7 +30,11 @@ let insecureAgent: Agent | undefined;
  */
 export function insecureTls(enabled: boolean): Record<string, unknown> {
   if (!enabled) return {};
-  insecureAgent ??= new Agent({ connect: { rejectUnauthorized: false } });
+  if (!insecureAgent) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Agent } = require("undici") as typeof import("undici");
+    insecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
+  }
   return { dispatcher: insecureAgent };
 }
 

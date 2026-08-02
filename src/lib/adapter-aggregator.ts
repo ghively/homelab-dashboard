@@ -495,13 +495,7 @@ export function worldSummary(
   };
 }
 
-export const ALL_STATES: VisualStateValue[] = [
-  "healthy",
-  "warning",
-  "critical",
-  "offline",
-  "stale",
-  "loading",
-  "empty",
-  "denied",
-];
+// Re-exported for existing server-side callers. Client components must import
+// from "@/lib/visual-states" directly — importing it from here pulls the whole
+// adapter tree (and Node built-ins) into the browser bundle.
+export { ALL_STATES } from "@/lib/visual-states";

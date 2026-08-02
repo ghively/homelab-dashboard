@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
-import { ALL_STATES } from "@/lib/adapter-aggregator";
+import { ALL_STATES } from "@/lib/visual-states";
 import type { VisualStateValue } from "@/adapters/types";
 
 // ── Dashboard Shell ──────────────────────────────────────────

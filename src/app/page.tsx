@@ -15,7 +15,7 @@ import {
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
-import { ALL_STATES } from "@/lib/adapter-aggregator";
+import { ALL_STATES } from "@/lib/visual-states";
 import { homelabSchemaComponents } from "@/visual/schemas";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
