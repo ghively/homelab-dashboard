@@ -1466,7 +1466,7 @@ export const KnowledgeGraph = defineComponent({
             {props.edges.map((e, i) => {
               const a = props.nodes.find((n) => n.id === e.source);
               const b = props.nodes.find((n) => n.id === e.target);
-              return a && b ? <line key={i} className="cnv-network-flow" x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
+              return a && b ? <line key={i} x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
             })}
             {props.nodes.map((n) => (
               <g key={n.id} transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}>

@@ -1631,13 +1631,6 @@ button.dash-tag {
   isolation: isolate;
 }
 
-/* Keep keyboard activity easier to locate in a dense generated dashboard.
-   This remains static under reduced motion and does not imply clickability. */
-.chat-rendered .cnv-surface:focus-within {
-  border-color: var(--border-green-30);
-  box-shadow: 0 0 0 1px var(--border-green-30), 0 10px 30px rgba(0, 0, 0, 0.46);
-}
-
 .chat-streaming-dot {
   width: 7px;
   height: 7px;
