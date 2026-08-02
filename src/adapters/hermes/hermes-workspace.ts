@@ -5,20 +5,20 @@
 import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { Item, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 
 class HermesWorkspaceAdapter implements DataAdapter {
   readonly name = "hermes-workspace";
   readonly description = "Hermes Workspace — active tasks and artifact inventory.";
   readonly category = "ai" as const;
 
-  async health() {
+  async health(): Promise<FreshnessInfo> {
     const start = Date.now();
     try {
       // TODO: Real health check: internal workspace API health
-      return { healthy: true, latencyMs: Date.now() - start };
-    } catch (err) {
-      return { healthy: false, latencyMs: Date.now() - start, error: err instanceof Error ? err.message : "Unknown" };
+      return { adapter: this.name, source: this.name, queriedAt: new Date().toISOString(), stalenessSeconds: 0, cacheHit: false };
+    } catch {
+      return { adapter: this.name, source: this.name, queriedAt: new Date().toISOString(), stalenessSeconds: Math.round((Date.now() - start) / 1000), cacheHit: false };
     }
   }
 
@@ -28,7 +28,6 @@ class HermesWorkspaceAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
     const start = Date.now();
 
     try {
@@ -47,10 +46,10 @@ class HermesWorkspaceAdapter implements DataAdapter {
       ];
 
       const items: Item[] = [
-        { id: "t_b68aa39e", label: "Phase 6: AI & Agent Adapters", subtitle: "builder · running", state: "running", meta: { assignee: "builder", priority: 85, created_at: "2026-07-29" } },
-        { id: "t_8ec67ef1", label: "Phase 1: OpenUI Dashboard Scaffold", subtitle: "builder · done", state: "done", meta: { assignee: "builder", priority: 95, completed_at: "2026-07-29" } },
-        { id: "t_37022ed1", label: "Phase 11: Dashboard Composition", subtitle: "builder · todo", state: "todo", meta: { assignee: "builder", priority: 99, blocked_by: ["Phase 2-10"] } },
-        { id: "t_56833a87", label: "Agent Vault Phase 5", subtitle: "builder · done", state: "done", meta: { assignee: "builder", priority: 70, completed_at: "2026-07-28" } },
+        { id: "t_b68aa39e", label: "Phase 6: AI & Agent Adapters", subtitle: "builder · running", state: "warning", group: "running", meta: { assignee: "builder", priority: 85, created_at: "2026-07-29" } },
+        { id: "t_8ec67ef1", label: "Phase 1: OpenUI Dashboard Scaffold", subtitle: "builder · done", state: "healthy", group: "done", meta: { assignee: "builder", priority: 95, completed_at: "2026-07-29" } },
+        { id: "t_37022ed1", label: "Phase 11: Dashboard Composition", subtitle: "builder · todo", state: "empty", group: "todo", meta: { assignee: "builder", priority: 99, blocked_by: ["Phase 2-10"] } },
+        { id: "t_56833a87", label: "Agent Vault Phase 5", subtitle: "builder · done", state: "healthy", group: "done", meta: { assignee: "builder", priority: 70, completed_at: "2026-07-28" } },
       ];
 
       return {
@@ -59,9 +58,14 @@ class HermesWorkspaceAdapter implements DataAdapter {
         state: "healthy",
         metrics,
         items,
-        source: this.name,
-        fetchedAt: now,
-        ageMs: Date.now() - start,
+        source: "live",
+        freshness: {
+          adapter: this.name,
+          source: this.name,
+          queriedAt: new Date(start).toISOString(),
+          stalenessSeconds: 0,
+          cacheHit: false,
+        },
       };
     } catch (err) {
       return {
@@ -69,9 +73,14 @@ class HermesWorkspaceAdapter implements DataAdapter {
         subtitle: err instanceof Error ? err.message : "Unknown error",
         state: "critical",
         metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
-        source: this.name,
-        fetchedAt: now,
-        ageMs: Date.now() - start,
+        source: "live",
+        freshness: {
+          adapter: this.name,
+          source: this.name,
+          queriedAt: new Date(start).toISOString(),
+          stalenessSeconds: 0,
+          cacheHit: false,
+        },
       };
     }
   }

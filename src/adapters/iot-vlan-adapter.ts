@@ -105,10 +105,14 @@ export class IoTVLANAdapter implements DataAdapter {
           value: d.vlan,
           state: new Date(d.lastSeen) > fiveMinAgo ? "healthy" : "warning",
         })),
-        source: this.name,
-        fetchedAt: now.toISOString(),
-        ageMs: Date.now() - start,
-        staleMs: 60000, // 1 minute
+        source: "live",
+        freshness: {
+          adapter: this.name,
+          source: this.name,
+          queriedAt: new Date(start).toISOString(),
+          stalenessSeconds: 0,
+          cacheHit: false,
+        },
       };
     } catch (error) {
       return {
@@ -116,10 +120,15 @@ export class IoTVLANAdapter implements DataAdapter {
         subtitle: "Failed to scan VLAN",
         state: "offline",
         metrics: [{ label: "Status", value: "ERROR", state: "offline" }],
-        source: this.name,
-        fetchedAt: new Date().toISOString(),
-        ageMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Unknown error",
+        source: "live",
+        freshness: {
+          adapter: this.name,
+          source: this.name,
+          queriedAt: new Date(start).toISOString(),
+          stalenessSeconds: 0,
+          cacheHit: false,
+        },
+        summary: `Adapter error: ${error instanceof Error ? error.message : "Unknown error"}`,
       };
     }
   }
