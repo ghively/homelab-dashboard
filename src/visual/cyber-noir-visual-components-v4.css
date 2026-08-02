@@ -134,21 +134,41 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 .cnv-surface.gl-state.state-warning  { box-shadow: 0 0 20px oklch(0.82 0.15 85 / 0.34); }
 .cnv-surface.gl-state.state-critical { box-shadow: 0 0 24px oklch(0.65 0.22 25 / 0.42); }
 .cnv-surface.gl-state.state-offline  { box-shadow: 0 0 16px oklch(0.55 0.02 265 / 0.34); }
+.chat-rendered .cnv-surface.gl-state.state-healthy  { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-healthy) 18%, transparent), 0 0 16px color-mix(in srgb, var(--cnv-healthy) 12%, transparent); }
+.chat-rendered .cnv-surface.gl-state.state-warning,
+.chat-rendered .cnv-surface.gl-state.state-stale    { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-warning) 22%, transparent), 0 0 18px color-mix(in srgb, var(--cnv-warning) 15%, transparent); }
+.chat-rendered .cnv-surface.gl-state.state-critical,
+.chat-rendered .cnv-surface.gl-state.state-denied   { box-shadow: 0 0 0 1px color-mix(in srgb, var(--cnv-critical) 28%, transparent), 0 0 20px color-mix(in srgb, var(--cnv-critical) 18%, transparent); }
+.chat-rendered .cnv-surface.gl-state.state-offline,
+.chat-rendered .cnv-surface.gl-state.state-empty,
+.chat-rendered .cnv-surface.gl-state.state-loading  { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 14px rgba(255, 255, 255, 0.05); }
 
 /* ── Motion ──────────────────────────────────────────────────────────── */
 .cnv-surface {
   transition: box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
-  animation: cnv-enter 240ms ease both;
 }
-@keyframes cnv-enter {
+.chat-rendered .cnv-surface {
+  animation: cnv-panel-enter 280ms var(--ease-out-quart) both;
+}
+@keyframes cnv-panel-enter {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
 .cnv-clickable { transition: background-color 120ms ease; }
+.chat-rendered .cnv-clickable {
+  transition: background-color 120ms ease, transform 160ms var(--ease-out-quart);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .cnv-surface { animation: none; transition: none; }
-  .cnv-clickable { transition: none; }
+  .chat-rendered .cnv-surface {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .cnv-surface,
+  .cnv-clickable {
+    transition: none;
+  }
 }
 
 /* ── Panels adopt the world-card treatment ───────────────────
@@ -182,6 +202,40 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
 }
+.chat-rendered .cnv-surface {
+  --cnv-surface-bloom: color-mix(in srgb, var(--cnv-series-1) 13%, transparent);
+  position: relative;
+  isolation: isolate;
+}
+.chat-rendered .cnv-surface.state-healthy  { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-healthy) 12%, transparent); }
+.chat-rendered .cnv-surface.state-warning,
+.chat-rendered .cnv-surface.state-stale    { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-warning) 15%, transparent); }
+.chat-rendered .cnv-surface.state-critical,
+.chat-rendered .cnv-surface.state-denied   { --cnv-surface-bloom: color-mix(in srgb, var(--cnv-critical) 19%, transparent); }
+.chat-rendered .cnv-surface.state-offline,
+.chat-rendered .cnv-surface.state-empty,
+.chat-rendered .cnv-surface.state-loading  { --cnv-surface-bloom: rgba(255, 255, 255, 0.055); }
+.chat-rendered .cnv-surface::before,
+.chat-rendered .cnv-surface::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+.chat-rendered .cnv-surface::before {
+  inset: 0 12% auto;
+  height: 42px;
+  background: radial-gradient(ellipse at top, var(--cnv-surface-bloom), transparent 72%);
+}
+.chat-rendered .cnv-surface::after {
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.16);
+}
+.chat-rendered .cnv-surface > * {
+  position: relative;
+  z-index: 1;
+}
 
 /* Flatten the inner tiles. They were bordered, opaque, 11px-radius boxes — a
    full second card per metric. A hairline and a barely-there wash give the same
@@ -213,11 +267,14 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 .cnv-surface.state-offline,
 .cnv-surface.state-empty,
 .cnv-surface.state-loading  { border-top: 2px solid rgba(255, 255, 255, 0.12); }
+.chat-rendered .cnv-surface.state-stale  { border-top: 2px solid rgba(255, 194, 102, 0.42); }
+.chat-rendered .cnv-surface.state-denied { border-top: 2px solid rgba(255, 95, 86, 0.5); }
 
-.cnv-surface:hover {
+.chat-rendered .cnv-surface.cnv-clickable:hover {
   background: rgba(255, 255, 255, 0.065);
   border-color: rgba(0, 255, 0, 0.34);
   box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.22), 0 12px 34px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -612,9 +669,11 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 /* The wash under the line. Low enough that four of them can overlap in a
    MultiLine without the plot turning to mud. */
 .cnv-chart-area {
+  --cnv-chart-area-opacity: 0.13;
   opacity: 0.13;
 }
 .cnv-chart-area-multi {
+  --cnv-chart-area-opacity: 0.08;
   opacity: 0.08;
 }
 .cnv-chart-halo {
@@ -625,6 +684,34 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* A line draws once to establish its direction; its area follows after the
+   line is legible. Neither animation changes chart geometry or values. */
+.chat-rendered .cnv-chart-line-reveal {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cnv-draw-line 700ms var(--ease-out-quart) forwards;
+}
+
+.chat-rendered .cnv-chart-area-reveal {
+  opacity: 0;
+  animation: cnv-fade-area 420ms 180ms ease-out forwards;
+}
+
+.chat-rendered .cnv-network-flow {
+  stroke-dasharray: 5 8;
+  animation: cnv-flow-dash 1400ms linear infinite;
+}
+
+@keyframes cnv-draw-line {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes cnv-fade-area {
+  to { opacity: var(--cnv-chart-area-opacity); }
+}
+@keyframes cnv-flow-dash {
+  to { stroke-dashoffset: -13; }
 }
 
 /* ── Legend (MultiLine, Donut, Gauge) ────────────────────────────────── */
@@ -693,6 +780,14 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   place-items: center;
   max-width: 190px;
 }
+.chat-rendered .cnv-capacity > .cnv-ring {
+  opacity: 0;
+  transform: scale(0.96);
+  animation: cnv-reveal-ring 460ms var(--ease-out-quart) forwards;
+}
+@keyframes cnv-reveal-ring {
+  to { opacity: 1; transform: scale(1); }
+}
 /* The hole. It was an OPAQUE var(--cnv-panel) disc, which punched a solid
    circle through a panel the wallpaper otherwise reads through. */
 .cnv-capacity > .cnv-ring strong {
@@ -753,6 +848,25 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
 .cnv-bars article i {
   border-radius: 4px;
   transition: width var(--dur-base) var(--ease-out-quart);
+}
+.chat-rendered .cnv-bars article i {
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: cnv-reveal-bar 360ms var(--ease-out-quart) forwards;
+}
+.chat-rendered .cnv-bars article:nth-child(2) i  { animation-delay: 45ms; }
+.chat-rendered .cnv-bars article:nth-child(3) i  { animation-delay: 90ms; }
+.chat-rendered .cnv-bars article:nth-child(4) i  { animation-delay: 135ms; }
+.chat-rendered .cnv-bars article:nth-child(5) i  { animation-delay: 180ms; }
+.chat-rendered .cnv-bars article:nth-child(6) i  { animation-delay: 225ms; }
+.chat-rendered .cnv-bars article:nth-child(7) i  { animation-delay: 270ms; }
+.chat-rendered .cnv-bars article:nth-child(8) i  { animation-delay: 315ms; }
+.chat-rendered .cnv-bars article:nth-child(9) i  { animation-delay: 360ms; }
+.chat-rendered .cnv-bars article:nth-child(10) i { animation-delay: 405ms; }
+.chat-rendered .cnv-bars article:nth-child(11) i { animation-delay: 450ms; }
+.chat-rendered .cnv-bars article:nth-child(12) i { animation-delay: 495ms; }
+@keyframes cnv-reveal-bar {
+  to { transform: scaleX(1); }
 }
 .cnv-bars b {
   font-variant-numeric: tabular-nums;
@@ -943,6 +1057,11 @@ svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; 
   transition: background-color var(--dur-fast) var(--ease-out-quart),
     border-color var(--dur-fast) var(--ease-out-quart);
 }
+.chat-rendered .cnv-clickable {
+  transition: background-color var(--dur-fast) var(--ease-out-quart),
+    border-color var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
 .cnv-clickable:hover {
   background: rgba(255, 255, 255, 0.07);
 }
@@ -1070,4 +1189,185 @@ svg .cnv-clickable:focus-visible circle {
   stroke: var(--neon-green);
   stroke-width: 3;
   filter: drop-shadow(0 0 6px var(--neon-green));
+}
+
+/* ── Generated media layouts ────────────────────────────────────────── */
+.cnv-posters {
+  align-items: start;
+}
+.cnv-posters-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+}
+.cnv-media-tile {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(8, 8, 12, 0.34);
+  transform: translateZ(0);
+  transition: transform var(--dur-fast) var(--ease-out-quart), border-color var(--dur-fast) var(--ease-out-quart), box-shadow var(--dur-fast) var(--ease-out-quart);
+}
+.cnv-media-art {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+.cnv-albums .cnv-media-art { aspect-ratio: 1; }
+.cnv-media-meta {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(16, 16, 23, 0.96), rgba(7, 7, 10, 0.98));
+}
+.cnv-media-meta strong,
+.cnv-media-meta small,
+.cnv-playback-info strong,
+.cnv-playback-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cnv-media-meta small { color: var(--cnv-muted); }
+.cnv-media-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cnv-media-badge,
+.cnv-playback-state {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--cnv-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cnv-posters-layout-rail {
+  display: flex;
+  grid-template-columns: none;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.cnv-posters-layout-rail .cnv-media-tile {
+  flex: 0 0 min(42vw, 180px);
+  scroll-snap-align: start;
+}
+.cnv-posters-layout-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(118px, 0.7fr));
+}
+.cnv-posters-layout-feature .cnv-media-tile-feature {
+  grid-row: span 2;
+}
+.cnv-posters-layout-feature .cnv-media-tile-feature .cnv-media-art {
+  aspect-ratio: 16 / 9;
+}
+.cnv-posters-layout-feature .cnv-media-tile-feature .cnv-media-meta {
+  background: linear-gradient(180deg, rgba(20, 20, 30, 0.86), rgba(5, 5, 8, 0.98));
+}
+.cnv-playback article {
+  grid-template-columns: 70px minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: hidden;
+}
+.cnv-playback-art {
+  width: 70px;
+  height: 100%;
+  min-height: 104px;
+  aspect-ratio: 2 / 3 !important;
+  border-radius: 7px;
+}
+.cnv-playback-info {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+}
+.cnv-playback-status {
+  display: flex;
+  align-self: start;
+  flex-direction: column;
+  align-items: end;
+  gap: 5px;
+}
+.cnv-playback-state.is-active { color: var(--cnv-healthy); border-color: color-mix(in srgb, var(--cnv-healthy) 45%, transparent); }
+.cnv-playback-state.is-paused { color: var(--cnv-warning); border-color: color-mix(in srgb, var(--cnv-warning) 45%, transparent); }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .cnv-media-tile.cnv-clickable:hover {
+    transform: translateY(-3px);
+    border-color: rgba(0, 243, 255, 0.48);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.36);
+  }
+}
+@media (max-width: 520px) {
+  .cnv-posters-layout-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnv-posters-layout-feature { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnv-posters-layout-feature .cnv-media-tile-feature { grid-column: span 2; grid-row: auto; }
+  .cnv-posters-layout-feature .cnv-media-tile-feature .cnv-media-art { aspect-ratio: 16 / 10; }
+  .cnv-playback article { grid-template-columns: 58px minmax(0, 1fr); }
+  .cnv-playback-art { width: 58px; min-height: 92px; }
+  .cnv-playback-status { grid-column: 2; flex-direction: row; align-items: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cnv-media-tile { transform: none; transition: none; }
+}
+
+/* Motion marks interactivity, active playback, and critical state. Static
+   panels never lift, and status text remains fully legible between pulses. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .chat-rendered .cnv-clickable:not(g):hover {
+    transform: translateY(-2px);
+  }
+}
+.chat-rendered .cnv-playback-state.is-active,
+.chat-rendered .cnv-surface.state-critical .cnv-badge {
+  animation: cnv-live-marker 1800ms ease-in-out infinite;
+}
+@keyframes cnv-live-marker {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent); }
+}
+
+/* Every motion hook above resolves to its final, readable frame when motion is
+   reduced. Flow direction remains represented by the dashed link itself. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-rendered .cnv-surface,
+  .chat-rendered .cnv-chart-line-reveal,
+  .chat-rendered .cnv-chart-area-reveal,
+  .chat-rendered .cnv-network-flow,
+  .chat-rendered .cnv-bars article i,
+  .chat-rendered .cnv-capacity > .cnv-ring,
+  .chat-rendered .cnv-playback-state.is-active,
+  .chat-rendered .cnv-surface.state-critical .cnv-badge {
+    animation: none;
+  }
+  .chat-rendered .cnv-surface,
+  .chat-rendered .cnv-clickable,
+  .chat-rendered .cnv-bars article i,
+  .chat-rendered .cnv-capacity > .cnv-ring {
+    transform: none;
+    transition: none;
+  }
+  .chat-rendered .cnv-chart-line-reveal,
+  .chat-rendered .cnv-network-flow {
+    stroke-dashoffset: 0;
+  }
+  .chat-rendered .cnv-chart-area-reveal {
+    opacity: var(--cnv-chart-area-opacity);
+  }
+  .chat-rendered .cnv-capacity > .cnv-ring {
+    opacity: 1;
+  }
 }

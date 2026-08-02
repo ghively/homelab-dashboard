@@ -38,10 +38,10 @@ const metrics = [
 ];
 
 const items = [
-  { id: "1", label: "Severance", subtitle: "Apple TV+ · continuing", value: 19, state: "healthy" },
-  { id: "2", label: "The Bear", subtitle: "FX · continuing", value: 42, state: "healthy" },
-  { id: "3", label: "True Detective", subtitle: "HBO · ended", value: 30, state: "stale" },
-  { id: "4", label: "Mr. Robot", subtitle: "USA · ended", value: 45, state: "healthy" },
+  { id: "1", label: "Severance", subtitle: "Apple TV+ · continuing", image: "/media-demo/severance.svg", progress: 0.62, state: "healthy", meta: { year: 2025, quality: "4K HDR" } },
+  { id: "2", label: "The Bear", subtitle: "FX · continuing", image: "/media-demo/bear.svg", progress: 0.42, state: "healthy", meta: { year: 2025, quality: "4K" } },
+  { id: "3", label: "Dune", subtitle: "Max · continuing", image: "/media-demo/dune.svg", progress: 0.78, state: "stale", meta: { year: 2024, quality: "4K HDR" } },
+  { id: "4", label: "Foundation", subtitle: "Apple TV+ · continuing", image: "/media-demo/foundation.svg", progress: 0.31, state: "healthy", meta: { year: 2025, quality: "4K HDR" } },
 ];
 
 const series = [
@@ -93,7 +93,14 @@ const PROPS: Record<string, Record<string, unknown>> = {
   Kanban: { ...base, title: "Download queue", items },
   VisualTable: { ...base, title: "Series library", items },
   ArtworkWall: { ...base, title: "Recently added", items },
-  PlaybackSessions: { ...base, title: "Now playing", items: items.slice(0, 2) },
+  PlaybackSessions: {
+    ...base,
+    title: "Now playing",
+    items: [
+      { ...items[0], meta: { client: "Apple TV", quality: "4K HDR", isPaused: true } },
+      { ...items[1], meta: { client: "Safari", quality: "4K", isPaused: false } },
+    ],
+  },
   Capacity: { ...base, title: "Storage", state: "warning", metrics: [{ label: "Used", value: 71, unit: "%" }], series },
   SecurityPosture: { ...base, title: "Wazuh", items: items.slice(0, 3), metrics: metrics.slice(0, 3) },
   MarkdownReader: { ...base, title: "Runbook", markdown: "## Synology\n\n`volume_2` is full. DSM reports **attention**.\n\n- Free space or expand the pool\n- Re-check SMART on the Seagate drives" },
@@ -138,7 +145,7 @@ function page(name: string, subtitle: string, body: string): string {
     radial-gradient(60ch 40ch at 85% 70%, rgba(0,243,255,.24), transparent 60%),
     var(--bg-dark);}
 </style></head>
-<body><div class="frame">${body}</div></body></html>
+<body><div class="frame chat-rendered">${body}</div></body></html>
 `;
 }
 
@@ -161,6 +168,18 @@ for (const c of homelabComponents as unknown as Array<{
   } catch (err) {
     failed.push(`${c.name}: ${err instanceof Error ? err.message : String(err)}`);
   }
+}
+
+const artworkWall = (homelabComponents as unknown as Array<{
+  name: string;
+  component: (a: { props: unknown; renderNode?: unknown }) => React.ReactElement;
+}>).find((component) => component.name === "ArtworkWall");
+
+if (artworkWall) {
+  const html = renderToStaticMarkup(
+    React.createElement(() => artworkWall.component({ props: { ...base, title: "Recently added", items, layout: "rail" }, renderNode: () => null })),
+  );
+  writeFileSync(join(OUT, "components", "ArtworkWallRail.html"), page("ArtworkWallRail", "Horizontally scrolling artwork rail", html));
 }
 
 console.log(`  rendered ${ok}/${(homelabComponents as unknown[]).length} components -> ${OUT}/components/`);

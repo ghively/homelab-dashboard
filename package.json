@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check:parity": "tsx scripts/check-parity.cjs",
-    "export:design": "tsx scripts/export-design-previews.cjs"
+    "export:design": "tsx scripts/export-design-previews.cjs",
+    "check:visual": "npm run export:design && node scripts/check-visual-quality.cjs",
+    "check:prompt-guidance": "tsx scripts/check-prompt-guidance.ts"
   },
   "dependencies": {
     "@openuidev/lang-core": "0.2.10",

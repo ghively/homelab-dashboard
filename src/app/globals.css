@@ -1588,7 +1588,7 @@ button.dash-tag {
    The same max-width as the composer, so the conversation and the control that
    drives it share one column and the eye never has to re-find the measure. */
 .chat-thread {
-  width: min(860px, 100%);
+  width: min(1180px, 100%);
   margin: 0 auto;
   padding: 26px 24px 8px;
   display: flex;
@@ -1619,12 +1619,18 @@ button.dash-tag {
   border: 1px solid var(--border-neutral);
   border-radius: 12px;
   padding: 10px 14px;
-  max-width: 90%;
+  max-width: min(860px, 90%);
   white-space: pre-wrap;
   line-height: 1.6;
 }
 
-.chat-rendered { display: flex; flex-direction: column; gap: 14px; }
+.chat-msg-assistant .chat-rendered {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  isolation: isolate;
+}
 
 .chat-streaming-dot {
   width: 7px;

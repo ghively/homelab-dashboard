@@ -52,6 +52,8 @@ export const ItemSchema = z.object({
 });
 tagSchemaId(ItemSchema, "Item");
 
+export const ArtworkLayoutSchema = z.enum(["grid", "rail", "feature"]);
+
 export const SeriesSchema = z.object({
   name: z.string(),
   unit: z.string().optional(),
@@ -276,11 +278,13 @@ export const VisualTableSchema = defineComponent({
 
 export const ArtworkWallSchema = defineComponent({
   name: "ArtworkWall",
-  props: z.object({ ...baseFields, items: z.array(ItemSchema), square: z.boolean().optional() }),
+  props: z.object({ ...baseFields, items: z.array(ItemSchema), square: z.boolean().optional(), layout: ArtworkLayoutSchema.optional() }),
   description:
     "Grid of poster/cover art (movie library, album wall, image gallery). " +
     "Each Item needs {id, label, subtitle?, image? (URL), progress?}. " +
     "Set square=true for album covers / square thumbnails. " +
+    "layout='grid' is the responsive default for browsing a library; layout='rail' is a horizontally scrolling recently-added strip; " +
+    "layout='feature' spotlights the first item with supporting posters. " +
     "Use PlaybackSessions for currently-playing media with stream details.",
   component: null as never,
 });
@@ -290,7 +294,7 @@ export const PlaybackSessionsSchema = defineComponent({
   props: z.object({ ...baseFields, items: z.array(ItemSchema) }),
   description:
     "Active media streams / playback sessions (Emby/Jellyfin/Plex current plays). " +
-    "Each Item: {id, label (title), subtitle (client), image? (thumbnail), progress? (0–1), meta: {mode: 'direct'|'transcode'}}. " +
+    "Each Item: {id, label (title), subtitle? (client), image? (thumbnail), progress? (0–1), meta?: {mode?, client?, device?, user?, quality?, isPaused?, paused?}}. isPaused is the live Emby pause state; paused is a legacy alias. " +
     "Use ArtworkWall for a static library browse view.",
   component: null as never,
 });

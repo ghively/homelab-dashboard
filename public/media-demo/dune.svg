@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img">
+  <title>Abstract desert planet cover</title>
+  <defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#08070d"/><stop offset="1" stop-color="#d77a32"/></linearGradient></defs>
+  <rect width="600" height="900" fill="url(#g)"/>
+  <circle cx="300" cy="260" r="170" fill="#ffb35c" opacity=".78"/>
+  <path d="M0 620Q180 510 360 625T700 620V900H0Z" fill="#17101f"/>
+  <path d="M0 710Q170 600 330 720T700 700V900H0Z" fill="#08070d"/>
+</svg>
