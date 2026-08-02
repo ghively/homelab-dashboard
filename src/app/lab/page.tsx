@@ -20,6 +20,8 @@ import { Grid } from "@/components/canvasui/Grid";
 import { GlyphRain } from "@/components/canvasui/GlyphRain";
 import { Liquid } from "@/components/canvasui/Liquid";
 import { DecryptReveal } from "@/components/canvasui/DecryptReveal";
+import { useEffectGate } from "@/components/canvasui/Effect";
+import { budgetState } from "@/components/canvasui/budget";
 
 const PANEL: React.CSSProperties = {
   padding: "18px 20px",
@@ -58,6 +60,56 @@ function Cell({ name, note, children }: { name: string; note: string; children: 
       </div>
       <p style={{ color: "var(--text-dim)", fontSize: ".74rem" }}>{note}</p>
     </section>
+  );
+}
+
+/**
+ * Why the main page might differ from this one.
+ *
+ * The cells below mount Canvas UI directly. The dashboard instead goes through
+ * useEffectGate, which additionally requires a free WebGL slot and
+ * prefers-reduced-motion to be unset. If the effects render here but not there,
+ * the gate is the difference — and this panel says which condition failed.
+ */
+function GateDiagnostics() {
+  const gated = useEffectGate(true);
+  const [info, setInfo] = useState<{ reduced: boolean; budget: ReturnType<typeof budgetState> } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.resolve().then(() => {
+      if (!alive) return;
+      setInfo({
+        reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        budget: budgetState(),
+      });
+    });
+    return () => { alive = false; };
+  }, []);
+
+  const row = (k: string, v: string, bad: boolean) => (
+    <div style={{ display: "flex", gap: 10 }}>
+      <span style={{ width: 190, color: "var(--text-dim)" }}>{k}</span>
+      <strong style={{ color: bad ? "var(--dot-red)" : "var(--neon-green)" }}>{v}</strong>
+    </div>
+  );
+
+  return (
+    <div style={{
+      border: "1px solid var(--border-neutral)", borderRadius: "var(--radius)",
+      padding: "12px 14px", background: "rgba(0,0,0,.35)", fontSize: ".78rem",
+      display: "flex", flexDirection: "column", gap: 5,
+    }}>
+      <div style={{ color: "var(--neon-cyan)", fontWeight: 600, marginBottom: 3 }}>
+        Gate diagnostics — this is what the dashboard uses
+      </div>
+      {row("useEffectGate grants", gated ? "YES" : "NO", !gated)}
+      {info && row("prefers-reduced-motion", info.reduced ? "REDUCE (blocks effects)" : "no-preference", info.reduced)}
+      {info && row("slots used / max", `${info.budget.used} + ${info.budget.reservedUsed} reserved / ${info.budget.max}`, false)}
+      <div style={{ color: "var(--text-mute)", marginTop: 4 }}>
+        If the cells below animate but this says NO, the gate is why the dashboard looks unchanged.
+      </div>
+    </div>
   );
 }
 
@@ -110,6 +162,8 @@ export default function Lab() {
           )}
         </div>
       </header>
+
+      <GateDiagnostics />
 
       <div style={{ display: "grid", gap: 20, gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))" }}>
         <Cell name="Glass" note="Refractive glass over live content. The dashboard's panel surface candidate.">
