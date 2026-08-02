@@ -186,41 +186,6 @@ function StreamingRender({ response }: { response: string }) {
   );
 }
 
-// ── Suggestion prompts ───────────────────────────────────────
-
-/**
- * Title plus a quiet subtitle, rather than a row of chips.
- *
- * A chip has to be short enough to fit, which pushes every prompt toward
- * "Show fleet status" — technically valid and useless as a demonstration. The
- * two-line form lets the title stay scannable while the subtitle carries the
- * specificity that shows what this thing can actually do. They are also the
- * fastest way to teach the input: read three, and the shape of a good request
- * is obvious.
- */
-const SUGGESTIONS: Array<{ title: string; detail: string; prompt: string }> = [
-  {
-    title: "Show me the fleet",
-    detail: "every world, health rolled up",
-    prompt: "Show fleet status overview across all worlds",
-  },
-  {
-    title: "What is unhealthy right now",
-    detail: "only what needs attention",
-    prompt: "Show only adapters that are unhealthy, with the reason for each",
-  },
-  {
-    title: "Map the network",
-    detail: "how the tailnet fits together",
-    prompt: "Show network topology across the tailnet",
-  },
-  {
-    title: "Media library at a glance",
-    detail: "Emby, Sonarr, Radarr together",
-    prompt: "Display media server activity and library totals",
-  },
-];
-
 // ── GenerativeChat component ─────────────────────────────────
 
 /**
@@ -319,19 +284,6 @@ export function GenerativeChat({ subtitle }: { subtitle?: string }) {
 
             {composer}
 
-            <div className="chat-suggestions">
-              <div className="chat-suggestions-label">Suggested</div>
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s.title}
-                  className="chat-suggestion"
-                  onClick={() => chat.sendMessage(s.prompt)}
-                >
-                  <strong>{s.title}</strong>
-                  <small>{s.detail}</small>
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           <div className="chat-thread">
