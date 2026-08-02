@@ -163,6 +163,18 @@ for (const c of homelabComponents as unknown as Array<{
   }
 }
 
+const artworkWall = (homelabComponents as unknown as Array<{
+  name: string;
+  component: (a: { props: unknown; renderNode?: unknown }) => React.ReactElement;
+}>).find((component) => component.name === "ArtworkWall");
+
+if (artworkWall) {
+  const html = renderToStaticMarkup(
+    React.createElement(() => artworkWall.component({ props: { ...base, title: "Recently added", items, layout: "rail" }, renderNode: () => null })),
+  );
+  writeFileSync(join(OUT, "components", "ArtworkWallRail.html"), page("ArtworkWallRail", "Horizontally scrolling artwork rail", html));
+}
+
 console.log(`  rendered ${ok}/${(homelabComponents as unknown[]).length} components -> ${OUT}/components/`);
 if (failed.length) {
   console.log("  FAILED:");

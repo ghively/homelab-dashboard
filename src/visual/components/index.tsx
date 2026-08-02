@@ -72,6 +72,8 @@ const ItemSchema = z.object({
 });
 tagSchemaId(ItemSchema, "Item");
 
+const ArtworkLayoutSchema = z.enum(["grid", "rail", "feature"]);
+
 const SeriesSchema = z.object({
   name: z.string(),
   unit: z.string().optional(),
@@ -363,6 +365,47 @@ function artProps(image?: string): {
 } {
   const bg = artBackground(image);
   return bg ? { style: { backgroundImage: bg }, "data-art": "image" } : { "data-art": "none" };
+}
+
+/** One resilient media tile, shared by every ArtworkWall layout. */
+function ArtworkTile({
+  item,
+  onActivate,
+  featured = false,
+}: {
+  item: z.infer<typeof ItemSchema>;
+  onActivate: () => void;
+  featured?: boolean;
+}) {
+  const metadata = ["year", "quality", "rating"].flatMap((key) => {
+    const value = item.meta?.[key];
+    return typeof value === "string" || typeof value === "number" ? [[key, value] as const] : [];
+  });
+  const clickProps = clickable(onActivate, `Show details for ${item.label}`);
+  return (
+    <article
+      {...clickProps}
+      className={`${featured ? "cnv-media-tile cnv-media-tile-feature" : "cnv-media-tile"} ${clickProps.className}`}
+    >
+      <div className="cnv-art cnv-media-art" {...artProps(item.image)} />
+      <div className="cnv-media-meta">
+        <strong>{item.label}</strong>
+        {item.subtitle && <small>{item.subtitle}</small>}
+        {metadata.length > 0 && (
+          <div className="cnv-media-badges">
+            {metadata.map(([key, value]) => (
+              <span className="cnv-media-badge" key={key}>{value}</span>
+            ))}
+          </div>
+        )}
+        {item.progress != null && (
+          <div className="cnv-progress" aria-label={`${Math.round(item.progress * 100)} percent complete`}>
+            <i style={{ width: `${item.progress * 100}%` }} />
+          </div>
+        )}
+      </div>
+    </article>
+  );
 }
 
 // ── Chart primitives ──────────────────────────────────────────
@@ -1120,31 +1163,33 @@ export const ArtworkWall = defineComponent({
     state: VisualStateSchema.optional(),
     items: z.array(ItemSchema),
     square: z.boolean().optional(),
+    layout: ArtworkLayoutSchema.optional(),
   }),
   description:
     "Grid of poster/cover art (movie library, album wall, image gallery). " +
     "Each Item needs {id, label, subtitle?, image? (URL), progress?}. " +
     "Set square=true for album covers / square thumbnails. " +
+    "layout='grid' is the responsive default for browsing a library; layout='rail' is a horizontally scrolling recently-added strip; " +
+    "layout='feature' spotlights the first item with supporting posters. " +
     "Items are clickable — clicking one asks for that title's details. " +
     "Use PlaybackSessions for currently-playing media with stream details.",
-  component: function ArtworkWallView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean } & SurfaceExtras>) {
+  component: function ArtworkWallView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean; layout?: z.infer<typeof ArtworkLayoutSchema> } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
     if (!props.items?.length) return <EmptyPanel props={props} title="Gallery" label="No items" shape="tiles" />;
+    const items = props.items.slice(0, 18);
+    const layout = props.layout ?? "grid";
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
-        <div className={props.square ? "cnv-albums" : "cnv-posters"}>
-          {props.items.slice(0, 18).map((i) => (
-            <article
-              key={i.id}
-              {...clickable(() => triggerAction(`Show details for ${i.label}`), `Show details for ${i.label}`)}
-            >
-              <div className="cnv-art" {...artProps(i.image)}>
-                <b>{i.label}</b>
-              </div>
-              <strong>{i.label}</strong>
-              <small>{i.subtitle}</small>
-              {i.progress != null && <i style={{ width: `${i.progress * 100}%` }} />}
-            </article>
+        <div className={`cnv-posters cnv-posters-layout-${layout}${props.square ? " cnv-albums" : ""}`}>
+          {layout === "feature" ? (
+            <>
+              <ArtworkTile item={items[0]} featured onActivate={() => triggerAction(`Show details for ${items[0].label}`)} />
+              {items.slice(1).map((item) => (
+                <ArtworkTile key={item.id} item={item} onActivate={() => triggerAction(`Show details for ${item.label}`)} />
+              ))}
+            </>
+          ) : items.map((item) => (
+            <ArtworkTile key={item.id} item={item} onActivate={() => triggerAction(`Show details for ${item.label}`)} />
           ))}
         </div>
       </Surface>
@@ -1167,7 +1212,7 @@ export const PlaybackSessions = defineComponent({
   }),
   description:
     "Active media streams / playback sessions (Emby/Jellyfin/Plex current plays). " +
-    "Each Item: {id, label (title), subtitle (client), image? (thumbnail), progress? (0–1), meta: {mode: 'direct'|'transcode'}}. " +
+    "Each Item: {id, label (title), subtitle? (client), image? (thumbnail), progress? (0–1), meta?: {mode?, client?, device?, user?, quality?, paused?}}. " +
     "Use ArtworkWall for a static library browse view.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
     if (!props.items?.length) return <EmptyPanel props={props} title="Active Sessions" label="No active sessions" shape="rows" />;
@@ -1176,15 +1221,37 @@ export const PlaybackSessions = defineComponent({
         <div className="cnv-playback">
           {props.items.slice(0, 8).map((i) => (
             <article key={i.id}>
-              <div className="cnv-art" {...artProps(i.image)} />
-              <div>
+              <div className="cnv-art cnv-playback-art" {...artProps(i.image)} />
+              <div className="cnv-playback-info">
                 <strong>{i.label}</strong>
-                <small>{i.subtitle}</small>
+                {i.subtitle && <small>{i.subtitle}</small>}
+                {["client", "device", "user", "quality"].flatMap((key) => {
+                  const value = i.meta?.[key];
+                  return typeof value === "string" || typeof value === "number" ? [[key, value] as const] : [];
+                }).length > 0 && (
+                  <div className="cnv-media-badges">
+                    {["client", "device", "user", "quality"].flatMap((key) => {
+                      const value = i.meta?.[key];
+                      return typeof value === "string" || typeof value === "number" ? [[key, value] as const] : [];
+                    }).map(([key, value]) => (
+                      <span className="cnv-media-badge" key={key}>{value}</span>
+                    ))}
+                  </div>
+                )}
                 {i.progress != null && (
                   <div className="cnv-progress"><i style={{ width: `${i.progress * 100}%` }} /></div>
                 )}
               </div>
-              <span>{String(i.meta?.mode ?? "direct")}</span>
+              <div className="cnv-playback-status">
+                {typeof i.meta?.mode === "string" && (
+                  <span className="cnv-media-badge">{i.meta.mode}</span>
+                )}
+                {typeof i.meta?.paused === "boolean" && (
+                  <span className={i.meta.paused ? "cnv-playback-state is-paused" : "cnv-playback-state is-active"}>
+                    {i.meta.paused ? "paused" : "active"}
+                  </span>
+                )}
+              </div>
             </article>
           ))}
         </div>
