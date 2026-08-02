@@ -20,3 +20,93 @@
 .cnv-clickable:hover { background: var(--cnv-panel2); }
 .cnv-clickable:focus-visible { outline: 2px solid var(--cnv-series-1); outline-offset: 2px; }
 svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; }
+
+/* ══ Phase 5: visual layer ═══════════════════════════════════════════════ */
+/* Every class here is reachable only via a closed enum in surface-style.ts.
+   The model never emits raw CSS. */
+
+/* ── 12-column grid ──────────────────────────────────────────────────── */
+.cnv-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.cnv-grid > * { grid-column: span 12; }          /* full width unless told otherwise */
+.cnv-grid > .col-1  { grid-column: span 1; }
+.cnv-grid > .col-2  { grid-column: span 2; }
+.cnv-grid > .col-3  { grid-column: span 3; }
+.cnv-grid > .col-4  { grid-column: span 4; }
+.cnv-grid > .col-5  { grid-column: span 5; }
+.cnv-grid > .col-6  { grid-column: span 6; }
+.cnv-grid > .col-7  { grid-column: span 7; }
+.cnv-grid > .col-8  { grid-column: span 8; }
+.cnv-grid > .col-9  { grid-column: span 9; }
+.cnv-grid > .col-10 { grid-column: span 10; }
+.cnv-grid > .col-11 { grid-column: span 11; }
+.cnv-grid > .col-12 { grid-column: span 12; }
+.cnv-grid > .row-2 { grid-row: span 2; }
+.cnv-grid > .row-3 { grid-row: span 3; }
+
+/* Collapse to fewer columns on narrow viewports so spans stay sensible. */
+@media (max-width: 1100px) {
+  .cnv-grid { grid-template-columns: repeat(6, 1fr); }
+  .cnv-grid > [class*="col-"] { grid-column: span 6; }
+}
+@media (max-width: 700px) {
+  .cnv-grid { grid-template-columns: 1fr; }
+  .cnv-grid > [class*="col-"] { grid-column: span 1; }
+}
+
+/* ── Translucency ────────────────────────────────────────────────────── */
+/* oklch supports an alpha channel, so translucent surfaces work as tokens.
+   Gradients cannot — those need their own class below. */
+.cnv-surface.tr-subtle { background: oklch(0.19 0.02 265 / 0.82); }
+.cnv-surface.tr-medium { background: oklch(0.19 0.02 265 / 0.62); }
+.cnv-surface.tr-strong { background: oklch(0.19 0.02 265 / 0.38); }
+
+/* ── Backdrop blur (the glass effect) ────────────────────────────────── */
+.cnv-surface.bl-sm { backdrop-filter: blur(4px);  -webkit-backdrop-filter: blur(4px); }
+.cnv-surface.bl-md { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.cnv-surface.bl-lg { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+/* Glass reads as glass only with a light edge. */
+.cnv-surface[class*="bl-"] { border-color: oklch(0.75 0.03 265 / 0.22); }
+
+/* ── Background treatments ───────────────────────────────────────────── */
+.cnv-surface.bg-gradient {
+  background-image: linear-gradient(145deg, oklch(0.24 0.04 275 / 0.9), oklch(0.17 0.02 265 / 0.9));
+}
+.cnv-surface.bg-accent {
+  background-image: linear-gradient(145deg, oklch(0.30 0.09 220 / 0.55), oklch(0.18 0.03 265 / 0.9));
+}
+
+/* ── Elevation ───────────────────────────────────────────────────────── */
+.cnv-surface.el-sm { box-shadow: 0 1px 3px oklch(0 0 0 / 0.35); }
+.cnv-surface.el-md { box-shadow: 0 4px 14px oklch(0 0 0 / 0.42); }
+.cnv-surface.el-lg { box-shadow: 0 12px 34px oklch(0 0 0 / 0.52); }
+
+/* ── Glow ────────────────────────────────────────────────────────────── */
+.cnv-surface.gl-accent {
+  box-shadow: 0 0 0 1px var(--cnv-series-1), 0 0 22px oklch(0.72 0.16 220 / 0.30);
+}
+/* gl-state ties the glow to the panel's health — a critical panel glows red. */
+.cnv-surface.gl-state.state-healthy  { box-shadow: 0 0 18px oklch(0.75 0.17 155 / 0.28); }
+.cnv-surface.gl-state.state-warning  { box-shadow: 0 0 20px oklch(0.82 0.15 85 / 0.34); }
+.cnv-surface.gl-state.state-critical { box-shadow: 0 0 24px oklch(0.65 0.22 25 / 0.42); }
+.cnv-surface.gl-state.state-offline  { box-shadow: 0 0 16px oklch(0.55 0.02 265 / 0.34); }
+
+/* ── Motion ──────────────────────────────────────────────────────────── */
+.cnv-surface {
+  transition: box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+  animation: cnv-enter 240ms ease both;
+}
+@keyframes cnv-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.cnv-clickable { transition: background-color 120ms ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cnv-surface { animation: none; transition: none; }
+  .cnv-clickable { transition: none; }
+}
