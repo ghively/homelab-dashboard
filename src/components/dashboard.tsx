@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/visual-states";
-import { Surface, Metrics } from "@/visual/components";
 import { GlyphRain } from "@/components/canvasui/GlyphRain";
 import { useEffectGate } from "@/components/canvasui/Effect";
 import { DecryptText } from "@/components/decrypt-text";
@@ -305,96 +304,6 @@ export function QuickTags({ tags, activeTag, onTagClick }: QuickTagsProps) {
     </div>
   );
 }
-
-// ── Visual Panel (renders adapter result inline) ─────────────
-
-/** States worth drawing the eye to — these get the state-coloured glow. */
-const NEEDS_ATTENTION = ["warning", "critical", "offline", "stale", "denied"];
-
-interface VisualPanelProps {
-  title: string;
-  subtitle?: string;
-  state?: VisualStateValue;
-  /**
-   * Where the numbers came from. "fixture" means this service is not configured
-   * and the panel is showing sample data.
-   */
-  source?: "live" | "fixture" | "offline";
-  children: ReactNode;
-}
-
-/**
- * Panel chrome for the dashboard shell.
- *
- * This used to be a hand-rolled copy of the visual library's Surface. Plan
- * Task 5.2 called for deleting it and importing the real one; that step was
- * skipped, so every page you navigate rendered older markup with none of the
- * Phase 5 surface treatment. It now delegates to Surface and adds only what the
- * shell needs on top: the sample-data badge and a state glow.
- */
-export function VisualPanel({
-  title,
-  subtitle,
-  state = "healthy",
-  source,
-  children,
-}: VisualPanelProps) {
-  const isFixture = source === "fixture";
-
-  const panel = (
-    <Surface
-      title={title}
-      {...(subtitle ? { subtitle } : {})}
-      state={state}
-      surfaceStyle={{
-        translucency: "medium",
-        blur: "md",
-        elevation: "md",
-        ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
-      }}
-      {...(isFixture ? { className: "is-fixture" } : {})}
-      badge={
-        isFixture ? (
-          <span
-            className="cnv-badge cnv-badge-fixture"
-            title="Sample data — this service is not configured"
-          >
-            SAMPLE DATA
-          </span>
-        ) : undefined
-      }
-    >
-      {children}
-    </Surface>
-  );
-
-  // See WorldCard: panels do not claim WebGL contexts.
-  return panel;
-}
-
-// ── Metric Strip ─────────────────────────────────────────────
-
-/**
- * Thin alias over the visual library's Metrics row.
- *
- * The shell used to carry its own copy of this markup (plan Task 5.2, skipped).
- * The name is kept so callers are unchanged, but there is now exactly one
- * implementation.
- */
-export function MetricStrip({
-  metrics,
-}: {
-  metrics: Array<{
-    label: string;
-    value: string | number;
-    unit?: string;
-    trend?: number;
-    state?: string;
-  }>;
-}) {
-  return <Metrics metrics={metrics} />;
-}
-
 
 // ── Entity Detail Drawer ─────────────────────────────────────
 
