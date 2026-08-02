@@ -18,6 +18,11 @@ import { RadarrAdapter } from "@/lib/adapters/radarr/adapter";
 import { SabnzbdAdapter } from "@/lib/adapters/sabnzbd/adapter";
 import { TdarrAdapter } from "@/lib/adapters/tdarr/adapter";
 import { RommAdapter } from "@/lib/adapters/romm/adapter";
+import { PiHoleAdapter } from "@/adapters/pihole-adapter";
+import { UnifiAdapter } from "@/adapters/unifi-adapter";
+import watchtowerVps from "@/adapters/storage/watchtower-vps-adapter";
+import watchtowerMedia from "@/adapters/storage/watchtower-media-adapter";
+import watchtowerStorage from "@/adapters/storage/watchtower-storage-adapter";
 
 const registry = new Map<string, DataAdapter>();
 let initialized = false;
@@ -175,6 +180,36 @@ function registerRomm(): void {
   );
 }
 
+/**
+ * Adapters under src/adapters/ implement DataAdapter directly, so they need no
+ * bridge — they go straight into the registry.
+ *
+ * They read their own env vars rather than going through getServiceConfig(),
+ * and each has a hardcoded default host baked into the module. That default is
+ * why registration is gated on the env var being explicitly set: without the
+ * gate an unconfigured service would hit someone else's LAN address and render
+ * `offline`, when the plan requires it to render a labelled fixture instead.
+ *
+ * Only adapters whose query() derives every displayed value from a real fetch
+ * are registered here. See the audit note in the Phase 6 PR — most modules
+ * under src/adapters/ return hardcoded data and must NOT be registered.
+ */
+function registerPihole(): void {
+  if (!process.env.PIHOLE_BASE_URL || !process.env.PIHOLE_API_KEY) return;
+  registry.set("pihole", new PiHoleAdapter());
+}
+
+function registerUnifi(): void {
+  if (!process.env.UNIFI_BASE_URL || !process.env.UNIFI_PASSWORD) return;
+  registry.set("unifi", new UnifiAdapter());
+}
+
+function registerWatchtowers(): void {
+  if (process.env.WATCHTOWER_VPS_URL) registry.set("watchtower-vps", watchtowerVps);
+  if (process.env.WATCHTOWER_MEDIA_URL) registry.set("watchtower-media", watchtowerMedia);
+  if (process.env.WATCHTOWER_STORAGE_URL) registry.set("watchtower-storage", watchtowerStorage);
+}
+
 export function initAdapters(): void {
   if (initialized) return;
   initialized = true;
@@ -184,6 +219,9 @@ export function initAdapters(): void {
   registerSabnzbd();
   registerTdarr();
   registerRomm();
+  registerPihole();
+  registerUnifi();
+  registerWatchtowers();
 }
 
 export function getAdapter(name: string): DataAdapter | undefined {
