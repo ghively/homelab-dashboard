@@ -25,6 +25,15 @@ import {
   useTriggerAction,
   type ComponentRenderProps,
 } from "@openuidev/react-lang";
+import {
+  SurfaceStyleSchema,
+  SpanSchema,
+  RowSpanSchema,
+  surfaceClass,
+  type GridSpan,
+  type SurfaceExtras,
+  type SurfaceStyle,
+} from "./surface-style";
 import "../cyber-noir-visual-components-v4.css";
 
 // ── Shared schemas (tagged so signatures stay short) ──────────
@@ -107,15 +116,19 @@ function Surface({
   title,
   subtitle,
   state = "healthy",
+  surfaceStyle,
+  gridSpan,
   children,
 }: {
   title: string;
   subtitle?: string;
   state?: string;
+  surfaceStyle?: SurfaceStyle | undefined;
+  gridSpan?: GridSpan | undefined;
   children: React.ReactNode;
 }) {
   return (
-    <section className={`cnv cnv-surface state-${state}`}>
+    <section className={surfaceClass(state, surfaceStyle, gridSpan)}>
       <header className="cnv-head">
         <div>
           <h3>{title}</h3>
@@ -141,6 +154,9 @@ function NoData({ label = "No data" }: { label?: string }) {
 export const MetricStrip = defineComponent({
   name: "MetricStrip",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -151,10 +167,10 @@ export const MetricStrip = defineComponent({
     "Each metric shows label, value, optional unit, and a trend arrow. " +
     "Choose this over Gauge when there are multiple independent numbers. " +
     "Choose Gauge when there is ONE bounded number (e.g. disk fill %).",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[] }>) => {
-    if (!props.metrics?.length) return <Surface title={props.title ?? "Metrics"} state={props.state}><NoData label="No metrics" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[] } & SurfaceExtras>) => {
+    if (!props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Metrics"} state={props.state}><NoData label="No metrics" /></Surface>;
     return (
-      <Surface title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-metrics">
           {props.metrics.slice(0, 6).map((m, i) => (
             <article key={i}>
@@ -174,6 +190,9 @@ export const MetricStrip = defineComponent({
 export const Gauge = defineComponent({
   name: "Gauge",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     value: z.number(),
@@ -187,9 +206,9 @@ export const Gauge = defineComponent({
     "Use when there is one number with a known maximum. For an unbounded single number use MetricStrip. " +
     "thresholds color the arc: at/above warning = amber, at/above critical = red. " +
     "Default max is 100 (percentage). Set max for non-percentage gauges.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; value: number; max?: number; unit?: string; state?: string; thresholds?: { warning: number; critical: number } }>) => {
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; value: number; max?: number; unit?: string; state?: string; thresholds?: { warning: number; critical: number } } & SurfaceExtras>) => {
     const v = Number(props.value);
-    if (!Number.isFinite(v)) return <Surface title={props.title ?? "Gauge"} state={props.state}><NoData label="No gauge value" /></Surface>;
+    if (!Number.isFinite(v)) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gauge"} state={props.state}><NoData label="No gauge value" /></Surface>;
     const max = props.max ?? 100;
     const pct = Math.min(100, Math.max(0, (v / max) * 100));
     const th = props.thresholds;
@@ -199,7 +218,7 @@ export const Gauge = defineComponent({
       else if (pct >= th.warning) color = "#ffc266";
     }
     return (
-      <Surface title={props.title ?? "Gauge"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gauge"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-capacity">
           <div style={{ background: `conic-gradient(${color} 0 ${pct}%, #2b2f3a ${pct}%)` }}>
             <strong>{v}{props.unit ?? (max === 100 ? "%" : "")}</strong>
@@ -215,6 +234,9 @@ export const Gauge = defineComponent({
 export const Donut = defineComponent({
   name: "Donut",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -225,10 +247,10 @@ export const Donut = defineComponent({
     "Each segment has a label, value (numeric), and optional color. " +
     "Choose over BarRank when proportions matter more than ranking. " +
     "Choose Capacity when there is a single used/available split.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; segments: { label: string; value: number; color?: string }[] }>) => {
-    if (!props.segments?.length) return <Surface title={props.title ?? "Distribution"} state={props.state}><NoData label="No distribution data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; segments: { label: string; value: number; color?: string }[] } & SurfaceExtras>) => {
+    if (!props.segments?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Distribution"} state={props.state}><NoData label="No distribution data" /></Surface>;
     const total = props.segments.reduce((s, x) => s + Number(x.value) || 0, 0);
-    if (total === 0) return <Surface title={props.title ?? "Distribution"} state={props.state}><NoData label="Total is zero" /></Surface>;
+    if (total === 0) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Distribution"} state={props.state}><NoData label="Total is zero" /></Surface>;
     const colors = ["var(--cnv-series-1)", "var(--cnv-series-2)", "var(--cnv-series-3)", "var(--cnv-series-4)", "#ff6b6b", "#74b9ff"];
     let acc = 0;
     const stops = props.segments.map((seg, i) => {
@@ -239,7 +261,7 @@ export const Donut = defineComponent({
     });
     const grad = stops.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(", ");
     return (
-      <Surface title={props.title ?? "Distribution"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Distribution"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-capacity">
           <div style={{ background: `conic-gradient(${grad})` }}>
             <strong>{total}</strong>
@@ -262,6 +284,9 @@ export const Donut = defineComponent({
 export const LineChart = defineComponent({
   name: "LineChart",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -272,13 +297,13 @@ export const LineChart = defineComponent({
     "One Series with {name, unit?, points: [{x,y}]}. " +
     "For multiple overlapping series use MultiLine. " +
     "For ranked horizontal bars use BarRank.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; series: z.infer<typeof SeriesSchema>[] }>) => {
-    if (!props.series?.length || !props.series[0]?.points?.length) return <Surface title={props.title ?? "Line Chart"} state={props.state}><NoData label="No time-series data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; series: z.infer<typeof SeriesSchema>[] } & SurfaceExtras>) => {
+    if (!props.series?.length || !props.series[0]?.points?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Line Chart"} state={props.state}><NoData label="No time-series data" /></Surface>;
     const s = props.series[0];
     const max = Math.max(...s.points.map((p) => p.y), 1);
     const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" ");
     return (
-      <Surface title={props.title ?? s.name} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? s.name} subtitle={props.subtitle} state={props.state}>
         <svg className="cnv-chart" viewBox="0 0 640 220" role="img">
           <path d={d} fill="none" stroke="var(--cnv-series-1)" strokeWidth="3" />
         </svg>
@@ -292,6 +317,9 @@ export const LineChart = defineComponent({
 export const MultiLine = defineComponent({
   name: "MultiLine",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -300,10 +328,10 @@ export const MultiLine = defineComponent({
   description:
     "Multi-series line chart for comparing trends across 2–4 metrics over the same axis (e.g. CPU vs memory vs network over time). " +
     "Each Series gets its own colored line. For a single metric use LineChart.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; series: z.infer<typeof SeriesSchema>[] }>) => {
-    if (!props.series?.length || props.series.every((s) => !s.points?.length)) return <Surface title={props.title ?? "Multi-Line"} state={props.state}><NoData label="No time-series data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; series: z.infer<typeof SeriesSchema>[] } & SurfaceExtras>) => {
+    if (!props.series?.length || props.series.every((s) => !s.points?.length)) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Multi-Line"} state={props.state}><NoData label="No time-series data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Multi-Line"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Multi-Line"} subtitle={props.subtitle} state={props.state}>
         <svg className="cnv-chart" viewBox="0 0 640 220" role="img">
           {props.series.slice(0, 4).map((s, si) => {
             if (!s.points?.length) return null;
@@ -325,6 +353,9 @@ export const MultiLine = defineComponent({
 export const BarRank = defineComponent({
   name: "BarRank",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -334,12 +365,12 @@ export const BarRank = defineComponent({
     "Horizontal bar chart ranking items by value (top services by traffic, largest tables by size, most active users). " +
     "Each Item needs {id, label, value}. Up to 12 bars. " +
     "For proportional parts-of-a-whole use Donut. For time-series use LineChart.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Bar Rank"} state={props.state}><NoData label="No data to rank" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Bar Rank"} state={props.state}><NoData label="No data to rank" /></Surface>;
     const items = props.items;
     const max = Math.max(...items.map((i) => Number(i.value) || 0), 1);
     return (
-      <Surface title={props.title ?? "Bar Rank"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Bar Rank"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-bars">
           {items.slice(0, 12).map((i) => (
             <article key={i.id}>
@@ -359,6 +390,9 @@ export const BarRank = defineComponent({
 export const Timeline = defineComponent({
   name: "Timeline",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -369,10 +403,10 @@ export const Timeline = defineComponent({
     "Each Event has {id, at (timestamp), title, detail?, state?}. " +
     "Choose over EventStream when temporal ordering is primary. " +
     "EventStream is for high-volume real-time log-like feeds.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; events: z.infer<typeof EventSchema>[] }>) => {
-    if (!props.events?.length) return <Surface title={props.title ?? "Timeline"} state={props.state}><NoData label="No events" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; events: z.infer<typeof EventSchema>[] } & SurfaceExtras>) => {
+    if (!props.events?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Timeline"} state={props.state}><NoData label="No events" /></Surface>;
     return (
-      <Surface title={props.title ?? "Timeline"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Timeline"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-timeline">
           {props.events.map((e) => (
             <article key={e.id}>
@@ -392,6 +426,9 @@ export const Timeline = defineComponent({
 export const EventStream = defineComponent({
   name: "EventStream",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -401,10 +438,10 @@ export const EventStream = defineComponent({
     "High-volume event feed / activity log (CI events, audit trail, live alerts). " +
     "Denser than Timeline — optimized for scanning many entries. " +
     "Use LogStream for raw system logs with severity levels.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; events: z.infer<typeof EventSchema>[] }>) => {
-    if (!props.events?.length) return <Surface title={props.title ?? "Event Stream"} state={props.state}><NoData label="No events" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; events: z.infer<typeof EventSchema>[] } & SurfaceExtras>) => {
+    if (!props.events?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Event Stream"} state={props.state}><NoData label="No events" /></Surface>;
     return (
-      <Surface title={props.title ?? "Event Stream"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Event Stream"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-timeline">
           {props.events.slice(0, 30).map((e) => (
             <article key={e.id} className={`state-${e.state ?? "healthy"}`}>
@@ -424,6 +461,9 @@ export const EventStream = defineComponent({
 export const LogStream = defineComponent({
   name: "LogStream",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -438,11 +478,11 @@ export const LogStream = defineComponent({
     "Raw log output viewer with severity levels (debug, info, warn, error, fatal). " +
     "Each entry: {timestamp, level, message, source?}. " +
     "Use EventStream for higher-level domain events with titles and detail text.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; entries: { timestamp: string; level: string; message: string; source?: string }[] }>) => {
-    if (!props.entries?.length) return <Surface title={props.title ?? "Log Stream"} state={props.state}><NoData label="No log entries" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; entries: { timestamp: string; level: string; message: string; source?: string }[] } & SurfaceExtras>) => {
+    if (!props.entries?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Log Stream"} state={props.state}><NoData label="No log entries" /></Surface>;
     const colors: Record<string, string> = { error: "#ff5555", fatal: "#ff5555", warn: "#ffc266", info: "var(--cnv-series-1)", debug: "var(--cnv-muted)" };
     return (
-      <Surface title={props.title ?? "Log Stream"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Log Stream"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
           {props.entries.slice(0, 50).map((e, i) => (
             <article key={i} style={{ gridTemplateColumns: "80px 70px 1fr" }}>
@@ -462,6 +502,9 @@ export const LogStream = defineComponent({
 export const NodeGraph = defineComponent({
   name: "NodeGraph",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -473,11 +516,11 @@ export const NodeGraph = defineComponent({
     "Nodes need {id, label, x?, y?} (coordinates in a ~800×430 space). Edges need {source, target, label?, value?}. " +
     "Nodes are clickable — clicking one asks for that node's details. " +
     "For sequential pipeline/flow use Flow. For proportional flow use Sankey.",
-  component: function NodeGraphView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] }>) {
+  component: function NodeGraphView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Node Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
+    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Node Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Network"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Network"} subtitle={props.subtitle} state={props.state}>
         <svg className="cnv-network" viewBox="0 0 800 430" role="img">
           {props.edges.map((e, i) => {
             const a = props.nodes.find((n) => n.id === e.source);
@@ -506,6 +549,9 @@ export const NodeGraph = defineComponent({
 export const Sankey = defineComponent({
   name: "Sankey",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -517,10 +563,10 @@ export const Sankey = defineComponent({
     "Nodes appear left-to-right; edge.value encodes flow magnitude. " +
     "Choose over NodeGraph when the quantity flowing between nodes matters. " +
     "Choose Flow for simple sequential steps without branching.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] }>) => {
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Flow"} state={props.state}><NoData label="No flow data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] } & SurfaceExtras>) => {
+    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} state={props.state}><NoData label="No flow data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-flow">
           {props.nodes.slice(0, 8).map((n, i) => (
             <React.Fragment key={n.id}>
@@ -539,6 +585,9 @@ export const Sankey = defineComponent({
 export const Kanban = defineComponent({
   name: "Kanban",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -549,12 +598,12 @@ export const Kanban = defineComponent({
     "Each Item needs {id, label, subtitle?, group}. Items are auto-grouped by their group field. " +
     "Cards are clickable — clicking one asks for that item's details. " +
     "Use VisualTable for flat tabular data. Use RoomBoard for physical topology.",
-  component: function KanbanView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) {
+  component: function KanbanView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface title={props.title ?? "Board"} state={props.state}><NoData label="No items" /></Surface>;
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Board"} state={props.state}><NoData label="No items" /></Surface>;
     const groups = [...new Set(props.items.map((i) => i.group || "Active"))];
     return (
-      <Surface title={props.title ?? "Board"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Board"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-board">
           {groups.map((g) => (
             <section key={g}>
@@ -579,6 +628,9 @@ export const Kanban = defineComponent({
 export const VisualTable = defineComponent({
   name: "VisualTable",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -590,11 +642,11 @@ export const VisualTable = defineComponent({
     "sends a follow-up asking for that entity's details; respond with a DetailPanel. " +
     "Use LogStream for raw logs. Use BarRank for ranked numeric comparison. " +
     "Use DetailPanel for a single entity's key-value details.",
-  component: function VisualTableView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) {
+  component: function VisualTableView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface title={props.title ?? "Table"} state={props.state}><NoData label="No rows" /></Surface>;
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Table"} state={props.state}><NoData label="No rows" /></Surface>;
     return (
-      <Surface title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
           {props.items.map((i) => (
             <article
@@ -619,6 +671,9 @@ export const VisualTable = defineComponent({
 export const ArtworkWall = defineComponent({
   name: "ArtworkWall",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -631,11 +686,11 @@ export const ArtworkWall = defineComponent({
     "Set square=true for album covers / square thumbnails. " +
     "Items are clickable — clicking one asks for that title's details. " +
     "Use PlaybackSessions for currently-playing media with stream details.",
-  component: function ArtworkWallView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean }>) {
+  component: function ArtworkWallView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface title={props.title ?? "Gallery"} state={props.state}><NoData label="No items" /></Surface>;
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gallery"} state={props.state}><NoData label="No items" /></Surface>;
     return (
-      <Surface title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
         <div className={props.square ? "cnv-albums" : "cnv-posters"}>
           {props.items.slice(0, 18).map((i) => (
             <article
@@ -662,6 +717,9 @@ export const ArtworkWall = defineComponent({
 export const PlaybackSessions = defineComponent({
   name: "PlaybackSessions",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -671,10 +729,10 @@ export const PlaybackSessions = defineComponent({
     "Active media streams / playback sessions (Emby/Jellyfin/Plex current plays). " +
     "Each Item: {id, label (title), subtitle (client), image? (thumbnail), progress? (0–1), meta: {mode: 'direct'|'transcode'}}. " +
     "Use ArtworkWall for a static library browse view.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Active Sessions"} state={props.state}><NoData label="No active sessions" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Active Sessions"} state={props.state}><NoData label="No active sessions" /></Surface>;
     return (
-      <Surface title={props.title ?? "Active Sessions"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Active Sessions"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-playback">
           {props.items.slice(0, 8).map((i) => (
             <article key={i.id}>
@@ -700,6 +758,9 @@ export const PlaybackSessions = defineComponent({
 export const Capacity = defineComponent({
   name: "Capacity",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -711,12 +772,12 @@ export const Capacity = defineComponent({
     "The first metric's value becomes the donut percentage. " +
     "Choose over Gauge when you want the fill ring + supporting detail together. " +
     "Choose Gauge for a standalone single metric.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; series?: z.infer<typeof SeriesSchema>[] }>) => {
-    if (!props.metrics?.length) return <Surface title={props.title ?? "Capacity"} state={props.state}><NoData label="No capacity data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; series?: z.infer<typeof SeriesSchema>[] } & SurfaceExtras>) => {
+    if (!props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Capacity"} state={props.state}><NoData label="No capacity data" /></Surface>;
     const used = Number(props.metrics[0].value);
-    if (!Number.isFinite(used)) return <Surface title={props.title ?? "Capacity"} state={props.state}><NoData label="No capacity data" /></Surface>;
+    if (!Number.isFinite(used)) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Capacity"} state={props.state}><NoData label="No capacity data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Capacity"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Capacity"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-capacity">
           <div style={{ background: `conic-gradient(var(--cnv-series-1) 0 ${used}%, #2b2f3a ${used}%)` }}>
             <strong>{used}%</strong>
@@ -749,6 +810,9 @@ export const Capacity = defineComponent({
 export const SecurityPosture = defineComponent({
   name: "SecurityPosture",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -760,10 +824,10 @@ export const SecurityPosture = defineComponent({
     "Items shown as a grid of status cells with state-colored indicators. " +
     "Each Item: {id, label, subtitle?, state}. " +
     "Use VisualTable for flat security event lists.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; metrics?: z.infer<typeof MetricSchema>[] }>) => {
-    if (!props.items?.length && !props.metrics?.length) return <Surface title={props.title ?? "Security"} state={props.state}><NoData label="No security data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; metrics?: z.infer<typeof MetricSchema>[] } & SurfaceExtras>) => {
+    if (!props.items?.length && !props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Security"} state={props.state}><NoData label="No security data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Security Posture"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Security Posture"} subtitle={props.subtitle} state={props.state}>
         {props.metrics && props.metrics.length > 0 && (
           <div className="cnv-metrics">
             {props.metrics.slice(0, 6).map((m, i) => (
@@ -788,6 +852,9 @@ export const SecurityPosture = defineComponent({
 export const MarkdownReader = defineComponent({
   name: "MarkdownReader",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -799,11 +866,11 @@ export const MarkdownReader = defineComponent({
     "The markdown prop is rendered as headings, paragraphs, and code blocks. " +
     "items[] optionally populates the backlinks sidebar. " +
     "Use Callout for short alert text, not full documents.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; markdown: string; items?: z.infer<typeof ItemSchema>[] }>) => {
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; markdown: string; items?: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
     const md = props.markdown || "## No content\nNo markdown provided.";
     const lines = md.split("\n");
     return (
-      <Surface title={props.title ?? "Document"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Document"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-knowledge-reader">
           <aside>
             <strong>On this page</strong>
@@ -833,6 +900,9 @@ export const MarkdownReader = defineComponent({
 export const KnowledgeGraph = defineComponent({
   name: "KnowledgeGraph",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -843,10 +913,10 @@ export const KnowledgeGraph = defineComponent({
     "Wiki/knowledge graph showing connected notes and concepts with relationships. " +
     "Same shape as NodeGraph but styled for knowledge bases with larger text labels. " +
     "Use Backlinks for a simple list of linking notes.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] }>) => {
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Knowledge Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] } & SurfaceExtras>) => {
+    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Knowledge Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Knowledge Graph"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Knowledge Graph"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-knowledge-graph">
           <svg className="cnv-network" viewBox="0 0 800 430" role="img">
             {props.edges.map((e, i) => {
@@ -872,6 +942,9 @@ export const KnowledgeGraph = defineComponent({
 export const Backlinks = defineComponent({
   name: "Backlinks",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -881,10 +954,10 @@ export const Backlinks = defineComponent({
     "List of notes/documents that link to the current topic, with context. " +
     "Each Item: {id, label, subtitle? (context), meta: {evidence?: number}}. " +
     "Use KnowledgeGraph for a visual graph view.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Backlinks"} state={props.state}><NoData label="No backlinks" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Backlinks"} state={props.state}><NoData label="No backlinks" /></Surface>;
     return (
-      <Surface title={props.title ?? "Backlinks"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Backlinks"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-backlinks">
           {props.items.slice(0, 8).map((i) => (
             <article key={i.id}>
@@ -904,6 +977,9 @@ export const Backlinks = defineComponent({
 export const DetailPanel = defineComponent({
   name: "DetailPanel",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -914,10 +990,10 @@ export const DetailPanel = defineComponent({
     "Single-entity detail view showing labeled key-value pairs (one device, one container, one service). " +
     "Metrics render as label/value rows. summary renders as a callout paragraph. " +
     "Use MetricStrip for dashboard KPI rows. Use DetailPanel when drilling into one entity.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; summary?: string }>) => {
-    if (!props.metrics?.length && !props.summary) return <Surface title={props.title ?? "Details"} state={props.state}><NoData label="No detail data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; summary?: string } & SurfaceExtras>) => {
+    if (!props.metrics?.length && !props.summary) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Details"} state={props.state}><NoData label="No detail data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
         {props.summary && (
           <div className="cnv-callout"><p>{props.summary}</p></div>
         )}
@@ -938,6 +1014,9 @@ export const DetailPanel = defineComponent({
 export const Callout = defineComponent({
   name: "Callout",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     state: VisualStateSchema.optional(),
     summary: z.string(),
@@ -947,9 +1026,9 @@ export const Callout = defineComponent({
     "Alert / attention callout for warnings, status summaries, or important notes. " +
     "summary is the main text. state colors the border (warning=amber, critical=red). " +
     "Use MarkdownReader for full documents. Use MetricStrip for data without narrative.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; state?: string; summary: string; metrics?: z.infer<typeof MetricSchema>[] }>) => {
+  component: ({ props }: ComponentRenderProps<{ title?: string; state?: string; summary: string; metrics?: z.infer<typeof MetricSchema>[] } & SurfaceExtras>) => {
     return (
-      <Surface title={props.title ?? "Notice"} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Notice"} state={props.state}>
         <div className="cnv-callout">
           <strong>{props.summary}</strong>
           {props.metrics && props.metrics.length > 0 && (
@@ -970,6 +1049,9 @@ export const Callout = defineComponent({
 export const EmptyState = defineComponent({
   name: "EmptyState",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     state: VisualStateSchema.optional(),
     summary: z.string(),
@@ -978,9 +1060,9 @@ export const EmptyState = defineComponent({
     "Explicit empty / placeholder state with a message. " +
     "Use when a query returned no results or a feature is not configured. " +
     "Do NOT use to hide missing data — use it to communicate absence honestly.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; state?: string; summary: string }>) => {
+  component: ({ props }: ComponentRenderProps<{ title?: string; state?: string; summary: string } & SurfaceExtras>) => {
     return (
-      <Surface title={props.title ?? "Empty"} state={props.state ?? "empty"}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Empty"} state={props.state ?? "empty"}>
         <div className="cnv-state"><strong>{props.summary}</strong></div>
       </Surface>
     );
@@ -992,6 +1074,9 @@ export const EmptyState = defineComponent({
 export const RoomBoard = defineComponent({
   name: "RoomBoard",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -1001,11 +1086,11 @@ export const RoomBoard = defineComponent({
     "Physical topology / room-based layout (home automation devices by room, rack layout). " +
     "Items grouped by item.group (room name or rack position). " +
     "Use Kanban for workflow/task boards. Use NodeGraph for logical network topology.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] }>) => {
-    if (!props.items?.length) return <Surface title={props.title ?? "Topology"} state={props.state}><NoData label="No topology data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
+    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Topology"} state={props.state}><NoData label="No topology data" /></Surface>;
     const groups = [...new Set(props.items.map((i) => i.group || "Default"))];
     return (
-      <Surface title={props.title ?? "Topology"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Topology"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-board">
           {groups.map((g) => (
             <section key={g}>
@@ -1026,6 +1111,9 @@ export const RoomBoard = defineComponent({
 export const Flow = defineComponent({
   name: "Flow",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -1036,10 +1124,10 @@ export const Flow = defineComponent({
     "Nodes rendered left-to-right with connecting arrows. Only the label and value of each node is shown. " +
     "Use Sankey when the magnitude of flow between nodes matters. " +
     "Use NodeGraph for non-sequential / branching topology.",
-  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[] }>) => {
-    if (!props.nodes?.length) return <Surface title={props.title ?? "Flow"} state={props.state}><NoData label="No flow data" /></Surface>;
+  component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[] } & SurfaceExtras>) => {
+    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} state={props.state}><NoData label="No flow data" /></Surface>;
     return (
-      <Surface title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-flow">
           {props.nodes.slice(0, 8).map((n, i) => (
             <React.Fragment key={n.id}>
@@ -1061,6 +1149,9 @@ export const Flow = defineComponent({
 export const FilterDropdown = defineComponent({
   name: "FilterDropdown",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     name: z.string(),
     label: z.string().optional(),
     value: reactive(z.string().optional()),
@@ -1099,6 +1190,9 @@ export const FilterDropdown = defineComponent({
 export const Section = defineComponent({
   name: "Section",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     subtitle: z.string().optional(),
     state: VisualStateSchema.optional(),
@@ -1121,10 +1215,56 @@ export const Section = defineComponent({
     "MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall. " +
     "Do NOT nest Section, Kanban, or Stack inside a Section.",
   component: ({ props, renderNode }) => (
-    <Surface title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
+    <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
       <div className="cnv-section">{renderNode(props.children)}</div>
     </Surface>
   ),
+});
+
+// ── DashboardGrid — 12-column responsive grid ───────────────────────────────
+// Stack is flex and cannot express "this panel is 8 of 12 columns wide".
+// This is CSS Grid: each child's own `span` prop sets its width and `rowSpan`
+// its height, so the grid itself stays dumb and children keep control.
+export const DashboardGrid = defineComponent({
+  name: "DashboardGrid",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
+    children: z.array(z.union([
+      MetricStrip.ref, Gauge.ref, Donut.ref, LineChart.ref, MultiLine.ref,
+      BarRank.ref, Timeline.ref, EventStream.ref, LogStream.ref, NodeGraph.ref,
+      Sankey.ref, Kanban.ref, VisualTable.ref, ArtworkWall.ref,
+      PlaybackSessions.ref, Capacity.ref, SecurityPosture.ref, DetailPanel.ref,
+      Callout.ref, EmptyState.ref, RoomBoard.ref, Flow.ref, Section.ref,
+    ])),
+  }),
+  description:
+    "12-column responsive grid for multi-panel dashboard layouts. " +
+    "Set each CHILD panel's span (1-12) for its width and rowSpan (1-3) for its height — " +
+    "span 6 is half width, span 4 a third, span 12 full width. " +
+    "Prefer this over Stack whenever panels need specific widths. " +
+    "Use Stack for simple vertical stacking, Section for a titled group of panels.",
+  component: ({ props, renderNode }) => {
+    const grid = <div className="cnv-grid">{renderNode(props.children)}</div>;
+    // Only wrap in a Surface when there is a heading — a bare grid shouldn't
+    // gain a panel border it didn't ask for.
+    if (!props.title && !props.subtitle) return grid;
+    return (
+      <Surface
+        title={props.title ?? "Dashboard"}
+        subtitle={props.subtitle}
+        state={props.state}
+        surfaceStyle={props.surfaceStyle}
+        gridSpan={{ span: props.span, rowSpan: props.rowSpan }}
+      >
+        {grid}
+      </Surface>
+    );
+  },
 });
 
 const allComponents = [
@@ -1133,7 +1273,7 @@ const allComponents = [
   Kanban, VisualTable, ArtworkWall, PlaybackSessions,
   Capacity, SecurityPosture, MarkdownReader, KnowledgeGraph,
   Backlinks, DetailPanel, Callout, EmptyState, RoomBoard, Flow,
-  FilterDropdown, Section,
+  FilterDropdown, Section, DashboardGrid,
 ];
 
 export const homelabComponents = allComponents;

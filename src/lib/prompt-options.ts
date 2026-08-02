@@ -16,7 +16,8 @@ export const promptOptions: PromptOptions = {
     "Interactivity — filters: use FilterDropdown to let the user narrow results. Set name to a $variable (e.g. \"range\"), then reference that $variable in the Query() args of the panels it controls. Selecting an option re-fetches those queries automatically — no extra wiring.",
     "Interactivity — drill-down: rows in VisualTable, cards in Kanban, items in ArtworkWall, and nodes in NodeGraph are clickable. Clicking sends a follow-up message (e.g. \"Show details for X\"); respond with a DetailPanel for that entity. Do not pre-render detail views the user hasn't requested.",
     "Interactivity — nesting: Section groups child panels under a title. Its children are a tight union of display components (MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall) — do not nest Section, Kanban, or Stack inside a Section.",
-    "Use Stack for vertical composition; for multi-column layouts use Stack with direction \"row\" and wrap set to true. There is no separate Grid component.",
+    "Layout: use DashboardGrid for multi-panel dashboards where widths matter — set each CHILD's span (1-12) for width and rowSpan (1-3) for height. span 6 is half width, 4 a third, 12 full. Use Stack for simple vertical stacking, and Section for a titled group of panels.",
+    "Visual style: every panel accepts an optional surfaceStyle object with closed enums — translucency (none|subtle|medium|strong), blur (none|sm|md|lg, the frosted-glass effect), background (solid|gradient|accent), elevation (none|sm|md|lg), glow (none|state|accent). glow \"state\" ties the glow color to the panel's health, so a critical panel glows red. Use these sparingly for emphasis; a dashboard where every panel glows reads as noise. There is no raw CSS — these enums are the only styling available.",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
   ],
   toolExamples: [
@@ -60,6 +61,18 @@ poolData = Query("synology-dsm", {view: "pools"}, {state: "healthy", items: []},
 rightCol = Section("Media", null, null, [mediaStrip])
 mediaStrip = MetricStrip(mediaData)
 mediaData = Query("emby", {}, {state: "healthy", metrics: []}, 60)`,
+    `Example — Glass dashboard on a 12-column grid:
+
+root = DashboardGrid("Fleet", "Live status", null, null, null, null, [cpu, disk, events])
+cpu = Gauge(cpuData)
+cpuData = Query("prometheus", {}, {title: "CPU", value: 0, max: 100, thresholds: {warning: 70, critical: 90}}, 30)
+disk = Gauge(diskData)
+diskData = Query("synology-dsm", {}, {title: "Disk", value: 0, max: 100, thresholds: {warning: 75, critical: 90}}, 60)
+events = EventStream(alertData)
+alertData = Query("wazuh-manager", {}, {state: "healthy", events: []}, 30)
+
+Set span on each child: cpu and disk at span 3 sit side by side, events at span 6 fills the rest.
+Add surfaceStyle {blur: "md", translucency: "medium", glow: "state"} to a panel that should stand out.`,
     `Example — AI model activity:
 
 root = Stack([header, cards])
