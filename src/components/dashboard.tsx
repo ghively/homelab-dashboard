@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/visual-states";
 import { Surface, Metrics } from "@/visual/components";
+import { Glass } from "@/components/canvasui/Glass";
+import { GlyphRain } from "@/components/canvasui/GlyphRain";
+import { useEffectGate } from "@/components/canvasui/Effect";
 import type { VisualStateValue } from "@/adapters/types";
 
 // ── Dashboard Shell ──────────────────────────────────────────
@@ -132,7 +135,9 @@ interface HeroProps {
 }
 
 export function Hero({ title, subtitle, metrics, accent }: HeroProps) {
-  return (
+  const rain = useEffectGate(true);
+
+  const inner = (
     // Phase 5's visual language (glass, gradient, elevation, glow) was only
     // ever applied to the GENERATED components. The app shell kept its original
     // flat styling, so the dashboard you actually navigate looked pre-redesign.
@@ -156,6 +161,30 @@ export function Hero({ title, subtitle, metrics, accent }: HeroProps) {
         </div>
       )}
     </header>
+  );
+
+  if (!rain) return inner;
+
+  // Density and glow are deliberately low: this sits behind the headline and
+  // the ask box, and the point is atmosphere, not a wall of falling glyphs.
+  // Katakana plus hex digits reads as the terminal language the rest of the
+  // system speaks.
+  return (
+    <GlyphRain
+      className="dash-hero-rain"
+      charset="0123456789ABCDEFｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ"
+      cell={13}
+      color={[0, 0.62, 0.42]}
+      headColor={[0.1, 1, 0.55]}
+      speed={0.14}
+      density={0.055}
+      glow={1.15}
+      trail={0.86}
+      stir={0.35}
+      dim={0.72}
+    >
+      {inner}
+    </GlyphRain>
   );
 }
 
@@ -268,19 +297,30 @@ export function VisualPanel({
   children,
 }: VisualPanelProps) {
   const isFixture = source === "fixture";
-  return (
+  const glass = useEffectGate();
+
+  const panel = (
     <Surface
       title={title}
       {...(subtitle ? { subtitle } : {})}
       state={state}
-      surfaceStyle={{
-        // Matches the glass card Gene picked: ~0.5 alpha, real blur, and enough
-        // elevation to lift off the ambient ground.
-        translucency: "medium",
-        blur: "md",
-        elevation: "md",
-        ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
-      }}
+      surfaceStyle={
+        glass
+          ? // Real refraction is doing the work, so the CSS translucency and
+            // blur come off — stacking both muddies the result and costs a
+            // backdrop-filter pass for nothing. Elevation and the state glow
+            // stay, since Glass does not provide them.
+            {
+              elevation: "md",
+              ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
+            }
+          : {
+              translucency: "medium",
+              blur: "md",
+              elevation: "md",
+              ...(NEEDS_ATTENTION.includes(String(state)) ? { glow: "state" as const } : {}),
+            }
+      }
       {...(isFixture ? { className: "is-fixture" } : {})}
       badge={
         isFixture ? (
@@ -296,8 +336,24 @@ export function VisualPanel({
       {children}
     </Surface>
   );
-}
 
+  if (!glass) return panel;
+
+  return (
+    <Glass
+      className="cnv-glass-host"
+      ior={1.28}
+      blur={0.4}
+      edge={0.5}
+      bevel={0.35}
+      aberration={0.22}
+      shine={0.35}
+      reflection={0.28}
+    >
+      {panel}
+    </Glass>
+  );
+}
 
 // ── Metric Strip ─────────────────────────────────────────────
 
