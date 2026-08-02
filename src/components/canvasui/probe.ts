@@ -95,15 +95,25 @@ function runProbe(): Promise<ProbeResult> {
     host.setAttribute("aria-hidden", "true");
     host.style.cssText =
       "position:fixed;left:-9999px;top:0;width:16px;height:16px;" +
-      "pointer-events:none;contain:strict;";
-
-    const swatch = document.createElement("div");
-    swatch.style.cssText = `width:${SIZE}px;height:${SIZE}px;background:rgb(${R},${G},${B});`;
-    host.appendChild(swatch);
+      "pointer-events:none;";
 
     const canvas = document.createElement("canvas") as PaintableCanvas;
     canvas.width = SIZE;
     canvas.height = SIZE;
+    // `layoutsubtree` is what opts the canvas's fallback content into being laid
+    // out and painted instead of ignored. Without it there is nothing to draw.
+    canvas.setAttribute("layoutsubtree", "true");
+
+    // The swatch must be an IMMEDIATE CHILD of the canvas. Chrome 150 rejects
+    // anything else with "Only immediate children of the <canvas> element can
+    // be passed to DrawElementImage" — the first version of this probe made the
+    // swatch a sibling and so reported every browser as unable to rasterise,
+    // which denied the gate across the entire dashboard. The probe has to build
+    // the same DOM shape the components build, or it tests nothing they do.
+    const swatch = document.createElement("div");
+    swatch.style.cssText = `width:${SIZE}px;height:${SIZE}px;background:rgb(${R},${G},${B});`;
+    canvas.appendChild(swatch);
+
     host.appendChild(canvas);
     document.body.appendChild(host);
 

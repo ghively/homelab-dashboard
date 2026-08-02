@@ -83,9 +83,7 @@ function Cell({ name, note, children }: { name: string; note: string; children: 
 function GateDiagnostics() {
   const gated = useEffectGate(true);
   const [probe, setProbe] = useState<ProbeResult | null>(null);
-  const [env, setEnv] = useState<{
-    reduced: boolean; api: boolean; ua: string; slots: ReturnType<typeof budgetState>;
-  } | null>(null);
+  const [env, setEnv] = useState<{ reduced: boolean; api: boolean; ua: string } | null>(null);
   const [failures, setFailures] = useState<Array<{ component: string; message: string }>>([]);
 
   useEffect(() => {
@@ -99,7 +97,6 @@ function GateDiagnostics() {
         reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         api: hasHtmlInCanvasApi(),
         ua: (navigator.userAgent.match(/Chrome\/[\d.]+/) ?? ["not Chrome"])[0],
-        slots: budgetState(),
       });
     });
     void probeHtmlInCanvas().then((r) => {
@@ -154,11 +151,19 @@ function GateDiagnostics() {
         env.reduced ? "bad" : "good",
       )}
       {row("Dashboard gate grants", gated ? "YES" : "NO", gated ? "good" : "bad")}
-      {env && row(
-        "WebGL slots in use",
-        `${env.slots.used} + ${env.slots.reservedUsed} reserved of ${env.slots.max}`,
-        "flat",
-      )}
+      {env && (() => {
+        // Read at render rather than snapshotted into state: these are plain
+        // module counters with no browser API behind them, and a stored copy is
+        // both stale and — across a Fast Refresh that preserves the old object
+        // shape — a crash waiting to happen. This panel exists to explain
+        // breakage, so it must not be able to break.
+        const b = budgetState();
+        return row(
+          "WebGL slots in use",
+          `${b.used} + ${b.reservedUsed} reserved of ${b.max}`,
+          "flat",
+        );
+      })()}
 
       {failures.length > 0 && (
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-neutral)" }}>
