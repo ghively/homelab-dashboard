@@ -1,22 +1,32 @@
 // OmniRoute adapter — providers, routes, circuit breakers, costs.
 // Host: gh-arm (192.168.0.156 or Tailscale 100.65.126.126)
-// API: Dashboard API (exact endpoint TBD from docs)
+//
+// NOT IMPLEMENTED. OmniRoute's dashboard API is undocumented — the original
+// module carried "exact endpoint TBD from docs" and returned a hardcoded
+// provider list, which the dashboard would have rendered as live data.
+//
+// Rather than guess at endpoints, query() reports an explicit unimplemented
+// state. Phase 0's rule is that a panel must never show a fabricated number;
+// an honest "no data" is the correct behaviour until the API is known.
+//
+// To implement: replace query() with real fetches and register it in
+// src/lib/adapter-runtime.ts gated on OMNIROUTE_URL.
 
 import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { Item, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, VisualQueryResult } from "../types";
 
-// Mock OmniRoute data structure.
-interface OmniRouteModel {
-  id: string;
-  name: string;
-  provider: string;
-  route: string;
-  state: "healthy" | "degraded" | "offline";
-  latencyMs: number;
-  costPerToken: number;
-  tokensPerMin: number;
+const OMNIROUTE_URL = process.env.OMNIROUTE_URL || "";
+
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "omniroute",
+    source: OMNIROUTE_URL || "unconfigured",
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
+  };
 }
 
 class OmniRouteAdapter implements DataAdapter {
@@ -24,26 +34,8 @@ class OmniRouteAdapter implements DataAdapter {
   readonly description = "Model routing and circuit breaker provider.";
   readonly category = "ai" as const;
 
-  async health() {
-    const start = Date.now();
-    try {
-      // TODO: Real health check via OmniRoute Dashboard API.
-      return {
-        adapter: this.name,
-        source: "omniroute-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
-    } catch (err) {
-      return {
-        adapter: this.name,
-        source: "omniroute-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
-    }
+  async health(): Promise<FreshnessInfo> {
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -52,63 +44,15 @@ class OmniRouteAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
-    const start = Date.now();
-
-    try {
-      // TODO: Fetch from OmniRoute Dashboard API.
-      // Mock data for now.
-      const models: OmniRouteModel[] = [
-        { id: "gpt-5.2", name: "GPT-5.2", provider: "zai", route: "zai-glm-5.2", state: "healthy", latencyMs: 120, costPerToken: 0.000002, tokensPerMin: 50000 },
-        { id: "claude-3.7", name: "Claude 3.7", provider: "anthropic", route: "anthropic-claude-3.7", state: "healthy", latencyMs: 180, costPerToken: 0.000003, tokensPerMin: 40000 },
-        { id: "llama-3.3-70b", name: "Llama 3.3 70B", provider: "ollama", route: "ollama-llama-3.3-70b", state: "degraded", latencyMs: 450, costPerToken: 0, tokensPerMin: 8000 },
-        { id: "qwen-2.5", name: "Qwen 2.5", provider: "zai", route: "zai-qwen-2.5", state: "healthy", latencyMs: 95, costPerToken: 0.000001, tokensPerMin: 60000 },
-      ];
-
-      const items: Item[] = models.map((m) => ({
-        id: m.id,
-        label: m.name,
-        subtitle: `${m.provider} via ${m.route}`,
-        state: m.state === "healthy" ? "healthy" : m.state === "degraded" ? "warning" : "critical",
-        meta: { provider: m.provider, route: m.route, latencyMs: m.latencyMs, costPerToken: m.costPerToken, tokensPerMin: m.tokensPerMin },
-      }));
-
-      const metrics: Metric[] = [
-        { label: "Total Routes", value: models.length, state: "healthy" },
-        { label: "Healthy Routes", value: models.filter((m) => m.state === "healthy").length, state: "healthy" },
-        { label: "Degraded Routes", value: models.filter((m) => m.state === "degraded").length, state: "warning" },
-        { label: "Avg Latency", value: Math.round(models.reduce((a, b) => a + b.latencyMs, 0) / models.length), unit: "ms", state: models.some((m) => m.latencyMs > 300) ? "warning" : "healthy" },
-      ];
-
-      return {
-        title: "OmniRoute — Model Routing",
-        subtitle: "Circuit breakers, provider routes, and token costs",
-        state: "healthy",
-        freshness: {
-          adapter: this.name,
-          source: "omniroute-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics,
-        items,
-      };
-    } catch (err) {
-      return {
-        title: "OmniRoute — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical",
-        freshness: {
-          adapter: this.name,
-          source: "omniroute-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
-      };
-    }
+    return {
+      title: "OmniRoute",
+      subtitle: "Adapter not implemented — dashboard API undocumented",
+      state: "empty",
+      freshness: makeFreshness(),
+      metrics: [{ label: "Status", value: "NOT IMPLEMENTED", state: "empty" }],
+      summary:
+        "No client exists for OmniRoute yet. Showing no data rather than placeholder values.",
+    };
   }
 }
 

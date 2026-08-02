@@ -238,7 +238,7 @@ export interface AdapterConfig {
   refreshIntervalMs: number;
   timeoutMs: number;
   retryAttempts: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -248,7 +248,7 @@ export interface AdapterResult {
   adapter: string;
   success: boolean;
   timestamp: string;
-  data: any;
+  data: unknown;
   error?: string;
   state: AdapterState;
   latencyMs: number;

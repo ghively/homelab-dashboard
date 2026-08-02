@@ -49,55 +49,54 @@ class WazuhDashboardAdapter implements DataAdapter {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
+      // /api/status is the OpenSearch Dashboards status document: overall state
+      // plus per-plugin states. It carries no security telemetry, so this panel
+      // reports service health only.
+      //
+      // The previous version fetched this endpoint, discarded the response, and
+      // returned an invented "Security Score" of 87, "Active Threats: 2",
+      // "CVEs Detected (30d): 15", three fabricated events naming a specific
+      // CVE, and a five-point score trend. None of it came from Wazuh.
+      // Alert and CVE counts belong to the Indexer — see wazuh-indexer.
+      const status = (await res.json()) as {
+        status?: {
+          overall?: { state?: string; title?: string };
+          statuses?: Array<{ id?: string; state?: string; message?: string }>;
+        };
+        version?: { number?: string };
+      };
+
+      const overall = status.status?.overall?.state ?? "unknown";
+      const plugins = status.status?.statuses ?? [];
+      const degraded = plugins.filter((p) => p.state && p.state !== "green");
+
+      const state =
+        overall === "green" ? "healthy" : overall === "unknown" ? "empty" : "warning";
+
       return {
-        title: "Wazuh Dashboard — Security Intelligence",
-        subtitle: "Threat detection and compliance monitoring",
-        state: "warning",
+        title: "Wazuh Dashboard — Service Status",
+        subtitle: status.version?.number
+          ? `OpenSearch Dashboards ${status.version.number}`
+          : "OpenSearch Dashboards",
+        state,
         freshness: makeFreshness(WAZUH_DASHBOARD_URL),
         metrics: [
-          { label: "Security Score", value: 87, state: "healthy" },
-          { label: "Compliance Status", value: "98%", state: "healthy" },
-          { label: "Active Threats", value: 2, state: "warning" },
-          { label: "Threat Intel Feeds", value: 12, state: "healthy" },
-          { label: "Failed Compliance Checks", value: 3, state: "warning" },
-          { label: "CVEs Detected (30d)", value: 15, state: "warning" },
-        ],
-        events: [
+          { label: "Overall", value: overall.toUpperCase(), state },
+          { label: "Plugins", value: plugins.length, state: "healthy" },
           {
-            id: "evt-001",
-            at: new Date(Date.now() - 600_000).toISOString(),
-            title: "New CVE detected",
-            detail: "CVE-2024-38156 (high severity) detected on gh-arm",
-            state: "warning",
-          },
-          {
-            id: "evt-002",
-            at: new Date(Date.now() - 7_200_000).toISOString(),
-            title: "Compliance check failed",
-            detail: "SSH configuration not compliant with CIS benchmark",
-            state: "warning",
-          },
-          {
-            id: "evt-003",
-            at: new Date(Date.now() - 86_400_000).toISOString(),
-            title: "Threat intelligence updated",
-            detail: "12 feeds updated, 0 new threats detected",
-            state: "healthy",
+            label: "Degraded",
+            value: degraded.length,
+            state: degraded.length > 0 ? "warning" : "healthy",
           },
         ],
-        series: [
-          {
-            name: "Security Score Trend",
-            unit: "score",
-            points: [
-              { x: "Mon", y: 82 },
-              { x: "Tue", y: 84 },
-              { x: "Wed", y: 85 },
-              { x: "Thu", y: 87 },
-              { x: "Fri", y: 87 },
-            ],
-          },
-        ],
+        items: degraded.map((p, i) => ({
+          id: p.id ?? `plugin-${i}`,
+          label: p.id ?? "unknown plugin",
+          subtitle: p.message ?? p.state ?? "",
+          state: "warning" as const,
+          group: "degraded",
+        })),
+        summary: status.status?.overall?.title ?? `Dashboard status: ${overall}`,
       };
     } catch {
       return {

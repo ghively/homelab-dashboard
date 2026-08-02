@@ -1,19 +1,25 @@
-// Hermes Gateway adapter — sessions, model routes, tool invocations.
-// Host: gh-ai (192.168.0.50 or Tailscale 100.92.162.32)
-// API: HTTP/OTel: sessions, model routes, tool invocations, error rate
+// Hermes gateway adapter — service reachability probe.
+//
+// Hermes exposes no documented metrics API, so this adapter reports only what
+// it can actually observe: whether the configured endpoint answers, the HTTP
+// status it returns, and how long it took. Every value below is measured.
+//
+// The previous version returned a hardcoded inventory (session counts, tool
+// invocation totals, error rates) that the dashboard rendered as live data.
+// If a real metrics endpoint is added later, widen query() then — do not
+// reintroduce placeholder numbers.
 
 import type { DataAdapter } from "../adapter-base";
-import type { Event, FreshnessInfo, Item, Metric, Series, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 
-const HERMES_GATEWAY_URL =
-  process.env.HERMES_GATEWAY_URL || "http://gh-ai:3000";
+const HERMES_GATEWAY_URL = process.env.HERMES_GATEWAY_URL || "";
 
-function makeFreshness(source: string): FreshnessInfo {
+function makeFreshness(): FreshnessInfo {
   return {
     adapter: "hermes-gateway",
-    source,
+    source: HERMES_GATEWAY_URL || "unconfigured",
     queriedAt: new Date().toISOString(),
     stalenessSeconds: 0,
     cacheHit: false,
@@ -22,18 +28,18 @@ function makeFreshness(source: string): FreshnessInfo {
 
 class HermesGatewayAdapter implements DataAdapter {
   readonly name = "hermes-gateway";
-  readonly description = "Hermes Gateway — session routing and tool invocation metrics.";
+  readonly description = "Hermes gateway — service reachability.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    try {
-      await fetch(`${HERMES_GATEWAY_URL}/health`, {
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch {
-      // offline
+    if (HERMES_GATEWAY_URL) {
+      try {
+        await fetch(HERMES_GATEWAY_URL, { signal: AbortSignal.timeout(5000) });
+      } catch {
+        // Unreachable — freshness still records the endpoint queried.
+      }
     }
-    return makeFreshness(HERMES_GATEWAY_URL);
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -42,66 +48,44 @@ class HermesGatewayAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
-    const start = Date.now();
+    if (!HERMES_GATEWAY_URL) {
+      return {
+        title: "Hermes gateway",
+        subtitle: "Endpoint not configured",
+        state: "empty",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
+        summary: "Set HERMES_GATEWAY_URL to probe this service.",
+      };
+    }
 
+    const start = Date.now();
     try {
-      // TODO: Fetch from Hermes Gateway API + OTel metrics:
-      // - Session count, active sessions
-      // - Model routes (zai-glm-5.2, anthropic-claude-3.7)
-      // - Tool invocation counts by tool
-      // - Error rate, latency percentiles
+      const res = await fetch(HERMES_GATEWAY_URL, { signal: AbortSignal.timeout(8000) });
+      const latency = Date.now() - start;
+      const ok = res.ok;
 
       const metrics: Metric[] = [
-        { label: "Active Sessions", value: 7, state: "healthy" },
-        { label: "Total Sessions (24h)", value: 142, state: "healthy" },
-        { label: "Tool Invocations (24h)", value: 2847, state: "healthy" },
-        { label: "Error Rate", value: 0.8, unit: "%", state: "healthy" },
-        { label: "P95 Latency", value: 1200, unit: "ms", state: "healthy" },
-      ];
-
-      const items: Item[] = [
-        { id: "glm-5.2", label: "zai-glm-5.2", subtitle: "glm-4.5-air primary", value: 52, state: "healthy", meta: { provider: "zai", model: "glm-4.5-air" } },
-        { id: "claude-3.7", label: "anthropic-claude-3.7", subtitle: "Claude 3.7 Sonnet", value: 35, state: "healthy", meta: { provider: "anthropic", model: "claude-3.7-sonnet" } },
-        { id: "llama-3.3", label: "ollama-llama-3.3-70b", subtitle: "Local fallback", value: 13, state: "warning", meta: { provider: "ollama", model: "llama-3.3-70b" } },
-      ];
-
-      const events: Event[] = [
-        { id: "evt-1", at: new Date(Date.now() - 60_000).toISOString(), title: "High latency alert", detail: "P95 latency >2s on zai route", state: "warning", durationMs: 30_000 },
-        { id: "evt-2", at: new Date(Date.now() - 300_000).toISOString(), title: "Circuit breaker triggered", detail: "anthropic rate limit", state: "warning", durationMs: 15_000 },
-      ];
-
-      const series: Series[] = [
-        {
-          name: "Request Rate (req/s)",
-          unit: "req/s",
-          points: [
-            { x: now, y: 12 },
-            { x: new Date(Date.now() - 300_000).toISOString(), y: 10 },
-            { x: new Date(Date.now() - 600_000).toISOString(), y: 14 },
-            { x: new Date(Date.now() - 900_000).toISOString(), y: 11 },
-            { x: new Date(Date.now() - 1_200_000).toISOString(), y: 9 },
-          ],
-        },
+        { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
+        { label: "HTTP", value: res.status, state: ok ? "healthy" : "warning" },
+        { label: "Latency", value: latency, unit: "ms", state: latency > 2000 ? "warning" : "healthy" },
       ];
 
       return {
-        title: "Hermes Gateway — Session Routing",
-        subtitle: "Model distribution and tool invocation metrics",
-        state: "healthy",
-        freshness: makeFreshness(HERMES_GATEWAY_URL),
+        title: "Hermes gateway",
+        subtitle: HERMES_GATEWAY_URL,
+        state: ok ? "healthy" : "warning",
+        freshness: makeFreshness(),
         metrics,
-        items,
-        events,
-        series,
+        summary: `Responded ${res.status} in ${latency}ms`,
       };
-    } catch (err) {
+    } catch {
       return {
-        title: "Hermes Gateway — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical",
-        freshness: makeFreshness(HERMES_GATEWAY_URL),
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
+        title: "Hermes gateway",
+        subtitle: "Endpoint unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

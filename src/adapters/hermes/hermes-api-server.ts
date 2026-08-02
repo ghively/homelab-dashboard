@@ -1,40 +1,45 @@
-// Hermes API Server adapter — OpenAI API: /v1/models, request rate, token throughput.
-// Host: gh-ai (192.168.0.50 or Tailscale 100.92.162.32)
-// API: OpenAI-compatible API endpoints
+// Hermes API server adapter — service reachability probe.
+//
+// Hermes exposes no documented metrics API, so this adapter reports only what
+// it can actually observe: whether the configured endpoint answers, the HTTP
+// status it returns, and how long it took. Every value below is measured.
+//
+// The previous version returned a hardcoded inventory (session counts, tool
+// invocation totals, error rates) that the dashboard rendered as live data.
+// If a real metrics endpoint is added later, widen query() then — do not
+// reintroduce placeholder numbers.
 
 import type { DataAdapter } from "../adapter-base";
-import type { FreshnessInfo, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { Item, Metric, Series } from "../types";
+
+const HERMES_API_SERVER_URL = process.env.HERMES_API_SERVER_URL || "";
+
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "hermes-api-server",
+    source: HERMES_API_SERVER_URL || "unconfigured",
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
+  };
+}
 
 class HermesAPIServerAdapter implements DataAdapter {
   readonly name = "hermes-api-server";
-  readonly description = "Hermes API Server — OpenAI-compatible API with rate and token metrics.";
+  readonly description = "Hermes API server — service reachability.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
-    try {
-      // TODO: Real health check: GET http://gh-ai:4000/health
-      const now = new Date().toISOString();
-      return {
-        adapter: this.name,
-        source: "hermes-api",
-        queriedAt: now,
-        stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-        cacheHit: false,
-      };
-    } catch (err) {
-      const now = new Date().toISOString();
-      return {
-        adapter: this.name,
-        source: "hermes-api",
-        queriedAt: now,
-        stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-        cacheHit: false,
-      };
+    if (HERMES_API_SERVER_URL) {
+      try {
+        await fetch(HERMES_API_SERVER_URL, { signal: AbortSignal.timeout(5000) });
+      } catch {
+        // Unreachable — freshness still records the endpoint queried.
+      }
     }
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -43,90 +48,44 @@ class HermesAPIServerAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
+    if (!HERMES_API_SERVER_URL) {
+      return {
+        title: "Hermes API server",
+        subtitle: "Endpoint not configured",
+        state: "empty",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
+        summary: "Set HERMES_API_SERVER_URL to probe this service.",
+      };
+    }
+
     const start = Date.now();
     try {
-      // Mock data — replace with real API calls to Hermes
-      const models = [
-        { id: "gpt-4o-mini", name: "GPT-4o Mini", context: 128000 },
-        { id: "gpt-4.1-turbo", name: "GPT-4.1 Turbo", context: 128000 },
-        { id: "glm-4.5-air", name: "GLM-4.5 Air", context: 128000 },
-        { id: "deepseek-v3", name: "DeepSeek V3", context: 64000 },
-      ];
-
-      const series: Series[] = [
-        {
-          name: "requests",
-          unit: "req/s",
-          points: [
-            { x: "00:00", y: 12 },
-            { x: "00:01", y: 15 },
-            { x: "00:02", y: 18 },
-            { x: "00:03", y: 14 },
-            { x: "00:04", y: 16 },
-            { x: "00:05", y: 19 },
-            { x: "00:06", y: 17 },
-          ],
-        },
-        {
-          name: "tokens",
-          unit: "tok/s",
-          points: [
-            { x: "00:00", y: 2400 },
-            { x: "00:01", y: 3200 },
-            { x: "00:02", y: 3800 },
-            { x: "00:03", y: 2800 },
-            { x: "00:04", y: 3400 },
-            { x: "00:05", y: 4100 },
-            { x: "00:06", y: 3600 },
-          ],
-        },
-      ];
+      const res = await fetch(HERMES_API_SERVER_URL, { signal: AbortSignal.timeout(8000) });
+      const latency = Date.now() - start;
+      const ok = res.ok;
 
       const metrics: Metric[] = [
-        { label: "Requests/sec", value: 17, state: "healthy", trend: 0.1 },
-        { label: "Tokens/sec", value: 3300, state: "healthy", trend: 0.15 },
-        { label: "Avg Latency", value: "850ms", unit: "ms", state: "healthy", trend: -0.05 },
-        { label: "Uptime", value: "99.7%", unit: "%", state: "healthy" },
-        { label: "Models", value: models.length, state: "healthy" },
+        { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
+        { label: "HTTP", value: res.status, state: ok ? "healthy" : "warning" },
+        { label: "Latency", value: latency, unit: "ms", state: latency > 2000 ? "warning" : "healthy" },
       ];
 
-      const items: Item[] = models.map((m) => ({
-        id: m.id,
-        label: m.name,
-        subtitle: `${(m.context / 1000).toFixed(0)}K context`,
-        value: "Active",
-        state: "healthy",
-      }));
-
       return {
-        title: "Hermes API Server",
-        subtitle: "OpenAI-compatible inference API",
-        state: "healthy",
-        freshness: {
-          adapter: this.name,
-          source: "hermes-api",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
+        title: "Hermes API server",
+        subtitle: HERMES_API_SERVER_URL,
+        state: ok ? "healthy" : "warning",
+        freshness: makeFreshness(),
         metrics,
-        items,
-        series,
+        summary: `Responded ${res.status} in ${latency}ms`,
       };
-    } catch (error) {
+    } catch {
       return {
-        title: "Hermes API Server",
-        subtitle: error instanceof Error ? error.message : "Unknown error",
-        state: "critical",
-        freshness: {
-          adapter: this.name,
-          source: "hermes-api",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
+        title: "Hermes API server",
+        subtitle: "Endpoint unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

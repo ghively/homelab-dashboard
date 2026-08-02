@@ -1148,14 +1148,20 @@ export const Flow = defineComponent({
 // writes back to the store, which re-evaluates every Query() referencing it.
 export const FilterDropdown = defineComponent({
   name: "FilterDropdown",
+  // Content props come FIRST here, unlike the panel components.
+  // FilterDropdown is a control, not a surface, and every prompt example calls
+  // it as FilterDropdown(name, label, $var, options). With surfaceStyle/span/
+  // rowSpan leading, those four positional args landed on the wrong props and
+  // the control silently failed to render at all. Keep this order in sync with
+  // src/visual/schemas.ts.
   props: z.object({
-    surfaceStyle: SurfaceStyleSchema.optional(),
-    span: SpanSchema,
-    rowSpan: RowSpanSchema,
     name: z.string(),
     label: z.string().optional(),
     value: reactive(z.string().optional()),
     options: z.array(z.object({ value: z.string(), label: z.string() })),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
   }),
   description:
     "Interactive dropdown filter. name is the $variable to bind — reference it as $<name> in a Query()'s args. " +

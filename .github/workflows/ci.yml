@@ -16,9 +16,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The prompt library and the renderer library must declare identical props
+      # in identical order — OpenUI maps generated positional args by declaration
+      # order, so drift makes panels render blank with no error anywhere. This
+      # runs before the build because it is fast and the failure is specific.
+      - run: npm run check:parity
       # next.config.ts no longer sets ignoreBuildErrors, so this type-checks
       # for real. A type error fails the build.
       - run: npm run build
+      # The 30k system-prompt budget is a hard gate; adding components can blow it.
+      - run: npx tsx scripts/measure-prompt.ts
 
   lint:
     name: lint
@@ -30,7 +37,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # The repo carries pre-existing lint errors; --max-warnings is not set
-      # and eslint is not yet clean, so this is reported without failing the
-      # build. Tighten once the backlog is cleared.
-      - run: npm run lint || true
+      # The error backlog is cleared, so lint now FAILS the build. 68 warnings
+      # remain (mostly unused vars in legacy adapters); they are not gating yet.
+      # Do not reintroduce `|| true` to make a red build green — fix the error.
+      - run: npm run lint

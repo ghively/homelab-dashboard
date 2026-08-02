@@ -54,49 +54,46 @@ class WazuhManagerAdapter implements DataAdapter {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const raw = (await res.json()) as {
-        data?: { affected?: number; total?: number; active?: number };
+        data?: {
+          affected?: number;
+          total?: number;
+          active?: number;
+          disconnected?: number;
+          never_connected?: number;
+          pending?: number;
+        };
       };
       const active = raw.data?.active ?? 0;
       const total = raw.data?.total ?? 0;
+      const disconnected = raw.data?.disconnected ?? 0;
+      const neverConnected = raw.data?.never_connected ?? 0;
+      const pending = raw.data?.pending ?? 0;
 
+      // Only values the API actually returned. The previous version padded this
+      // out with invented alert counts and three fabricated security events
+      // (a named brute-force source IP, an /etc/passwd modification). Inventing
+      // security findings is worse than showing none — do not reintroduce them.
+      // Alerts live in the Indexer, not this endpoint; see wazuh-indexer.
       return {
-        title: "Wazuh Manager — Security Overview",
-        subtitle: "Intrusion detection and agent monitoring",
-        state: "healthy",
+        title: "Wazuh Manager — Agent Status",
+        subtitle: "Intrusion detection agent monitoring",
+        state: disconnected > 0 ? "warning" : "healthy",
         freshness: makeFreshness(WAZUH_MANAGER_URL),
         metrics: [
           { label: "Active Agents", value: active, state: "healthy" },
           { label: "Total Agents", value: total, state: "healthy" },
-          { label: "Security Alerts (24h)", value: 847, state: "healthy" },
-          { label: "Critical Alerts (24h)", value: 3, state: "warning" },
-          { label: "Integrity Events (24h)", value: 23, state: "healthy" },
+          {
+            label: "Disconnected",
+            value: disconnected,
+            state: disconnected > 0 ? "warning" : "healthy",
+          },
+          { label: "Never Connected", value: neverConnected, state: "healthy" },
+          { label: "Pending", value: pending, state: "healthy" },
         ],
-        events: [
-          {
-            id: "evt-001",
-            at: new Date(Date.now() - 300_000).toISOString(),
-            title: "SSH brute force attempt detected",
-            detail: "Multiple failed login attempts from 185.220.101.1",
-            state: "warning",
-          },
-          {
-            id: "evt-002",
-            at: new Date(Date.now() - 1_800_000).toISOString(),
-            title: "File integrity change",
-            detail: "/etc/passwd modified on gh-arm",
-            state: "critical",
-          },
-          {
-            id: "evt-003",
-            at: new Date(Date.now() - 3_600_000).toISOString(),
-            title: "Agent reconnected",
-            detail: "Agent 001 (gh-storage) back online after 15m outage",
-            state: "healthy",
-          },
-        ],
+        summary: `${active} of ${total} agents active`,
       };
     } catch {
-      // Fallback with mock data + offline state
+      // Unreachable — report offline. No cached or placeholder values.
       return {
         title: "Wazuh Manager — Security Overview",
         subtitle: "API unreachable — showing cached data",

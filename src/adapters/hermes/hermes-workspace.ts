@@ -1,25 +1,45 @@
-// Hermes Workspace adapter — active tasks, artifact inventory, storage.
-// Host: gh-ai (192.168.0.50 or Tailscale 100.92.162.32)
-// API: Internal API: active tasks, artifact inventory, storage
+// Hermes workspace adapter — service reachability probe.
+//
+// Hermes exposes no documented metrics API, so this adapter reports only what
+// it can actually observe: whether the configured endpoint answers, the HTTP
+// status it returns, and how long it took. Every value below is measured.
+//
+// The previous version returned a hardcoded inventory (session counts, tool
+// invocation totals, error rates) that the dashboard rendered as live data.
+// If a real metrics endpoint is added later, widen query() then — do not
+// reintroduce placeholder numbers.
 
 import type { DataAdapter } from "../adapter-base";
+import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+
+const HERMES_WORKSPACE_URL = process.env.HERMES_WORKSPACE_URL || "";
+
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "hermes-workspace",
+    source: HERMES_WORKSPACE_URL || "unconfigured",
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
+  };
+}
 
 class HermesWorkspaceAdapter implements DataAdapter {
   readonly name = "hermes-workspace";
-  readonly description = "Hermes Workspace — active tasks and artifact inventory.";
+  readonly description = "Hermes workspace — service reachability.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
-    try {
-      // TODO: Real health check: internal workspace API health
-      return { adapter: this.name, source: this.name, queriedAt: new Date().toISOString(), stalenessSeconds: 0, cacheHit: false };
-    } catch {
-      return { adapter: this.name, source: this.name, queriedAt: new Date().toISOString(), stalenessSeconds: Math.round((Date.now() - start) / 1000), cacheHit: false };
+    if (HERMES_WORKSPACE_URL) {
+      try {
+        await fetch(HERMES_WORKSPACE_URL, { signal: AbortSignal.timeout(5000) });
+      } catch {
+        // Unreachable — freshness still records the endpoint queried.
+      }
     }
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -28,59 +48,44 @@ class HermesWorkspaceAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const start = Date.now();
+    if (!HERMES_WORKSPACE_URL) {
+      return {
+        title: "Hermes workspace",
+        subtitle: "Endpoint not configured",
+        state: "empty",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
+        summary: "Set HERMES_WORKSPACE_URL to probe this service.",
+      };
+    }
 
+    const start = Date.now();
     try {
-      // TODO: Fetch from Hermes Workspace API:
-      // - Active tasks by status
-      // - Artifact inventory by type
-      // - Storage usage per workspace
-      // - Recent task events
+      const res = await fetch(HERMES_WORKSPACE_URL, { signal: AbortSignal.timeout(8000) });
+      const latency = Date.now() - start;
+      const ok = res.ok;
 
       const metrics: Metric[] = [
-        { label: "Active Tasks", value: 8, state: "healthy" },
-        { label: "Blocked Tasks", value: 2, state: "warning" },
-        { label: "Artifacts (24h)", value: 124, state: "healthy" },
-        { label: "Storage Used", value: 2.3, unit: "GB", state: "healthy" },
-        { label: "Workspaces", value: 5, state: "healthy" },
-      ];
-
-      const items: Item[] = [
-        { id: "t_b68aa39e", label: "Phase 6: AI & Agent Adapters", subtitle: "builder · running", state: "warning", group: "running", meta: { assignee: "builder", priority: 85, created_at: "2026-07-29" } },
-        { id: "t_8ec67ef1", label: "Phase 1: OpenUI Dashboard Scaffold", subtitle: "builder · done", state: "healthy", group: "done", meta: { assignee: "builder", priority: 95, completed_at: "2026-07-29" } },
-        { id: "t_37022ed1", label: "Phase 11: Dashboard Composition", subtitle: "builder · todo", state: "empty", group: "todo", meta: { assignee: "builder", priority: 99, blocked_by: ["Phase 2-10"] } },
-        { id: "t_56833a87", label: "Agent Vault Phase 5", subtitle: "builder · done", state: "healthy", group: "done", meta: { assignee: "builder", priority: 70, completed_at: "2026-07-28" } },
+        { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
+        { label: "HTTP", value: res.status, state: ok ? "healthy" : "warning" },
+        { label: "Latency", value: latency, unit: "ms", state: latency > 2000 ? "warning" : "healthy" },
       ];
 
       return {
-        title: "Hermes Workspace — Active Tasks",
-        subtitle: "Task queue and artifact inventory",
-        state: "healthy",
+        title: "Hermes workspace",
+        subtitle: HERMES_WORKSPACE_URL,
+        state: ok ? "healthy" : "warning",
+        freshness: makeFreshness(),
         metrics,
-        items,
-        source: "live",
-        freshness: {
-          adapter: this.name,
-          source: this.name,
-          queriedAt: new Date(start).toISOString(),
-          stalenessSeconds: 0,
-          cacheHit: false,
-        },
+        summary: `Responded ${res.status} in ${latency}ms`,
       };
-    } catch (err) {
+    } catch {
       return {
-        title: "Hermes Workspace — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical",
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
-        source: "live",
-        freshness: {
-          adapter: this.name,
-          source: this.name,
-          queriedAt: new Date(start).toISOString(),
-          stalenessSeconds: 0,
-          cacheHit: false,
-        },
+        title: "Hermes workspace",
+        subtitle: "Endpoint unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

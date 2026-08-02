@@ -32,7 +32,7 @@ export class SpoolmanAdapter extends BaseAdapter {
     this.apiKey = config.apiKey;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     try {
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -51,7 +51,7 @@ export class SpoolmanAdapter extends BaseAdapter {
       }
 
       const spools: SpoolResponse[] = spoolsResponse.ok ? await spoolsResponse.json() : [];
-      const vendors: any[] = vendorResponse.ok ? await vendorResponse.json() : [];
+      const vendors: unknown[] = vendorResponse.ok ? await vendorResponse.json() : [];
 
       const activeSpools = spools.filter((s) => s.remaining_weight > 0 && s.location);
       const usedUp = spools.filter((s) => s.remaining_weight <= 5);

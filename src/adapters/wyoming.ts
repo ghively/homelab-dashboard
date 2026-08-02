@@ -31,7 +31,7 @@ export class WyomingAdapter extends BaseAdapter {
     this.instanceCount = this.hosts.length;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     const results: Array<{
       id: number;
       host: string;
@@ -82,11 +82,12 @@ export class WyomingAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { connectedInstances?: number; healthy?: unknown; totalInstances?: number };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
-    if (data.connectedInstances === 0) return "critical";
-    if (data.connectedInstances < data.totalInstances) return "warning";
+    if (!d.healthy) return "critical";
+    if (d.connectedInstances === 0) return "critical";
+    if ((d.connectedInstances ?? 0) < (d.totalInstances ?? 0)) return "warning";
     return "healthy";
   }
 

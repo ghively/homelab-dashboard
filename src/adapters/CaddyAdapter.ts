@@ -18,7 +18,7 @@ export class CaddyAdapter extends BaseAdapter {
     this.baseUrl = `http://${config.host}:${config.adminPort || 2019}`;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     try {
       const [versionResponse, configResponse, metricsResponse] = await Promise.all([
         fetch(`${this.baseUrl}/version`),
@@ -34,12 +34,17 @@ export class CaddyAdapter extends BaseAdapter {
       const config = configResponse.ok ? await configResponse.json() : {};
       const metrics = metricsResponse.ok ? await metricsResponse.json() : {};
 
-      const servers: any[] = [];
+      const servers: Array<Record<string, unknown>> = [];
       if (config.apps && config.apps.http) {
         const serversMap = config.apps.http.servers || {};
         const serverKeys = Object.keys(serversMap);
         for (const serverName of serverKeys) {
-          const serverData = serversMap[serverName] as any;
+          const serverData = serversMap[serverName] as {
+            listen?: unknown[];
+            protocols?: unknown[];
+            routes?: unknown[];
+            tls_connection_policies?: unknown[];
+          };
           servers.push({
             name: serverName,
             listen: serverData.listen || [],

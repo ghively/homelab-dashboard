@@ -25,7 +25,7 @@ export class MQTTAdapter extends BaseAdapter {
     this.password = options.password;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.client || !this.client.connected) {
       throw new Error("MQTT client not connected");
     }
@@ -39,9 +39,10 @@ export class MQTTAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { connected?: unknown };
     if (!data) return "offline";
-    if (!data.connected) return "critical";
+    if (!d.connected) return "critical";
     return "healthy";
   }
 

@@ -1,23 +1,24 @@
-// Ollama adapter — models, loaded, GPU memory, queue.
+// Ollama adapter — models, loaded models, VRAM footprint.
 // Host: gh-nvidia (192.168.0.10 or Tailscale)
-// API: /api/tags, /api/ps, /api/show, inference metrics
+// API: GET /api/tags (installed models), GET /api/ps (currently loaded)
 
 import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
-import type { Item, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://gh-nvidia:11434";
 
 interface OllamaModel {
   name: string;
   modified_at: string;
   size: number;
   digest: string;
-  details: {
-    format: string;
-    family: string;
-    families: string[];
-    parameter_size: string;
-    quantization_level: string;
+  details?: {
+    format?: string;
+    family?: string;
+    parameter_size?: string;
+    quantization_level?: string;
   };
 }
 
@@ -25,8 +26,24 @@ interface OllamaRunning {
   name: string;
   model: string;
   size: number;
-  digest: string;
-  expires_at: string;
+  size_vram?: number;
+  expires_at?: string;
+}
+
+function makeFreshness(): FreshnessInfo {
+  return {
+    adapter: "ollama",
+    source: OLLAMA_URL,
+    queriedAt: new Date().toISOString(),
+    stalenessSeconds: 0,
+    cacheHit: false,
+  };
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${bytes} B`;
 }
 
 class OllamaAdapter implements DataAdapter {
@@ -34,26 +51,13 @@ class OllamaAdapter implements DataAdapter {
   readonly description = "Local model inference on gh-nvidia with GPU.";
   readonly category = "ai" as const;
 
-  async health() {
-    const start = Date.now();
+  async health(): Promise<FreshnessInfo> {
     try {
-      // TODO: Real health check: GET http://gh-nvidia:11434/api/tags
-      return {
-        adapter: this.name,
-        source: "ollama-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
-    } catch (err) {
-      return {
-        adapter: this.name,
-        source: "ollama-mock",
-        queriedAt: new Date().toISOString(),
-        stalenessSeconds: 0,
-        cacheHit: false,
-      };
+      await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    } catch {
+      // Unreachable — the freshness stamp still records the endpoint queried.
     }
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -62,74 +66,69 @@ class OllamaAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
-    const now = new Date().toISOString();
-    const start = Date.now();
-
     try {
-      // TODO: Fetch from Ollama API:
-      // - GET http://gh-nvidia:11434/api/tags (available models)
-      // - GET http://gh-nvidia:11434/api/ps (running models, memory)
-      // - GET http://gh-nvidia:11434/api/show (model details)
-      // - GPU metrics from nvidia-smi
+      const [tagsRes, psRes] = await Promise.all([
+        fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${OLLAMA_URL}/api/ps`, { signal: AbortSignal.timeout(8000) }),
+      ]);
+      if (!tagsRes.ok) throw new Error(`HTTP ${tagsRes.status}`);
 
-      // Mock data for now.
-      const models: OllamaModel[] = [
-        { name: "llama3.3:70b", modified_at: now, size: 42400000000, digest: "abc123", details: { format: "gguf", family: "llama", families: ["llama"], parameter_size: "70B", quantization_level: "Q4_K_M" } },
-        { name: "llava:7b", modified_at: now, size: 4300000000, digest: "def456", details: { format: "gguf", family: "llava", families: ["llama", "clip"], parameter_size: "7B", quantization_level: "Q4_K_M" } },
-        { name: "qwen2.5:14b", modified_at: now, size: 9200000000, digest: "ghi789", details: { format: "gguf", family: "qwen2", families: ["qwen2"], parameter_size: "14B", quantization_level: "Q4_K_M" } },
-      ];
+      const tags = (await tagsRes.json()) as { models?: OllamaModel[] };
+      const models = tags.models ?? [];
 
-      const running: OllamaRunning[] = [
-        { name: "llama3.3:70b", model: "llama3.3:70b", size: 42400000000, digest: "abc123", expires_at: new Date(Date.now() + 300_000).toISOString() },
-      ];
+      // /api/ps is present on newer Ollama builds only; treat absence as "none loaded"
+      // rather than failing the whole query.
+      let running: OllamaRunning[] = [];
+      if (psRes.ok) {
+        const ps = (await psRes.json()) as { models?: OllamaRunning[] };
+        running = ps.models ?? [];
+      }
 
-      const items: Item[] = models.map((m) => {
-        const isRunning = running.some((r) => r.name === m.name);
-        return {
-          id: m.name,
-          label: m.name,
-          subtitle: `${m.details.family} ${m.details.parameter_size} ${m.details.quantization_level}`,
-          state: isRunning ? ("healthy" as const) : ("stale" as const),
-          value: (m.size / 1_000_000_000).toFixed(1),
-          meta: { format: m.details.format, family: m.details.families.join(", "), size: m.size },
-        };
-      });
+      const diskBytes = models.reduce((acc, m) => acc + (m.size || 0), 0);
+      const vramBytes = running.reduce((acc, m) => acc + (m.size_vram ?? m.size ?? 0), 0);
 
       const metrics: Metric[] = [
-        { label: "Available Models", value: models.length, state: "healthy" as const },
-        { label: "Running Models", value: running.length, state: running.length > 0 ? "healthy" as const : "empty" as const },
-        { label: "GPU Memory Used", value: "16.2", unit: "GB", state: "warning" as const },
-        { label: "GPU Utilization", value: 78, unit: "%", state: "healthy" as const },
-        { label: "VRAM Free", value: 9.8, unit: "GB", state: "healthy" as const },
+        { label: "Models", value: models.length, state: "healthy" },
+        { label: "Loaded", value: running.length, state: "healthy" },
+        { label: "Disk", value: formatBytes(diskBytes) },
+        { label: "VRAM In Use", value: formatBytes(vramBytes) },
+      ];
+
+      const items: Item[] = [
+        ...running.map((m) => ({
+          id: `loaded-${m.name}`,
+          label: m.name,
+          subtitle: `loaded • ${formatBytes(m.size_vram ?? m.size ?? 0)} VRAM`,
+          state: "healthy" as const,
+          group: "loaded",
+        })),
+        ...models.map((m) => ({
+          id: m.digest || m.name,
+          label: m.name,
+          subtitle: [m.details?.parameter_size, m.details?.quantization_level, formatBytes(m.size)]
+            .filter(Boolean)
+            .join(" • "),
+          state: "healthy" as const,
+          group: "installed",
+        })),
       ];
 
       return {
-        title: "Ollama — Local Models on gh-nvidia",
-        subtitle: "GPU-accelerated inference",
-        state: "healthy" as const,
-        freshness: {
-          adapter: this.name,
-          source: "ollama-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
+        title: "Ollama — Local Inference",
+        subtitle: `${models.length} models • ${running.length} loaded`,
+        state: models.length > 0 ? "healthy" : "warning",
+        freshness: makeFreshness(),
         metrics,
         items,
+        summary: `${running.length} of ${models.length} models resident in VRAM`,
       };
-    } catch (err) {
+    } catch {
       return {
-        title: "Ollama — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical" as const,
-        freshness: {
-          adapter: this.name,
-          source: "ollama-mock",
-          queriedAt: now,
-          stalenessSeconds: Math.floor((Date.now() - start) / 1000),
-          cacheHit: false,
-        },
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" as const }],
+        title: "Ollama — Local Inference",
+        subtitle: "API unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

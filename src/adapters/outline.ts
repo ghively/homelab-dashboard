@@ -18,7 +18,7 @@ export class OutlineAdapter extends BaseAdapter {
     this.apiKey = apiKey;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.apiKey) {
       throw new Error("OUTLINE_API_KEY not configured");
     }
@@ -68,10 +68,11 @@ export class OutlineAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { collections?: unknown; healthy?: unknown };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
-    if (data.collections === 0) return "warning";
+    if (!d.healthy) return "critical";
+    if (d.collections === 0) return "warning";
     return "healthy";
   }
 }

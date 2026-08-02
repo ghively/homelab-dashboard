@@ -1,19 +1,25 @@
-// Hermes MCP Bridge adapter — connected clients, tool invocations, latency.
-// Host: gh-ai (192.168.0.50 or Tailscale 100.92.162.32)
-// API: MCP protocol via stdio
+// Hermes MCP bridge adapter — service reachability probe.
+//
+// Hermes exposes no documented metrics API, so this adapter reports only what
+// it can actually observe: whether the configured endpoint answers, the HTTP
+// status it returns, and how long it took. Every value below is measured.
+//
+// The previous version returned a hardcoded inventory (session counts, tool
+// invocation totals, error rates) that the dashboard rendered as live data.
+// If a real metrics endpoint is added later, widen query() then — do not
+// reintroduce placeholder numbers.
 
 import type { DataAdapter } from "../adapter-base";
-import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 
-const HERMES_MCP_BRIDGE_URL =
-  process.env.HERMES_MCP_BRIDGE_URL || "http://gh-ai:3000";
+const HERMES_MCP_BRIDGE_URL = process.env.HERMES_MCP_BRIDGE_URL || "";
 
-function makeFreshness(source: string): FreshnessInfo {
+function makeFreshness(): FreshnessInfo {
   return {
     adapter: "hermes-mcp-bridge",
-    source,
+    source: HERMES_MCP_BRIDGE_URL || "unconfigured",
     queriedAt: new Date().toISOString(),
     stalenessSeconds: 0,
     cacheHit: false,
@@ -22,18 +28,18 @@ function makeFreshness(source: string): FreshnessInfo {
 
 class HermesMCPBridgeAdapter implements DataAdapter {
   readonly name = "hermes-mcp-bridge";
-  readonly description = "Hermes MCP Bridge — Model Context Protocol client connections.";
+  readonly description = "Hermes MCP bridge — service reachability.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    try {
-      await fetch(`${HERMES_MCP_BRIDGE_URL}/health`, {
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch {
-      // offline
+    if (HERMES_MCP_BRIDGE_URL) {
+      try {
+        await fetch(HERMES_MCP_BRIDGE_URL, { signal: AbortSignal.timeout(5000) });
+      } catch {
+        // Unreachable — freshness still records the endpoint queried.
+      }
     }
-    return makeFreshness(HERMES_MCP_BRIDGE_URL);
+    return makeFreshness();
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -42,43 +48,44 @@ class HermesMCPBridgeAdapter implements DataAdapter {
       return getFixtureForState(this.name, fixtureStateValue);
     }
 
+    if (!HERMES_MCP_BRIDGE_URL) {
+      return {
+        title: "Hermes MCP bridge",
+        subtitle: "Endpoint not configured",
+        state: "empty",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
+        summary: "Set HERMES_MCP_BRIDGE_URL to probe this service.",
+      };
+    }
+
+    const start = Date.now();
     try {
-      // TODO: Fetch from Hermes MCP Bridge:
-      // - Connected MCP servers
-      // - Tool counts per server
-      // - Invocation counts and latency
-      // - Connection health
+      const res = await fetch(HERMES_MCP_BRIDGE_URL, { signal: AbortSignal.timeout(8000) });
+      const latency = Date.now() - start;
+      const ok = res.ok;
 
       const metrics: Metric[] = [
-        { label: "Connected Servers", value: 13, state: "healthy" },
-        { label: "Total Tools", value: 342, state: "healthy" },
-        { label: "Invocations (24h)", value: 5820, state: "healthy" },
-        { label: "Avg Tool Latency", value: 85, unit: "ms", state: "healthy" },
-      ];
-
-      const items: Item[] = [
-        { id: "agent-vault", label: "agent-vault", subtitle: "Entity queries, doc search", value: 47, state: "healthy", meta: { tools: 12, invocations: 847, avg_latency_ms: 45 } },
-        { id: "pihole", label: "pihole", subtitle: "DNS sinkhole control", value: 23, state: "healthy", meta: { tools: 8, invocations: 312, avg_latency_ms: 120 } },
-        { id: "synology", label: "synology", subtitle: "NAS management", value: 18, state: "healthy", meta: { tools: 15, invocations: 245, avg_latency_ms: 95 } },
-        { id: "home-assistant", label: "home-assistant", subtitle: "Home automation", value: 31, state: "healthy", meta: { tools: 22, invocations: 634, avg_latency_ms: 65 } },
-        { id: "gitlab", label: "gitlab", subtitle: "GitLab CE management", value: 12, state: "healthy", meta: { tools: 10, invocations: 189, avg_latency_ms: 150 } },
+        { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
+        { label: "HTTP", value: res.status, state: ok ? "healthy" : "warning" },
+        { label: "Latency", value: latency, unit: "ms", state: latency > 2000 ? "warning" : "healthy" },
       ];
 
       return {
-        title: "Hermes MCP Bridge — Connected Clients",
-        subtitle: "MCP servers and tool invocation metrics",
-        state: "healthy",
-        freshness: makeFreshness(HERMES_MCP_BRIDGE_URL),
+        title: "Hermes MCP bridge",
+        subtitle: HERMES_MCP_BRIDGE_URL,
+        state: ok ? "healthy" : "warning",
+        freshness: makeFreshness(),
         metrics,
-        items,
+        summary: `Responded ${res.status} in ${latency}ms`,
       };
-    } catch (err) {
+    } catch {
       return {
-        title: "Hermes MCP Bridge — Error",
-        subtitle: err instanceof Error ? err.message : "Unknown error",
-        state: "critical",
-        freshness: makeFreshness(HERMES_MCP_BRIDGE_URL),
-        metrics: [{ label: "Status", value: "ERROR", state: "critical" }],
+        title: "Hermes MCP bridge",
+        subtitle: "Endpoint unreachable",
+        state: "offline",
+        freshness: makeFreshness(),
+        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }
   }

@@ -10,6 +10,11 @@
  */
 import { z } from "zod";
 import { defineComponent, tagSchemaId } from "@openuidev/lang-core";
+import {
+  SurfaceStyleSchema,
+  SpanSchema,
+  RowSpanSchema,
+} from "@/visual/components/surface-style";
 
 // ── Shared schemas (tagged so signatures stay short) ──────────
 
@@ -89,7 +94,23 @@ tagSchemaId(EdgeSchema, "Edge");
 // These use component:null — lang-core accepts this for prompt generation.
 // The client library (src/visual/components) re-defines them WITH renderers.
 
+/**
+ * Props every panel carries, in the SAME ORDER as the renderers in
+ * src/visual/components/index.tsx.
+ *
+ * Order is load-bearing. OpenUI maps generated positional arguments onto props
+ * by declaration order, so if this list and the renderer's disagree, every
+ * argument lands in the wrong prop. That is exactly what happened: these three
+ * were present on the renderers but missing here, so a model-generated
+ * `Callout("Disk full", "critical", "…")` was parsed as
+ * `surfaceStyle="Disk full", span="critical", rowSpan="…"` and the panel
+ * rendered blank. Keep this in sync — `.verify/parity` (see AGENTS.md) fails
+ * the build on drift.
+ */
 const baseFields = {
+  surfaceStyle: SurfaceStyleSchema.optional(),
+  span: SpanSchema,
+  rowSpan: RowSpanSchema,
   title: z.string().optional(),
   subtitle: z.string().optional(),
   state: VisualStateSchema.optional(),
@@ -109,10 +130,15 @@ export const MetricStripSchema = defineComponent({
 export const GaugeSchema = defineComponent({
   name: "Gauge",
   props: z.object({
-    ...baseFields,
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
     value: z.number(),
     max: z.number().optional(),
     unit: z.string().optional(),
+    state: VisualStateSchema.optional(),
     thresholds: z.object({ warning: z.number(), critical: z.number() }).optional(),
   }),
   description:
@@ -335,6 +361,9 @@ export const DetailPanelSchema = defineComponent({
 export const CalloutSchema = defineComponent({
   name: "Callout",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     state: VisualStateSchema.optional(),
     summary: z.string(),
@@ -350,6 +379,9 @@ export const CalloutSchema = defineComponent({
 export const EmptyStateSchema = defineComponent({
   name: "EmptyState",
   props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
     title: z.string().optional(),
     state: VisualStateSchema.optional(),
     summary: z.string(),
@@ -384,12 +416,74 @@ export const FlowSchema = defineComponent({
 
 // ── Exports ───────────────────────────────────────────────────
 
+
+// ── Interactive + layout components ───────────────────────────
+// These were missing from this file entirely, so the prompt never described
+// them and the model could not reliably emit them. FilterDropdown is the whole
+// of Phase 4's reactive filtering; DashboardGrid is Phase 5's 12-column layout.
+// Prop order matches the renderers exactly — see the baseFields note above.
+
+export const FilterDropdownSchema = defineComponent({
+  name: "FilterDropdown",
+  // Content props first — see the matching note in src/visual/components/index.tsx.
+  props: z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    value: z.string().optional(),
+    options: z.array(z.object({ value: z.string(), label: z.string() })),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
+  }),
+  description:
+    "Interactive dropdown filter. name is the $variable to bind — reference it as $<name> in a Query()'s args. " +
+    "When the user selects an option, every Query() referencing that $variable re-fetches automatically. " +
+    "value is the initial selection (optional). Each option: {value, label}. " +
+    "Place inside a Stack at the top of a dashboard to control the panels below.",
+  component: null as never,
+});
+
+export const SectionSchema = defineComponent({
+  name: "Section",
+  props: z.object({
+    ...baseFields,
+    children: z.array(z.any()),
+  }),
+  description:
+    "Grouping container that renders a title and a vertical stack of child panels. " +
+    "Use to organize a dashboard into named regions. children accepts a tight set of display components: " +
+    "MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall. " +
+    "Do NOT nest Section, Kanban, or Stack inside a Section.",
+  component: null as never,
+});
+
+export const DashboardGridSchema = defineComponent({
+  name: "DashboardGrid",
+  props: z.object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
+    children: z.array(z.any()),
+  }),
+  description:
+    "12-column responsive grid for multi-panel dashboard layouts. " +
+    "Set each CHILD panel's span (1-12) for its width and rowSpan (1-3) for its height — " +
+    "span 6 is half width, span 4 a third, span 12 full width. " +
+    "Prefer this over Stack whenever panels need specific widths. " +
+    "Use Stack for simple vertical stacking, Section for a titled group of panels.",
+  component: null as never,
+});
+
 export const homelabSchemaComponents = [
   MetricStripSchema, GaugeSchema, DonutSchema, LineChartSchema, MultiLineSchema, BarRankSchema,
   TimelineSchema, EventStreamSchema, LogStreamSchema, NodeGraphSchema, SankeySchema,
   KanbanSchema, VisualTableSchema, ArtworkWallSchema, PlaybackSessionsSchema,
   CapacitySchema, SecurityPostureSchema, MarkdownReaderSchema, KnowledgeGraphSchema,
   BacklinksSchema, DetailPanelSchema, CalloutSchema, EmptyStateSchema, RoomBoardSchema, FlowSchema,
+  FilterDropdownSchema, SectionSchema, DashboardGridSchema,
 ];
 
 export const homelabGroup = {

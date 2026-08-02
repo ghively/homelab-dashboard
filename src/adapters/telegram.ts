@@ -17,7 +17,7 @@ export class TelegramAdapter extends BaseAdapter {
     this.botToken = botToken;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     if (!this.botToken) {
       throw new Error("TELEGRAM_BOT_TOKEN not configured");
     }
@@ -67,17 +67,18 @@ export class TelegramAdapter extends BaseAdapter {
     };
   }
 
-  protected override deriveState(data: any): AdapterState {
+  protected override deriveState(data: unknown): AdapterState {
+    const d = (data ?? {}) as { healthy?: unknown; webhook?: { pendingUpdateCount?: number } };
     if (!data) return "offline";
-    if (!data.healthy) return "critical";
-    if (data.webhook.pendingUpdateCount > 100) return "warning";
+    if (!d.healthy) return "critical";
+    if ((d.webhook?.pendingUpdateCount ?? 0) > 100) return "warning";
     return "healthy";
   }
 
   /**
    * Start long polling for updates
    */
-  async startPolling(onUpdate?: (update: any) => void): Promise<void> {
+  async startPolling(onUpdate?: (update: unknown) => void): Promise<void> {
     if (this.pollingActive) {
       return;
     }
@@ -131,7 +132,7 @@ export class TelegramAdapter extends BaseAdapter {
   /**
    * Send a text message
    */
-  async sendMessage(chatId: number | string, text: string): Promise<any> {
+  async sendMessage(chatId: number | string, text: string): Promise<unknown> {
     const client = axios.create({
       baseURL: `https://api.telegram.org/bot${this.botToken}`,
       headers: { "Content-Type": "application/json" },

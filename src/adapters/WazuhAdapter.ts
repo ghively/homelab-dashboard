@@ -9,7 +9,7 @@ export interface WazuhConfig extends AdapterConfig {
 
 interface WazuhResponse {
   total_items: number;
-  items: any[];
+  items: unknown[];
 }
 
 export class WazuhAdapter extends BaseAdapter {
@@ -22,7 +22,7 @@ export class WazuhAdapter extends BaseAdapter {
     this.authHeader = `Basic ${btoa(`${config.username}:${config.password}`)}`;
   }
 
-  protected async fetchData(): Promise<any> {
+  protected async fetchData(): Promise<unknown> {
     const endpoints = [
       { name: "agents", path: "/agents/summary/status" },
       { name: "alerts", path: "/alerts/summary/agents" },
@@ -36,7 +36,7 @@ export class WazuhAdapter extends BaseAdapter {
         });
         if (!response.ok) throw new Error(`Wazuh ${name} failed: ${response.statusText}`);
         const data = await response.json() as WazuhResponse;
-        return { [name]: (data as any).data || data };
+        return { [name]: (data as { data?: unknown }).data || data };
       })
     );
 
@@ -47,6 +47,6 @@ export class WazuhAdapter extends BaseAdapter {
         acc[endpoints[i].name] = { error: result.reason.message, healthy: false };
       }
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, unknown>);
   }
 }
