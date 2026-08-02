@@ -394,9 +394,15 @@ function enrichFixture(
 //   3. Live adapter THROWS → return a minimal offline result, source: "live".
 //      NEVER silently fall back to a healthy fixture. A configured service that
 //      cannot be reached must show offline — this is the entire point of Phase 0.
+// `view` selects between the named queries an adapter exposes via the bridge
+// (e.g. emby "sessions" vs "library"). Omitted means the adapter's defaultQuery.
+// This must be threaded through: the model emits Query("emby", {view: "sessions"}),
+// and dropping it here would silently return the default view instead — the
+// wrong data, with no error.
 export async function queryAdapter(
   adapterName: string,
   state: VisualStateValue = "healthy",
+  view?: string,
 ): Promise<VisualQueryResult | null> {
   const entry = ADAPTER_INVENTORY.find((a) => a.name === adapterName);
   if (!entry) return null;
@@ -404,7 +410,7 @@ export async function queryAdapter(
   const liveAdapter = getAdapter(adapterName);
   if (liveAdapter) {
     try {
-      const result = await liveAdapter.query({});
+      const result = await liveAdapter.query(view ? { query: view } : {});
       return { ...result, source: "live" };
     } catch (err) {
       return {
