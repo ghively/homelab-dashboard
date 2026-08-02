@@ -181,7 +181,7 @@ function GateDiagnostics() {
 
       <div style={{ color: "var(--text-mute)", marginTop: 6 }}>
         {probe && !probe.ok && env?.api
-          ? "The flag is on but the browser will not rasterise. The dashboard now detects this and uses its CSS styling, so panels stay readable instead of going blank."
+          ? "The flag is on but the browser will not rasterise, so the effects run in their reduced mode. This no longer suppresses them — the gate requires WebGL2, not HTML-in-Canvas."
           : "The cells below mount the raw components. The dashboard mounts them through the gate above."}
       </div>
     </div>
@@ -225,16 +225,20 @@ export default function Lab() {
           }}
         >
           {supported === null && "Drawing a test element to see whether HTML-in-Canvas really works…"}
-          {supported === true && "HTML-in-Canvas RASTERISES here — verified by reading pixels back, not by feature detection. Every effect below is live."}
+          {supported === true && "HTML-in-Canvas RASTERISES here — verified by reading pixels back, not by feature detection. The effects below additionally refract the live content behind them."}
           {supported === false && (
             <>
-              <strong>HTML-in-Canvas did not produce pixels in this browser.</strong>
+              <strong>HTML-in-Canvas did not produce pixels — the effects still run.</strong>
               <br />
-              See the reason in the diagnostics below — it distinguishes &ldquo;the flag is
-              off&rdquo; from &ldquo;the flag is on but the draw fails&rdquo;, which look
-              identical from the outside and need opposite fixes. If the flag is off:
-              open <code>chrome://flags/#canvas-draw-element</code>, set it to Enabled, and relaunch.
-              Chrome or a Chromium browser only — Firefox and Safari have not implemented it.
+              This is the reduced mode, not a failure: the components pass the API&rsquo;s
+              availability to the shader as a uniform and have a full branch for its absence,
+              so they still render over the live DOM content. What is missing is content
+              refraction — the effect cannot bend the pixels behind it.
+              <br />
+              The reason below distinguishes &ldquo;the flag is off&rdquo; from &ldquo;the flag
+              is on but the draw fails&rdquo;, which look identical from outside and need
+              opposite fixes. If it is off: open <code>chrome://flags/#canvas-draw-element</code>,
+              set it to Enabled, and relaunch — Chromium browsers only.
             </>
           )}
         </div>
