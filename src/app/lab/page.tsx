@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Glass, supportsHtmlInCanvas } from "@/components/canvasui/Glass";
+import { Glass } from "@/components/canvasui/Glass";
 import { Frost } from "@/components/canvasui/Frost";
 import { Grid } from "@/components/canvasui/Grid";
 import { GlyphRain } from "@/components/canvasui/GlyphRain";
@@ -22,6 +22,12 @@ import { Liquid } from "@/components/canvasui/Liquid";
 import { DecryptReveal } from "@/components/canvasui/DecryptReveal";
 import { useEffectGate } from "@/components/canvasui/Effect";
 import { budgetState } from "@/components/canvasui/budget";
+import {
+  probeHtmlInCanvas,
+  hasHtmlInCanvasApi,
+  getDrawFailures,
+  type ProbeResult,
+} from "@/components/canvasui/probe";
 
 const PANEL: React.CSSProperties = {
   padding: "18px 20px",
@@ -64,50 +70,114 @@ function Cell({ name, note, children }: { name: string; note: string; children: 
 }
 
 /**
- * Why the main page might differ from this one.
+ * Why "the flag is on" and "the effects work" are different questions.
  *
- * The cells below mount Canvas UI directly. The dashboard instead goes through
- * useEffectGate, which additionally requires a free WebGL slot and
- * prefers-reduced-motion to be unset. If the effects render here but not there,
- * the gate is the difference — and this panel says which condition failed.
+ * Enabling chrome://flags/#canvas-draw-element exposes drawElementImage
+ * immediately. Every component checks only that the method EXISTS, then takes
+ * the WebGL path and wraps its draw in a catch that used to be empty — so a
+ * browser that exposes the API but cannot rasterise blanked the panels instead
+ * of falling back, and turning the flag ON made things look worse. This panel
+ * separates the two: whether the API is present, and whether it actually
+ * produced pixels when we drew a known colour through it.
  */
 function GateDiagnostics() {
   const gated = useEffectGate(true);
-  const [info, setInfo] = useState<{ reduced: boolean; budget: ReturnType<typeof budgetState> } | null>(null);
+  const [probe, setProbe] = useState<ProbeResult | null>(null);
+  const [env, setEnv] = useState<{
+    reduced: boolean; api: boolean; ua: string; slots: ReturnType<typeof budgetState>;
+  } | null>(null);
+  const [failures, setFailures] = useState<Array<{ component: string; message: string }>>([]);
 
   useEffect(() => {
     let alive = true;
+    // Deferred to a microtask: setting state synchronously in an effect body is
+    // what react-hooks flags as a cascading-render risk, and these reads touch
+    // browser APIs so they cannot happen during render either.
     void Promise.resolve().then(() => {
       if (!alive) return;
-      setInfo({
+      setEnv({
         reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-        budget: budgetState(),
+        api: hasHtmlInCanvasApi(),
+        ua: (navigator.userAgent.match(/Chrome\/[\d.]+/) ?? ["not Chrome"])[0],
+        slots: budgetState(),
       });
     });
-    return () => { alive = false; };
+    void probeHtmlInCanvas().then((r) => {
+      if (alive) setProbe(r);
+    });
+    // The components draw every frame, so give them a moment to fail before
+    // reporting. Anything they caught is a far better error message than
+    // anything this page could infer.
+    const t = window.setTimeout(() => {
+      if (alive) setFailures(getDrawFailures());
+    }, 1500);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
   }, []);
 
-  const row = (k: string, v: string, bad: boolean) => (
-    <div style={{ display: "flex", gap: 10 }}>
-      <span style={{ width: 190, color: "var(--text-dim)" }}>{k}</span>
-      <strong style={{ color: bad ? "var(--dot-red)" : "var(--neon-green)" }}>{v}</strong>
+  const row = (k: string, v: string, tone: "good" | "bad" | "flat") => (
+    <div key={k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+      <span style={{ width: 210, flexShrink: 0, color: "var(--text-dim)" }}>{k}</span>
+      <strong style={{
+        color: tone === "bad" ? "var(--dot-red)" : tone === "good" ? "var(--neon-green)" : "var(--dash-text)",
+      }}>{v}</strong>
     </div>
   );
 
   return (
     <div style={{
       border: "1px solid var(--border-neutral)", borderRadius: "var(--radius)",
-      padding: "12px 14px", background: "rgba(0,0,0,.35)", fontSize: ".78rem",
-      display: "flex", flexDirection: "column", gap: 5,
+      padding: "14px 16px", background: "rgba(0,0,0,.45)", fontSize: ".78rem",
+      display: "flex", flexDirection: "column", gap: 6, lineHeight: 1.5,
     }}>
       <div style={{ color: "var(--neon-cyan)", fontWeight: 600, marginBottom: 3 }}>
-        Gate diagnostics — this is what the dashboard uses
+        Diagnostics — API present vs. actually working
       </div>
-      {row("useEffectGate grants", gated ? "YES" : "NO", !gated)}
-      {info && row("prefers-reduced-motion", info.reduced ? "REDUCE (blocks effects)" : "no-preference", info.reduced)}
-      {info && row("slots used / max", `${info.budget.used} + ${info.budget.reservedUsed} reserved / ${info.budget.max}`, false)}
-      <div style={{ color: "var(--text-mute)", marginTop: 4 }}>
-        If the cells below animate but this says NO, the gate is why the dashboard looks unchanged.
+
+      {env && row("Browser", env.ua, "flat")}
+      {env && row("API exposed (flag on)", env.api ? "YES" : "NO", env.api ? "good" : "bad")}
+      {row(
+        "Pixels actually drawn",
+        probe === null ? "probing…" : probe.ok ? "YES" : `NO — ${probe.reason}`,
+        probe === null ? "flat" : probe.ok ? "good" : "bad",
+      )}
+      {probe && (
+        <div style={{ color: "var(--text-mute)", paddingLeft: 220, marginTop: -3 }}>
+          {probe.detail}
+        </div>
+      )}
+      {env && row(
+        "prefers-reduced-motion",
+        env.reduced ? "REDUCE — blocks effects" : "no-preference",
+        env.reduced ? "bad" : "good",
+      )}
+      {row("Dashboard gate grants", gated ? "YES" : "NO", gated ? "good" : "bad")}
+      {env && row(
+        "WebGL slots in use",
+        `${env.slots.used} + ${env.slots.reservedUsed} reserved of ${env.slots.max}`,
+        "flat",
+      )}
+
+      {failures.length > 0 && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-neutral)" }}>
+          <div style={{ color: "var(--dot-red)", fontWeight: 600, marginBottom: 4 }}>
+            Exceptions the components caught while drawing
+          </div>
+          {failures.map((f) => (
+            <div key={f.component} style={{ display: "flex", gap: 10 }}>
+              <span style={{ width: 210, flexShrink: 0, color: "var(--text-dim)" }}>{f.component}</span>
+              <code style={{ color: "var(--dot-red)" }}>{f.message}</code>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ color: "var(--text-mute)", marginTop: 6 }}>
+        {probe && !probe.ok && env?.api
+          ? "The flag is on but the browser will not rasterise. The dashboard now detects this and uses its CSS styling, so panels stay readable instead of going blank."
+          : "The cells below mount the raw components. The dashboard mounts them through the gate above."}
       </div>
     </div>
   );
@@ -117,13 +187,13 @@ export default function Lab() {
   const [supported, setSupported] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Deferred to a microtask rather than called straight in the effect body:
-    // setting state synchronously during an effect is what react-hooks flags as
-    // a cascading-render risk. The check itself touches browser APIs, so it
-    // cannot run during render either.
+    // The FUNCTIONAL probe, not `typeof drawElementImage === "function"`. The
+    // nominal check is what previously reported SUPPORTED on a browser where
+    // the draw then threw on every frame — the banner promised live effects
+    // while the panels rendered nothing.
     let alive = true;
-    void Promise.resolve().then(() => {
-      if (alive) setSupported(supportsHtmlInCanvas());
+    void probeHtmlInCanvas().then((r) => {
+      if (alive) setSupported(r.ok);
     });
     return () => {
       alive = false;
@@ -149,13 +219,15 @@ export default function Lab() {
             lineHeight: 1.6,
           }}
         >
-          {supported === null && "Checking HTML-in-Canvas support…"}
-          {supported === true && "HTML-in-Canvas is SUPPORTED — every effect below is live."}
+          {supported === null && "Drawing a test element to see whether HTML-in-Canvas really works…"}
+          {supported === true && "HTML-in-Canvas RASTERISES here — verified by reading pixels back, not by feature detection. Every effect below is live."}
           {supported === false && (
             <>
-              <strong>HTML-in-Canvas is NOT enabled in this browser.</strong>
+              <strong>HTML-in-Canvas did not produce pixels in this browser.</strong>
               <br />
-              Everything below renders as plain content with no effect. To turn it on:
+              See the reason in the diagnostics below — it distinguishes &ldquo;the flag is
+              off&rdquo; from &ldquo;the flag is on but the draw fails&rdquo;, which look
+              identical from the outside and need opposite fixes. If the flag is off:
               open <code>chrome://flags/#canvas-draw-element</code>, set it to Enabled, and relaunch.
               Chrome or a Chromium browser only — Firefox and Safari have not implemented it.
             </>

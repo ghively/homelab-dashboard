@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { recordDrawFailure } from "@/components/canvasui/probe";
 
 export interface GlassOptions {
   /** Lens shape. */
@@ -306,7 +307,13 @@ export function createGlass(
         sourceCtx!.drawElementImage!(content, 0, 0);
         contentDirty = true;
         wake();
-      } catch {}
+      } catch (err) {
+        // Was `catch {}`. Swallowing this is why enabling the Chrome
+        // flag blanked the panels instead of falling back: the draw
+        // threw every frame, contentDirty never flipped, and the
+        // shader sampled an empty texture.
+        recordDrawFailure("Glass", err);
+      }
     };
   }
 
