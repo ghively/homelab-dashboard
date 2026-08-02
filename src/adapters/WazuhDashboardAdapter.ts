@@ -5,6 +5,7 @@ import type { DataAdapter, HealthCheck } from "./adapter-base";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
 import type { Metric, VisualQueryResult } from "./types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_DASHBOARD_URL = process.env.WAZUH_DASHBOARD_URL || "https://wazuh.hively.dev";
 
@@ -17,7 +18,7 @@ class WazuhDashboardAdapter implements DataAdapter {
     const now = new Date().toISOString();
     try {
       const response = await fetch(`${WAZUH_DASHBOARD_URL}/api/status`, {
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
       if (response.ok) {
         return { adapter: this.name, source: "wazuh-dashboard", queriedAt: now, stalenessSeconds: 0, cacheHit: false, version: "online" };
@@ -37,7 +38,7 @@ class WazuhDashboardAdapter implements DataAdapter {
 
     try {
       const response = await fetch(`${WAZUH_DASHBOARD_URL}/api/status`, {
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
 
       if (!response.ok) {

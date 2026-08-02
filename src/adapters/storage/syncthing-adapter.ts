@@ -6,8 +6,9 @@ import type { DataAdapter } from "../adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
-const SYNECTHING_URL =
+const SYNCTHING_BASE_URL =
   process.env.SYNCTHING_URL || "http://100.88.40.87:8384";
 const SYNECTHING_API_KEY = process.env.SYNCTHING_API_KEY || "";
 
@@ -45,14 +46,14 @@ class SyncthingAdapter implements DataAdapter {
 
   async health(): Promise<FreshnessInfo> {
     try {
-      await fetch(`${SYNECTHING_URL}/rest/system/status`, {
+      await fetch(`${SYNCTHING_BASE_URL}/rest/system/status`, {
         headers: { "X-API-Key": SYNECTHING_API_KEY },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
     }
-    return makeFreshness(SYNECTHING_URL);
+    return makeFreshness(SYNCTHING_BASE_URL);
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -67,10 +68,10 @@ class SyncthingAdapter implements DataAdapter {
       // status document has no `version` field, so reading it there always
       // yielded "unknown". Confirmed against Syncthing v2.1.2.
       const [statusRes, connRes, configRes, versionRes] = await Promise.all([
-        fetch(`${SYNECTHING_URL}/rest/system/status`, { headers, signal: AbortSignal.timeout(8000) }),
-        fetch(`${SYNECTHING_URL}/rest/system/connections`, { headers, signal: AbortSignal.timeout(8000) }),
-        fetch(`${SYNECTHING_URL}/rest/config/folders`, { headers, signal: AbortSignal.timeout(8000) }),
-        fetch(`${SYNECTHING_URL}/rest/system/version`, { headers, signal: AbortSignal.timeout(8000) }),
+        fetch(`${SYNCTHING_BASE_URL}/rest/system/status`, { headers, signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
+        fetch(`${SYNCTHING_BASE_URL}/rest/system/connections`, { headers, signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
+        fetch(`${SYNCTHING_BASE_URL}/rest/config/folders`, { headers, signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
+        fetch(`${SYNCTHING_BASE_URL}/rest/system/version`, { headers, signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
       ]);
 
       if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
@@ -96,8 +97,8 @@ class SyncthingAdapter implements DataAdapter {
         configured.map(async (f): Promise<FolderStatus> => {
           try {
             const dbRes = await fetch(
-              `${SYNECTHING_URL}/rest/db/status?folder=${encodeURIComponent(f.id)}`,
-              { headers, signal: AbortSignal.timeout(8000) },
+              `${SYNCTHING_BASE_URL}/rest/db/status?folder=${encodeURIComponent(f.id)}`,
+              { headers, signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) },
             );
             if (!dbRes.ok) return { id: f.id, label: f.label || f.id };
             const db = (await dbRes.json()) as {
@@ -136,7 +137,7 @@ class SyncthingAdapter implements DataAdapter {
         title: "Syncthing — Continuous File Sync",
         subtitle: `${version ?? "unknown version"} • ${connectedCount} devices connected`,
         state: "healthy",
-        freshness: makeFreshness(SYNECTHING_URL),
+        freshness: makeFreshness(SYNCTHING_BASE_URL),
         metrics: [
           { label: "Version", value: version ?? "unknown" },
           { label: "Connected Devices", value: connectedCount, state: "healthy" },
@@ -160,7 +161,7 @@ class SyncthingAdapter implements DataAdapter {
         title: "Syncthing",
         subtitle: "API unreachable",
         state: "offline",
-        freshness: makeFreshness(SYNECTHING_URL),
+        freshness: makeFreshness(SYNCTHING_BASE_URL),
         metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
       };
     }

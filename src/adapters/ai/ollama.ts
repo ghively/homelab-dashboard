@@ -1,19 +1,33 @@
-// Ollama adapter — models, loaded models, VRAM footprint.
-// Host: gh-nvidia (192.168.0.10 or Tailscale)
-// API: GET /api/tags (installed models), GET /api/ps (currently loaded)
+// Ollama adapter — installed models, resident models, VRAM footprint.
+//
+// API: GET /api/tags (installed), GET /api/ps (currently loaded).
+//
+// Rewritten to go through adapter-http. The previous version used bare
+// AbortSignal.timeout and collapsed every failure into "API unreachable",
+// which hid the difference that matters: on this fleet Ollama IS running on
+// gh-nvidia (systemd unit active) but bound to 127.0.0.1:11434, so the
+// dashboard host gets ECONNREFUSED. "Connection refused — service not
+// listening" points at that; "unreachable" does not.
 
 import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+import {
+  ADAPTER_FANOUT_TIMEOUT_MS,
+  failureResult,
+  fetchJson,
+  makeFreshness,
+  notConfiguredResult,
+} from "@/lib/adapter-http";
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://gh-nvidia:11434";
+const OLLAMA_URL = process.env.OLLAMA_URL || "";
 
 interface OllamaModel {
   name: string;
-  modified_at: string;
-  size: number;
-  digest: string;
+  modified_at?: string;
+  size?: number;
+  digest?: string;
   details?: {
     format?: string;
     family?: string;
@@ -24,20 +38,10 @@ interface OllamaModel {
 
 interface OllamaRunning {
   name: string;
-  model: string;
-  size: number;
+  model?: string;
+  size?: number;
   size_vram?: number;
   expires_at?: string;
-}
-
-function makeFreshness(): FreshnessInfo {
-  return {
-    adapter: "ollama",
-    source: OLLAMA_URL,
-    queriedAt: new Date().toISOString(),
-    stalenessSeconds: 0,
-    cacheHit: false,
-  };
 }
 
 function formatBytes(bytes: number): string {
@@ -48,89 +52,79 @@ function formatBytes(bytes: number): string {
 
 class OllamaAdapter implements DataAdapter {
   readonly name = "ollama";
-  readonly description = "Local model inference on gh-nvidia with GPU.";
+  readonly description = "Ollama — local model inference.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    try {
-      await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(5000) });
-    } catch {
-      // Unreachable — the freshness stamp still records the endpoint queried.
-    }
-    return makeFreshness();
+    return makeFreshness(this.name, OLLAMA_URL || "unconfigured");
   }
 
   async query(): Promise<VisualQueryResult> {
     const fixtureStateValue = getFixtureState();
-    if (fixtureStateValue) {
-      return getFixtureForState(this.name, fixtureStateValue);
+    if (fixtureStateValue) return getFixtureForState(this.name, fixtureStateValue);
+
+    if (!OLLAMA_URL) {
+      return notConfiguredResult(this.name, "Ollama — Local Inference", "OLLAMA_URL");
     }
 
+    const base = OLLAMA_URL.replace(/\/$/, "");
+    const start = Date.now();
+
+    let models: OllamaModel[];
     try {
-      const [tagsRes, psRes] = await Promise.all([
-        fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(8000) }),
-        fetch(`${OLLAMA_URL}/api/ps`, { signal: AbortSignal.timeout(8000) }),
-      ]);
-      if (!tagsRes.ok) throw new Error(`HTTP ${tagsRes.status}`);
-
-      const tags = (await tagsRes.json()) as { models?: OllamaModel[] };
-      const models = tags.models ?? [];
-
-      // /api/ps is present on newer Ollama builds only; treat absence as "none loaded"
-      // rather than failing the whole query.
-      let running: OllamaRunning[] = [];
-      if (psRes.ok) {
-        const ps = (await psRes.json()) as { models?: OllamaRunning[] };
-        running = ps.models ?? [];
-      }
-
-      const diskBytes = models.reduce((acc, m) => acc + (m.size || 0), 0);
-      const vramBytes = running.reduce((acc, m) => acc + (m.size_vram ?? m.size ?? 0), 0);
-
-      const metrics: Metric[] = [
-        { label: "Models", value: models.length, state: "healthy" },
-        { label: "Loaded", value: running.length, state: "healthy" },
-        { label: "Disk", value: formatBytes(diskBytes) },
-        { label: "VRAM In Use", value: formatBytes(vramBytes) },
-      ];
-
-      const items: Item[] = [
-        ...running.map((m) => ({
-          id: `loaded-${m.name}`,
-          label: m.name,
-          subtitle: `loaded • ${formatBytes(m.size_vram ?? m.size ?? 0)} VRAM`,
-          state: "healthy" as const,
-          group: "loaded",
-        })),
-        ...models.map((m) => ({
-          id: m.digest || m.name,
-          label: m.name,
-          subtitle: [m.details?.parameter_size, m.details?.quantization_level, formatBytes(m.size)]
-            .filter(Boolean)
-            .join(" • "),
-          state: "healthy" as const,
-          group: "installed",
-        })),
-      ];
-
-      return {
-        title: "Ollama — Local Inference",
-        subtitle: `${models.length} models • ${running.length} loaded`,
-        state: models.length > 0 ? "healthy" : "warning",
-        freshness: makeFreshness(),
-        metrics,
-        items,
-        summary: `${running.length} of ${models.length} models resident in VRAM`,
-      };
-    } catch {
-      return {
-        title: "Ollama — Local Inference",
-        subtitle: "API unreachable",
-        state: "offline",
-        freshness: makeFreshness(),
-        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
-      };
+      const tags = await fetchJson<{ models?: OllamaModel[] }>(`${base}/api/tags`);
+      models = tags.models ?? [];
+    } catch (err) {
+      return failureResult(this.name, "Ollama — Local Inference", base, err, start);
     }
+
+    // /api/ps only exists on newer builds; absence means "none resident",
+    // not a failed query.
+    const ps = await fetchJson<{ models?: OllamaRunning[] }>(
+      `${base}/api/ps`,
+      {},
+      ADAPTER_FANOUT_TIMEOUT_MS,
+    ).catch(() => null);
+    const running = ps?.models ?? [];
+
+    const diskBytes = models.reduce((acc, m) => acc + (m.size ?? 0), 0);
+    const vramBytes = running.reduce((acc, m) => acc + (m.size_vram ?? m.size ?? 0), 0);
+
+    const metrics: Metric[] = [
+      { label: "Models", value: models.length, state: models.length ? "healthy" : "warning" },
+      { label: "Loaded", value: running.length },
+      { label: "Disk", value: formatBytes(diskBytes) },
+      { label: "VRAM In Use", value: formatBytes(vramBytes) },
+    ];
+
+    const items: Item[] = [
+      ...running.map((m) => ({
+        id: `loaded:${m.name}`,
+        label: m.name,
+        subtitle: `resident • ${formatBytes(m.size_vram ?? m.size ?? 0)} VRAM`,
+        state: "healthy" as const,
+        group: "loaded",
+      })),
+      ...models.map((m) => ({
+        id: `model:${m.digest || m.name}`,
+        label: m.name,
+        subtitle: [m.details?.parameter_size, m.details?.quantization_level, formatBytes(m.size ?? 0)]
+          .filter(Boolean)
+          .join(" • "),
+        state: "healthy" as const,
+        group: "installed",
+      })),
+    ];
+
+    return {
+      title: "Ollama — Local Inference",
+      subtitle: `${models.length} models • ${running.length} loaded • ${formatBytes(vramBytes)} VRAM`,
+      state: models.length > 0 ? "healthy" : "warning",
+      freshness: makeFreshness(this.name, base, start),
+      metrics,
+      items,
+      summary: `${running.length} of ${models.length} installed models resident in VRAM (${formatBytes(vramBytes)}).`,
+    };
   }
 }
 

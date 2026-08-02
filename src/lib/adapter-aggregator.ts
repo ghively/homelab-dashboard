@@ -5,6 +5,7 @@
 import type { VisualQueryResult, VisualStateValue } from "@/adapters/types";
 import { getFixtureForState } from "@/adapters/fixtures";
 import { getAdapter } from "@/lib/adapter-runtime";
+import { classifyError } from "@/lib/adapter-http";
 import { WORLDS, type WorldId } from "./workspace-config";
 
 export interface AdapterEntry {
@@ -401,11 +402,20 @@ function enrichFixture(
 // wrong data, with no error.
 export async function queryAdapter(
   adapterName: string,
-  state: VisualStateValue = "healthy",
+  state: VisualStateValue | null = null,
   view?: string,
 ): Promise<VisualQueryResult | null> {
   const entry = ADAPTER_INVENTORY.find((a) => a.name === adapterName);
   if (!entry) return null;
+
+  // An EXPLICIT state is a request for that fixture — it is how the state
+  // exerciser asks "what does `critical` look like?". Preferring the live
+  // adapter here answered the wrong question and, worse, turned a preview grid
+  // into 32 real network calls (a Synology DSM login takes ~5s, so the landing
+  // page hung for the better part of a minute). null means "prefer live".
+  if (state !== null) {
+    return { ...worldSpecificFixture(adapterName, entry.world, state), source: "fixture" };
+  }
 
   const liveAdapter = getAdapter(adapterName);
   if (liveAdapter) {
@@ -413,10 +423,18 @@ export async function queryAdapter(
       const result = await liveAdapter.query(view ? { query: view } : {});
       return { ...result, source: "live" };
     } catch (err) {
+      // Classify rather than blanket-`offline`. "Credentials rejected",
+      // "nothing answered within the timeout" and "the service returned 500"
+      // are three different problems with three different fixes, and a single
+      // OFFLINE badge for all of them tells the reader nothing actionable.
+      // The adapters that catch internally already do this via failureResult();
+      // this is the safety net for the ones that throw (every bridged adapter
+      // under src/lib/adapters/ does).
+      const c = classifyError(err);
       return {
         title: adapterName,
-        subtitle: "Live adapter failed — showing offline",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         source: "live",
         freshness: {
           adapter: adapterName,
@@ -425,20 +443,27 @@ export async function queryAdapter(
           stalenessSeconds: 0,
           cacheHit: false,
         },
-        metrics: [{ label: "Status", value: "OFFLINE", state: "offline" }],
-        summary: `Live adapter error: ${String(err)}`,
+        metrics: [
+          { label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state },
+        ],
+        summary: `${adapterName}: ${c.message}`,
       };
     }
   }
 
   // No live adapter registered — service is unconfigured, fall back to fixture.
-  return { ...worldSpecificFixture(adapterName, entry.world, state), source: "fixture" };
+  // `state` is null on this path (an explicit state returned above), so show
+  // the healthy sample.
+  return {
+    ...worldSpecificFixture(adapterName, entry.world, state ?? "healthy"),
+    source: "fixture",
+  };
 }
 
 // Query all adapters for a world.
 export async function queryWorld(
   world: WorldId,
-  state: VisualStateValue = "healthy",
+  state: VisualStateValue | null = null,
 ): Promise<{ adapter: string; result: VisualQueryResult }[]> {
   const worldConfig = WORLDS.find((w) => w.id === world);
   if (!worldConfig) return [];
@@ -457,10 +482,21 @@ export function worldSummary(
   results: { adapter: string; result: VisualQueryResult }[],
 ): { state: VisualStateValue; healthy: number; total: number; title: string; subtitle: string } {
   const total = results.length;
+
+  // Rollup severity for a WORLD tile, which is not the same as a panel's state.
+  //
+  // `empty` and `loading` describe a panel with nothing to draw; they say
+  // nothing bad about the service. Ranking them above `healthy` meant one idle
+  // panel dragged a whole world down: SABnzbd with an empty download queue —
+  // the desirable state — made the entire Media world read `empty` on the
+  // landing page while Emby, Sonarr, Radarr and Tdarr were all healthy.
+  //
+  // They now rank alongside `healthy`, so only a real problem (stale, warning,
+  // denied, critical, offline) can degrade a world.
   const stateRank: Record<VisualStateValue, number> = {
     healthy: 0,
-    loading: 1,
-    empty: 1,
+    loading: 0,
+    empty: 0,
     stale: 2,
     warning: 3,
     denied: 4,
@@ -484,13 +520,7 @@ export function worldSummary(
   };
 }
 
-export const ALL_STATES: VisualStateValue[] = [
-  "healthy",
-  "warning",
-  "critical",
-  "offline",
-  "stale",
-  "loading",
-  "empty",
-  "denied",
-];
+// Re-exported for existing server-side callers. Client components must import
+// from "@/lib/visual-states" directly — importing it from here pulls the whole
+// adapter tree (and Node built-ins) into the browser bundle.
+export { ALL_STATES } from "@/lib/visual-states";

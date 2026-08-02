@@ -22,6 +22,20 @@ import type {
   RommSystemStatus,
   RommScanJob,
 } from "./types";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
+
+/**
+ * Subset of RomM 5.x GET /api/heartbeat — the one endpoint that answers
+ * anonymously. It carries the version and the filesystem platform roster, so
+ * it is enough for a live, honest "system" panel without a credential.
+ */
+interface RommHeartbeat {
+  SYSTEM?: { VERSION?: string; SHOW_SETUP_WIZARD?: boolean };
+  WATCHER?: { ENABLED?: boolean; TITLE?: string };
+  SCHEDULER?: Record<string, unknown>;
+  FILESYSTEM?: { FS_PLATFORMS?: string[] };
+  METADATA_SOURCES?: Record<string, boolean>;
+}
 
 /**
  * RomM adapter configuration.
@@ -61,15 +75,15 @@ export class RommAdapter {
    */
   private async fetch<T>(endpoint: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    try {
-      const res = await fetch(url, { headers: this.getHeaders() });
-      if (!res.ok) {
-        throw new Error(`RomM API error: ${res.status} ${res.statusText}`);
-      }
-      return (await res.json()) as T;
-    } catch (err) {
-      throw new Error(`RomM fetch failed: ${err}`);
-    }
+    // The signal is load-bearing. Node fetch has no default timeout, so a
+    // host that accepts the connection and never answers held this promise
+    // for the kernel's full TCP retry window (~130s). /api/fleet awaits every
+    // adapter in a world, so one such host pinned the whole endpoint and the
+    // world tile sat on LOADING. AdapterHttpError is thrown rather than a
+    // stringified Error so classifyError() can still tell 401 from offline.
+    const res = await fetchWithTimeout(url, { headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+    return (await res.json()) as T;
   }
 
   /**
@@ -246,6 +260,59 @@ export class RommAdapter {
       };
     } catch (err) {
       return this.errorResult("ROM Platforms", err, start);
+    }
+  }
+
+  /**
+   * Query: Heartbeat — the anonymous system panel.
+   *
+   * This is the default query. /api/status is a 404 on RomM 5.x and
+   * /api/platforms is 403 without a key, so a keyless-but-reachable RomM (the
+   * common case here) has exactly one live surface: /api/heartbeat. Reading it
+   * means the panel shows real version + platform-count data instead of an
+   * offline badge for a service that is plainly running.
+   */
+  async queryHeartbeat(): Promise<VisualQueryResult> {
+    const start = Date.now();
+    try {
+      const hb = await this.fetch<RommHeartbeat>("/api/heartbeat");
+      const now = new Date().toISOString();
+      const fsPlatforms = hb.FILESYSTEM?.FS_PLATFORMS ?? [];
+      const enabledSources = Object.entries(hb.METADATA_SOURCES ?? {}).filter(
+        ([k, v]) => v === true && k.endsWith("_ENABLED"),
+      ).length;
+
+      const data: VisualData = {
+        title: "RomM",
+        subtitle: `v${hb.SYSTEM?.VERSION ?? "?"} • ${fsPlatforms.length} platforms on disk`,
+        state: "healthy",
+        metrics: [
+          { label: "Version", value: hb.SYSTEM?.VERSION ?? "unknown", unit: "" },
+          { label: "Filesystem Platforms", value: fsPlatforms.length, unit: "" },
+          { label: "Watcher", value: hb.WATCHER?.ENABLED ? "on" : "off", unit: "" },
+          { label: "Metadata Sources", value: enabledSources, unit: "" },
+        ],
+        items: fsPlatforms.slice(0, 40).map((p) => ({
+          id: `fs:${p}`,
+          label: p,
+          subtitle: "platform folder",
+          state: "healthy" as const,
+        })),
+        summary: `RomM ${hb.SYSTEM?.VERSION ?? "?"} up with ${fsPlatforms.length} platform folders. ROM counts need an API key (ROMM_API_KEY) — /api/platforms is auth-gated.`,
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `RomM:${this.baseUrl}/api/heartbeat`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult("RomM", err, start);
     }
   }
 
@@ -460,19 +527,27 @@ export class RommAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 403 (RomM is up, it wants a key) renders `denied` and names
+    // the fix, rather than the generic `offline` the old code showed for every
+    // failure — which read as "the service is down" when it was not.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
+        summary:
+          c.kind === "unauthorized"
+            ? `${title}: RomM requires an API key for this data — set ROMM_API_KEY.`
+            : `${title}: ${c.message}`,
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `RomM:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "denied" ? "offline" : c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },

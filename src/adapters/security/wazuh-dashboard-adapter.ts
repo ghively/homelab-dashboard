@@ -6,6 +6,8 @@ import type { DataAdapter } from "../adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { insecureTls, envFlag } from "../tls";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_DASHBOARD_URL =
   process.env.WAZUH_DASHBOARD_URL || "https://100.65.126.126";
@@ -20,6 +22,23 @@ function makeFreshness(source: string): FreshnessInfo {
   };
 }
 
+// The dashboard is OpenSearch Dashboards behind HTTPS with basic auth and a
+// self-signed certificate. Without both, /api/status returns 401 or the TLS
+// handshake fails, and the panel can only ever report offline.
+const WAZUH_DASHBOARD_USER =
+  process.env.WAZUH_DASHBOARD_USER || process.env.WAZUH_USER || "";
+const WAZUH_DASHBOARD_PASSWORD =
+  process.env.WAZUH_DASHBOARD_PASSWORD || process.env.WAZUH_PASSWORD || "";
+const WAZUH_TLS = envFlag("WAZUH_INSECURE_TLS");
+
+function authHeaders(): Record<string, string> {
+  if (!WAZUH_DASHBOARD_USER) return {};
+  const basic = Buffer.from(
+    `${WAZUH_DASHBOARD_USER}:${WAZUH_DASHBOARD_PASSWORD}`,
+  ).toString("base64");
+  return { Authorization: `Basic ${basic}` };
+}
+
 class WazuhDashboardAdapter implements DataAdapter {
   readonly name = "wazuh-dashboard";
   readonly description =
@@ -29,7 +48,9 @@ class WazuhDashboardAdapter implements DataAdapter {
   async health(): Promise<FreshnessInfo> {
     try {
       await fetch(`${WAZUH_DASHBOARD_URL}/api/status`, {
-        signal: AbortSignal.timeout(5000),
+        headers: authHeaders(),
+        ...insecureTls(WAZUH_TLS),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -45,7 +66,9 @@ class WazuhDashboardAdapter implements DataAdapter {
 
     try {
       const res = await fetch(`${WAZUH_DASHBOARD_URL}/api/status`, {
-        signal: AbortSignal.timeout(8000),
+        headers: authHeaders(),
+        ...insecureTls(WAZUH_TLS),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 

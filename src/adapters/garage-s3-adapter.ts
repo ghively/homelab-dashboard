@@ -12,6 +12,7 @@ import type { DataAdapter } from "./adapter-base";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const GARAGE_ADMIN_URL = process.env.GARAGE_ADMIN_URL || "";
 const GARAGE_ADMIN_TOKEN = process.env.GARAGE_ADMIN_TOKEN || "";
@@ -57,7 +58,7 @@ class GarageS3Adapter implements DataAdapter {
       try {
         await fetch(`${GARAGE_ADMIN_URL}/v1/status`, {
           headers: this.headers(),
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         });
       } catch {
         // Unreachable — freshness still records the endpoint queried.
@@ -88,11 +89,11 @@ class GarageS3Adapter implements DataAdapter {
       const [statusRes, bucketsRes] = await Promise.all([
         fetch(`${GARAGE_ADMIN_URL}/v1/status`, {
           headers: this.headers(),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
         fetch(`${GARAGE_ADMIN_URL}/v1/bucket?list`, {
           headers: this.headers(),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
       ]);
       if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);

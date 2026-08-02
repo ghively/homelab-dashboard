@@ -24,6 +24,7 @@ import type {
   EmbySession,
   EmbyServerInfo,
 } from "./types";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Emby adapter configuration.
@@ -59,19 +60,34 @@ export class EmbyAdapter {
   }
 
   /**
+   * Fetch a list endpoint and unwrap Emby's envelope.
+   *
+   * /Items and /Library/MediaFolders return {Items: [...], TotalRecordCount},
+   * NOT a bare array — only /Sessions is a bare array. The adapter typed these
+   * as arrays and called .map() on the envelope, which threw, so every Emby
+   * panel rendered offline even with a valid token. Verified live against the
+   * gh-media instance.
+   */
+  private async fetchList<T>(endpoint: string): Promise<T[]> {
+    const body = await this.fetch<T[] | { Items?: T[] }>(endpoint);
+    if (Array.isArray(body)) return body;
+    return body?.Items ?? [];
+  }
+
+  /**
    * Generic fetch with error handling.
    */
   private async fetch<T>(endpoint: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    try {
-      const res = await fetch(url, { headers: this.getHeaders() });
-      if (!res.ok) {
-        throw new Error(`Emby API error: ${res.status} ${res.statusText}`);
-      }
-      return (await res.json()) as T;
-    } catch (err) {
-      throw new Error(`Emby fetch failed: ${err}`);
-    }
+    // The signal is load-bearing. Node fetch has no default timeout, so a
+    // host that accepts the connection and never answers held this promise
+    // for the kernel's full TCP retry window (~130s). /api/fleet awaits every
+    // adapter in a world, so one such host pinned the whole endpoint and the
+    // world tile sat on LOADING. AdapterHttpError is thrown rather than a
+    // stringified Error so classifyError() can still tell 401 from offline.
+    const res = await fetchWithTimeout(url, { headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+    return (await res.json()) as T;
   }
 
   /**
@@ -104,7 +120,7 @@ export class EmbyAdapter {
   async queryRecentlyAddedMovies(): Promise<VisualQueryResult> {
     const start = Date.now();
     try {
-      const items = await this.fetch<EmbyItem[]>(
+      const items = await this.fetchList<EmbyItem>(
         "/Items?IncludeItemTypes=Movie&SortBy=DateCreated&SortOrder=Descending&Recursive=true&Limit=20&ImageTypes=Primary"
       );
 
@@ -170,7 +186,7 @@ export class EmbyAdapter {
         throw new Error("userId required for Continue Watching");
       }
 
-      const items = await this.fetch<EmbyItem[]>(
+      const items = await this.fetchList<EmbyItem>(
         `/Users/${this.config.userId}/Items/Resume?Limit=10&ImageTypes=Primary`
       );
 
@@ -291,22 +307,38 @@ export class EmbyAdapter {
   async queryLibraryOverview(): Promise<VisualQueryResult> {
     const start = Date.now();
     try {
-      const libraries = await this.fetch<EmbyLibrary[]>("/Library/MediaFolders");
+      const libraries = await this.fetchList<EmbyLibrary>("/Library/MediaFolders");
+
+      // /Library/MediaFolders does not carry item counts — ChildCount is absent,
+      // so every library reported 0. The count comes from a Limit=0 query per
+      // library, which returns TotalRecordCount without transferring any items.
+      const counts = await Promise.all(
+        libraries.map(async (lib) => {
+          try {
+            const body = await this.fetch<{ TotalRecordCount?: number }>(
+              `/Items?ParentId=${encodeURIComponent(lib.Id)}&Recursive=true&Limit=0`,
+            );
+            return body?.TotalRecordCount ?? 0;
+          } catch {
+            return 0;
+          }
+        }),
+      );
 
       const now = new Date().toISOString();
 
-      const metrics: Metric[] = libraries.map((lib) => ({
+      const metrics: Metric[] = libraries.map((lib, i) => ({
         label: lib.Name,
-        value: lib.ChildCount || 0,
+        value: counts[i] ?? 0,
         unit: "items",
         state: "healthy",
       }));
 
-      const items: Item[] = libraries.map((lib) => ({
+      const items: Item[] = libraries.map((lib, i) => ({
         id: lib.Id,
         label: lib.Name,
         subtitle: lib.CollectionType || lib.Type,
-        value: lib.ChildCount || 0,
+        value: counts[i] ?? 0,
         state: "healthy",
         meta: {
           collectionType: lib.CollectionType,
@@ -320,7 +352,11 @@ export class EmbyAdapter {
         state: "healthy",
         metrics,
         items,
-        summary: `${libraries.length} libraries across ${libraries.reduce((sum, l) => sum + (l.ChildCount || 0), 0)} total items`,
+        // Summed from `counts`, not from lib.ChildCount. /Library/MediaFolders
+        // omits ChildCount entirely, so the old expression was a sum of
+        // undefined-coerced-to-0 and the panel always read "0 total items"
+        // while the per-library metrics above showed the real numbers.
+        summary: `${libraries.length} libraries across ${counts.reduce((sum, c) => sum + c, 0).toLocaleString()} total items`,
         updatedAt: now,
       };
 
@@ -345,7 +381,7 @@ export class EmbyAdapter {
   async querySeries(): Promise<VisualQueryResult> {
     const start = Date.now();
     try {
-      const items = await this.fetch<EmbyItem[]>(
+      const items = await this.fetchList<EmbyItem>(
         "/Items?IncludeItemTypes=Series&SortBy=SortName&Recursive=true&Limit=30&ImageTypes=Primary"
       );
 
@@ -407,7 +443,7 @@ export class EmbyAdapter {
   async queryAlbums(): Promise<VisualQueryResult> {
     const start = Date.now();
     try {
-      const items = await this.fetch<EmbyItem[]>(
+      const items = await this.fetchList<EmbyItem>(
         "/Items?IncludeItemTypes=MusicAlbum&SortBy=SortName&Recursive=true&Limit=30&ImageTypes=Primary"
       );
 

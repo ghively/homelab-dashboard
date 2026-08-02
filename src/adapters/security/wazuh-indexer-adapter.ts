@@ -6,9 +6,25 @@ import type { DataAdapter } from "../adapter-base";
 import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { insecureTls, envFlag } from "../tls";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_INDEXER_URL =
   process.env.WAZUH_INDEXER_URL || "https://100.65.126.126:9200";
+
+// Wazuh Indexer is OpenSearch behind HTTPS with basic auth and, by default, a
+// self-signed certificate. Without credentials every request 401s; without the
+// TLS opt-in Node rejects the cert outright. Both are required for live data.
+const WAZUH_INDEXER_USER = process.env.WAZUH_INDEXER_USER || process.env.WAZUH_USER || "";
+const WAZUH_INDEXER_PASSWORD =
+  process.env.WAZUH_INDEXER_PASSWORD || process.env.WAZUH_PASSWORD || "";
+const WAZUH_TLS = envFlag("WAZUH_INSECURE_TLS");
+
+function authHeaders(): Record<string, string> {
+  if (!WAZUH_INDEXER_USER) return {};
+  const basic = Buffer.from(`${WAZUH_INDEXER_USER}:${WAZUH_INDEXER_PASSWORD}`).toString("base64");
+  return { Authorization: `Basic ${basic}` };
+}
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(1)} TB`;
@@ -36,7 +52,9 @@ class WazuhIndexerAdapter implements DataAdapter {
   async health(): Promise<FreshnessInfo> {
     try {
       await fetch(`${WAZUH_INDEXER_URL}/_cluster/health`, {
-        signal: AbortSignal.timeout(5000),
+        headers: authHeaders(),
+        ...insecureTls(WAZUH_TLS),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -52,9 +70,15 @@ class WazuhIndexerAdapter implements DataAdapter {
 
     try {
       const [healthRes, indicesRes] = await Promise.all([
-        fetch(`${WAZUH_INDEXER_URL}/_cluster/health`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${WAZUH_INDEXER_URL}/_cluster/health`, {
+          headers: authHeaders(),
+          ...insecureTls(WAZUH_TLS),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
+        }),
         fetch(`${WAZUH_INDEXER_URL}/_cat/indices?format=json&bytes=b`, {
-          signal: AbortSignal.timeout(8000),
+          headers: authHeaders(),
+          ...insecureTls(WAZUH_TLS),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
       ]);
       if (!healthRes.ok) throw new Error(`HTTP ${healthRes.status}`);

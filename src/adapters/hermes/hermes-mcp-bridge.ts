@@ -1,45 +1,27 @@
-// Hermes MCP bridge adapter — service reachability probe.
+// Hermes MCP bridge — reachability probe against the real health route.
 //
-// Hermes exposes no documented metrics API, so this adapter reports only what
-// it can actually observe: whether the configured endpoint answers, the HTTP
-// status it returns, and how long it took. Every value below is measured.
-//
-// The previous version returned a hardcoded inventory (session counts, tool
-// invocation totals, error rates) that the dashboard rendered as live data.
-// If a real metrics endpoint is added later, widen query() then — do not
-// reintroduce placeholder numbers.
+// Hermes exposes no aggregate metrics API on this surface, so this adapter
+// reports only what it can actually observe: whether /health answers, the
+// status it returns, how long it took, and whatever version/platform fields
+// the payload carries. Every value is measured. Do not reintroduce the
+// hardcoded session/tool-invocation counts this module used to return.
 
 import type { DataAdapter } from "../adapter-base";
-import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
+import type { FreshnessInfo, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { hermesFreshness, probeHermesEndpoint } from "./probe";
 
-const HERMES_MCP_BRIDGE_URL = process.env.HERMES_MCP_BRIDGE_URL || "";
+const BASE_URL = process.env.HERMES_MCP_BRIDGE_URL || "";
+const HEALTH_PATH = "/health";
 
-function makeFreshness(): FreshnessInfo {
-  return {
-    adapter: "hermes-mcp-bridge",
-    source: HERMES_MCP_BRIDGE_URL || "unconfigured",
-    queriedAt: new Date().toISOString(),
-    stalenessSeconds: 0,
-    cacheHit: false,
-  };
-}
-
-class HermesMCPBridgeAdapter implements DataAdapter {
+class HermesMcpBridgeAdapter implements DataAdapter {
   readonly name = "hermes-mcp-bridge";
-  readonly description = "Hermes MCP bridge — service reachability.";
+  readonly description = "Hermes MCP bridge — reachability and version.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {
-    if (HERMES_MCP_BRIDGE_URL) {
-      try {
-        await fetch(HERMES_MCP_BRIDGE_URL, { signal: AbortSignal.timeout(5000) });
-      } catch {
-        // Unreachable — freshness still records the endpoint queried.
-      }
-    }
-    return makeFreshness();
+    return hermesFreshness(this.name, BASE_URL);
   }
 
   async query(): Promise<VisualQueryResult> {
@@ -47,49 +29,15 @@ class HermesMCPBridgeAdapter implements DataAdapter {
     if (fixtureStateValue) {
       return getFixtureForState(this.name, fixtureStateValue);
     }
-
-    if (!HERMES_MCP_BRIDGE_URL) {
-      return {
-        title: "Hermes MCP bridge",
-        subtitle: "Endpoint not configured",
-        state: "empty",
-        freshness: makeFreshness(),
-        metrics: [{ label: "Status", value: "NOT CONFIGURED", state: "empty" }],
-        summary: "Set HERMES_MCP_BRIDGE_URL to probe this service.",
-      };
-    }
-
-    const start = Date.now();
-    try {
-      const res = await fetch(HERMES_MCP_BRIDGE_URL, { signal: AbortSignal.timeout(8000) });
-      const latency = Date.now() - start;
-      const ok = res.ok;
-
-      const metrics: Metric[] = [
-        { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
-        { label: "HTTP", value: res.status, state: ok ? "healthy" : "warning" },
-        { label: "Latency", value: latency, unit: "ms", state: latency > 2000 ? "warning" : "healthy" },
-      ];
-
-      return {
-        title: "Hermes MCP bridge",
-        subtitle: HERMES_MCP_BRIDGE_URL,
-        state: ok ? "healthy" : "warning",
-        freshness: makeFreshness(),
-        metrics,
-        summary: `Responded ${res.status} in ${latency}ms`,
-      };
-    } catch {
-      return {
-        title: "Hermes MCP bridge",
-        subtitle: "Endpoint unreachable",
-        state: "offline",
-        freshness: makeFreshness(),
-        metrics: [{ label: "Status", value: "UNREACHABLE", state: "offline" }],
-      };
-    }
+    return probeHermesEndpoint({
+      adapter: this.name,
+      title: "Hermes MCP bridge",
+      baseUrl: BASE_URL,
+      healthPath: HEALTH_PATH,
+      envVar: "HERMES_MCP_BRIDGE_URL",
+    });
   }
 }
 
-const adapter = new HermesMCPBridgeAdapter();
+const adapter = new HermesMcpBridgeAdapter();
 export { adapter as default };
