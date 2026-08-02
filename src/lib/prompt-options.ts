@@ -2,12 +2,36 @@ import { openuiPromptOptions } from "@openuidev/react-ui/genui-lib/prompt-option
 import type { PromptOptions } from "@openuidev/react-lang";
 import { serviceGuideText } from "@/visual/manifest-map";
 import { toolSpecs } from "@/lib/tools";
+import { WORLDS } from "@/lib/workspace-config";
+
+/**
+ * The authoritative adapter inventory, derived from the registry rather than
+ * written out by hand so it cannot drift as adapters come and go.
+ *
+ * Measured problem this solves: asked for a fleet overview, the model returned
+ * a dashboard for worlds called "Arrakis", "Pandora" and "Coruscant", querying
+ * adapters that do not exist — so every panel rendered empty. The names WERE
+ * already in the prompt, but only scattered through prose and examples, while
+ * the syntax section shows `Query("tool_name", ...)`. Faced with a placeholder
+ * and no closed list, the model invented plausible-sounding names.
+ *
+ * ~75 names costs a few hundred tokens against a 30k budget. Cheap, next to
+ * generating a dashboard that queries nothing real.
+ */
+const ADAPTER_NAMES = toolSpecs
+  .map((t) => t.name)
+  .sort()
+  .join(", ");
+
+const WORLD_NAMES = WORLDS.map((w) => w.label).join(", ");
 
 export const promptOptions: PromptOptions = {
   ...openuiPromptOptions,
   tools: toolSpecs,
   additionalRules: [
     ...(openuiPromptOptions.additionalRules ?? []),
+    `ADAPTER NAMES — the first argument to Query() must be one of these exact names, and nothing else. An unrecognised name returns no data and renders an empty panel, so an invented name is always a broken dashboard:\n${ADAPTER_NAMES}`,
+    `WORLDS — this homelab is organised into exactly these worlds: ${WORLD_NAMES}. Use these names when grouping or summarising by world. Never invent a world name.`,
     "Always pass live data via Query() — never hardcode or mock values. Each service has an adapter that returns the data the panel needs. Literal numbers in your output are always wrong unless the user explicitly gave them.",
     "Pick by data shape, not by service name: Gauge for a single bounded % (disk, battery, CPU); Donut for shares of a whole (media by type, spend by model); BarRank for ranked comparison (top items by size/count); LineChart for one time-series; MultiLine for 2–4 series compared; Timeline for timestamped events; EventStream for a high-volume alert feed; NodeGraph for topology; Sankey for a left-to-right pipeline; Kanban for work items grouped into columns; VisualTable for a row list; ArtworkWall for image grids; PlaybackSessions for active streams; Capacity for storage pools; SecurityPosture for severity matrices.",
     "For numeric summaries (CPU, memory, counts, pass/fail) use MetricStrip — it renders compact KPI rows.",
