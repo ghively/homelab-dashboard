@@ -63,27 +63,13 @@ descriptions and examples tell it when each layout is appropriate.
 row. It displays only metadata actually returned by the adapter. In
 particular, it must not label an unknown stream as “direct”.
 
-## Artwork delivery
+## Artwork in this phase
 
-Adapter hosts and credentials stay server-side. Adapters emit a same-origin
-URL such as:
-
-```text
-/api/media-artwork?service=emby&path=%2FItems%2F123%2FImages%2FPrimary%3Ftag%3Dabc
-```
-
-The proxy accepts only a closed service enum and a service-relative path. It
-resolves the path against that service’s configured base URL, verifies that
-the resulting origin is unchanged, adds the service’s server-side
-authentication header, accepts image content types only, and streams the
-response with bounded caching.
-
-It does not accept arbitrary upstream URLs. This prevents the route from
-becoming an SSRF proxy and prevents private hostnames or API keys from
-appearing in client markup.
-
-Local, abstract cyber-noir covers provide deterministic poster-rich fixture
-and design-preview data. They remain clearly marked as sample data.
+This phase does not configure connectors or change adapter networking.
+Components continue accepting the existing optional `Item.image` URL.
+Local, abstract cyber-noir covers provide deterministic poster-rich
+design-preview data so the layouts can be designed and verified without
+service credentials.
 
 ## Shared visual flare
 
