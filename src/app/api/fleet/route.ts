@@ -20,6 +20,10 @@ export async function GET(req: NextRequest) {
         state: summary.state,
         healthy: summary.healthy,
         total: summary.total,
+        // How many of these panels are real. A world whose adapters are all
+        // stubs (`home`) is not the same as one that queried live services and
+        // found them down, and the UI must not present them identically.
+        live: results.filter((r) => r.result.source === "live").length,
       };
     }),
   );
@@ -44,6 +48,11 @@ export async function GET(req: NextRequest) {
       healthy: overallHealthy,
       total: overallTotal,
       worldCount: worlds.length,
+      // Fleet-wide count of panels backed by a live adapter. This is what
+      // decides whether the app is running on real data — previously nothing
+      // reported it, so the shell defaulted to "fixture" forever and the
+      // DEMO DATA banner showed even with 68 adapters live.
+      live: worlds.reduce((a, w) => a + w.live, 0),
     },
   });
 }

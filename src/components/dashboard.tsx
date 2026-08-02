@@ -21,7 +21,13 @@ interface ShellProps {
   onNewChat?: () => void;
   fixtureState: VisualStateValue | null;
   onFixtureChange: (s: VisualStateValue | null) => void;
-  dataSource?: "fixture" | "live";
+  /**
+   * Whether the page is showing real adapter output. Defaults to `unknown`,
+   * not `fixture`: until the fleet has answered we do not know, and asserting
+   * DEMO DATA before asking is exactly the bug this replaced — every call site
+   * omitted the old prop, so the banner latched on with 68 adapters live.
+   */
+  dataSource?: "fixture" | "live" | "unknown";
 }
 
 export function DashboardShell({
@@ -31,7 +37,7 @@ export function DashboardShell({
   onNewChat,
   fixtureState,
   onFixtureChange,
-  dataSource = "fixture",
+  dataSource = "unknown",
 }: ShellProps) {
   const [clock, setClock] = useState("");
   useEffect(() => {
@@ -121,15 +127,31 @@ export function DashboardShell({
           </span>
           <span className="dash-waybar-clock">{clock}</span>
         </div>
-        {dataSource === "fixture" && (
+        {/* Two distinct conditions, said distinctly. Forcing a state from the
+            sidebar is a deliberate preview and should not read as a broken
+            deployment; "no live adapters" is a real fault worth alarming
+            about. Panels that are individually stubbed carry their own SAMPLE
+            marker, so a mostly-live fleet gets no page-level banner at all. */}
+        {fixtureState !== null ? (
+          <div className="dash-demo-banner" role="status">
+            <span className="dash-demo-banner-icon">◈</span>
+            <span>
+              <strong>STATE PREVIEW</strong>
+              <small>
+                Every panel forced to “{fixtureState}” from the sidebar — set State
+                Fixture back to Live to see real adapters
+              </small>
+            </span>
+          </div>
+        ) : dataSource === "fixture" ? (
           <div className="dash-demo-banner" role="status">
             <span className="dash-demo-banner-icon">◈</span>
             <span>
               <strong>DEMO DATA</strong>
-              <small>Showing fixture data — no live adapters connected</small>
+              <small>No adapter returned live data — check .env credentials</small>
             </span>
           </div>
-        )}
+        ) : null}
         {children}
       </main>
     </div>
@@ -518,18 +540,22 @@ export function useWorldData(world: WorldId, fixtureState: VisualStateValue | nu
 
 // ── Hook: fetch fleet data (all worlds for landing) ──────────
 
-interface FleetData {
+export interface FleetData {
   worlds: Array<{
     id: WorldId;
     state: VisualStateValue;
     healthy: number;
     total: number;
+    /** Panels in this world backed by a live adapter rather than a stub. */
+    live: number;
   }>;
   overall: {
     state: VisualStateValue;
     healthy: number;
     total: number;
     worldCount: number;
+    /** Fleet-wide live-adapter count; 0 means nothing real is connected. */
+    live: number;
   };
 }
 

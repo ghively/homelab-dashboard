@@ -9,6 +9,11 @@ out/
 .env
 .env.local
 .env.production
+# Every env fragment, not just the three named above. Adapter credentials are
+# assembled from per-world fragments (.env.ai, .env.home, ...) and a pattern
+# that only matches known names is one new filename away from committing a key.
+.env.*
+!.env.example
 
 # IDE
 .vscode/

@@ -15,14 +15,29 @@ repo's own components and fed by its own service adapters.
 surface with live adapter data, filters, drill-down, a 12-column grid, and
 glass/gradient/glow styling.
 
-**Phase 6 is the only open work:** wiring the remaining ~76 service adapters.
+**Phase 6 (adapter wiring) is largely done.** As of 2026-08-02, **58 of 75
+adapters are genuinely live** (`source: "live"`, every value from a real
+fetch). Registration is now split into one module per world under
+`src/lib/registration/<world>.ts` (aggregated by `registration/index.ts`,
+called last from `initAdapters()`), so worlds can be wired in parallel without
+colliding. `/api/fleet` exposes a per-world and overall **`live`** count — that,
+not `healthy`, is the real "connected" number, since a fixture reports fake
+health.
+
+The 17 remaining fixtures are **phantom or unreachable**, each verified: honcho
+(decommissioned), cognee, opencode, outline, disc-ripper, obsidian, garage-s3,
+systemd, the 3 watchtowers (Watchtower has no container-listing API), spotify
+(OAuth, no token), fail2ban (no HTTP surface), and pihole/unifi/iot-vlan
+(LAN-only, not routable from the gh-ai VPS). These are candidates for removal
+from `WORLDS`. Several `denied` panels flip to live once a credential is set —
+see `.env.example` for which var each needs.
 
 Verified on `main` from a clean `npm ci`:
 
 ```
 tsc --noEmit     0 errors
+npm run check:parity   PASS — 28 components
 npm run build    passes, and type-checks for real
-prompt size      13,636 tokens (hard gate: 30k)
 ```
 
 ## Start here
