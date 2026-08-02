@@ -63,7 +63,13 @@ class HermesGatewayAdapter implements DataAdapter {
     try {
       const res = await fetch(HERMES_GATEWAY_URL, { signal: AbortSignal.timeout(8000) });
       const latency = Date.now() - start;
-      const ok = res.ok;
+
+      // Any HTTP response means the service is up and answering. A 404 at "/"
+      // just means there is no route there, which is normal for an API — it is
+      // not a fault, and reporting it as one filled the dashboard with warnings
+      // for services that were fine. Only a 5xx indicates the service itself is
+      // failing.
+      const ok = res.status < 500;
 
       const metrics: Metric[] = [
         { label: "Status", value: ok ? "UP" : "ERROR", state: ok ? "healthy" : "warning" },
