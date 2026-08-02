@@ -16,6 +16,7 @@ import {
 import { GenerativeChat } from "@/components/generative-chat";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import { ALL_STATES } from "@/lib/adapter-aggregator";
+import { homelabSchemaComponents } from "@/visual/schemas";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
 export default function Home() {
@@ -128,11 +129,29 @@ function LandingPage({
 
   const overall = data?.overall;
 
+  // Quick Access used to be eight decorative <span>s with cursor:default and no
+  // handler — they looked clickable and did nothing, and half of them ("Energy
+  // Flow", "AI Spend") named concepts the dashboard has no notion of. They now
+  // filter the world grid by rollup state, which is something the data can
+  // actually answer.
+  const [worldFilter, setWorldFilter] = useState<"all" | "healthy" | "attention">("all");
+
+  const visibleWorlds = useMemo(() => {
+    if (worldFilter === "all") return WORLDS;
+    return WORLDS.filter((w) => {
+      const st = String(worldStates[w.id]?.state ?? "loading");
+      const needsAttention = ALERT_STATES.includes(st);
+      return worldFilter === "attention" ? needsAttention : !needsAttention;
+    });
+  }, [worldFilter, worldStates]);
+
   return (
     <>
       <Hero
         title="Visual OS"
-        subtitle="Single pane of glass for the homelab fleet — 8 worlds, 60+ adapters, 905 visual components"
+        subtitle={`Single pane of glass for the homelab fleet — ${WORLDS.length} worlds, ${
+          new Set(WORLDS.flatMap((w) => w.adapters)).size
+        } adapters, ${homelabSchemaComponents.length} visual components`}
         accent="var(--dash-accent)"
         metrics={
           overall
@@ -152,7 +171,7 @@ function LandingPage({
       </div>
 
       <div className="dash-world-grid">
-        {WORLDS.map((w) => {
+        {visibleWorlds.map((w) => {
           const ws = worldStates[w.id];
           return (
             <WorldCard
@@ -173,25 +192,26 @@ function LandingPage({
 
       <div className="dash-section-header">
         <h2>Quick Access</h2>
+        <small>Filter the worlds above</small>
       </div>
       <div className="dash-quick-tags">
-        {[
-          "All Healthy",
-          "Warnings",
-          "Critical",
-          "Recently Changed",
-          "Energy Flow",
-          "Network Mesh",
-          "Security Alerts",
-          "AI Spend",
-        ].map((tag) => (
-          <span
-            key={tag}
-            className="dash-tag"
-            style={{ cursor: "default" }}
+        {(
+          [
+            { id: "all", label: "All worlds" },
+            { id: "attention", label: "Needs attention" },
+            { id: "healthy", label: "Healthy only" },
+          ] as const
+        ).map((f) => (
+          <button
+            key={f.id}
+            className={`dash-tag${worldFilter === f.id ? " active" : ""}`}
+            onClick={() => setWorldFilter(f.id)}
           >
-            {tag}
-          </span>
+            {f.label}
+            {f.id === "attention" && data
+              ? ` (${data.worlds.filter((w) => ALERT_STATES.includes(String(w.state))).length})`
+              : null}
+          </button>
         ))}
       </div>
 
