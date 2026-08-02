@@ -48,6 +48,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
+  /* `html` carries the base colour; `body` is made transparent immediately
+     below so the fixed wallpaper can sit between the two. */
   background: var(--dash-bg);
   color: var(--dash-text);
   /* The design system is monospace throughout. This was previously the `font`
@@ -74,7 +76,18 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 0;
+  /* BEHIND the content, not merely at its level.
+     At `z-index: 0` this is still a POSITIONED element, and CSS paints
+     positioned boxes after every static in-flow box — so the wallpaper covered
+     any page that did not explicitly lift itself above it. `.dash-root` did;
+     a plain `<main>` (the /lab page) did not, and its headings, banner and
+     borders were painted underneath an opaque image. Only the Canvas UI
+     wrappers survived, because each one establishes its own stacking context.
+     Negative z-index puts the wallpaper below all content unconditionally, so
+     a new page is correct without having to know this rule exists. This works
+     only because `body` is transparent above: an opaque background on body
+     paints AFTER its own negative-z-index children and would hide this. */
+  z-index: -1;
   pointer-events: none;
   background:
     /* Veil over the image so foreground text is never at risk. Measured rather
@@ -104,7 +117,15 @@ body::before {
   }
 }
 
-/* Everything else sits above the ambient field. */
+/* body must not paint its own background, or it would cover the negative
+   z-index wallpaper above. `html` already supplies the base colour, so the
+   page still has a solid ground while the image loads. */
+body { background: transparent; }
+
+/* The dashboard shell keeps its own stacking context: the sidebar wallpaper,
+   waybar and entity drawer all layer within it. It no longer needs to escape
+   the backdrop — the backdrop is behind everything now — but the context is
+   still what those children position against. */
 .dash-root { position: relative; z-index: 1; }
 
 .dash-root {
