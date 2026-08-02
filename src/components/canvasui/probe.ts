@@ -38,6 +38,7 @@ export type ProbeResult = {
   /** Machine-readable cause, for the diagnostics panel. */
   reason:
     | "supported"
+    | "disabled"
     | "no-document"
     | "no-2d-context"
     | "api-missing"
@@ -60,6 +61,37 @@ type PaintableCanvas = HTMLCanvasElement & {
 };
 
 let cached: Promise<ProbeResult> | null = null;
+
+/**
+ * HTML-in-Canvas is OFF unless explicitly requested, and stays off by default.
+ *
+ * Gene's browser died with STATUS_BREAKPOINT — a Chromium CHECK() failure, i.e.
+ * the renderer deliberately aborting. That is not JavaScript misbehaving that
+ * we can defend against; it is an experimental origin-trial API reaching a
+ * state its own authors assert is impossible. No amount of care on our side
+ * makes calling into that safe, and a dashboard is not worth a browser crash.
+ *
+ * With this off, the probe never runs, so native mode never engages, so content
+ * never moves inside a canvas, so `htmlInCanvas` is false in every component and
+ * neither drawElementImage nor requestPaint is ever called. One switch removes
+ * the entire crash surface — the effects still render in the mode that works.
+ *
+ *   ?hic=on   opt in (expect crashes on Chrome 150-153)
+ *   ?hic=off  opt back out
+ */
+export function htmlInCanvasRequested(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const param = new URLSearchParams(window.location.search).get("hic");
+    if (param === "on" || param === "off") {
+      window.localStorage.setItem("canvasui-hic", param);
+      return param === "on";
+    }
+    return window.localStorage.getItem("canvasui-hic") === "on";
+  } catch {
+    return false;
+  }
+}
 
 /** Cheap synchronous check — the method is present. NOT proof it works. */
 export function hasHtmlInCanvasApi(): boolean {
@@ -91,6 +123,16 @@ export function isTransientDrawElementError(err: unknown): boolean {
 }
 
 function runProbe(): Promise<ProbeResult> {
+  if (!htmlInCanvasRequested()) {
+    return Promise.resolve({
+      ok: false,
+      reason: "disabled",
+      detail:
+        "HTML-in-Canvas is disabled by default: driving it crashed Chrome with " +
+        "STATUS_BREAKPOINT, a renderer CHECK failure. Effects run in their " +
+        "reduced mode, which needs only WebGL2. Add ?hic=on to opt in.",
+    });
+  }
   if (typeof document === "undefined") {
     return Promise.resolve({
       ok: false,
@@ -208,11 +250,19 @@ function runProbe(): Promise<ProbeResult> {
       lastFailure = failure;
       attempts++;
       wipe();
-      try {
-        canvas.requestPaint!();
-      } catch {
-        finish(failure);
-      }
+      // Scheduled, NOT called inline. requestPaint() from inside onpaint is a
+      // re-entrant paint request — asking the renderer to paint while it is
+      // painting — which is exactly the shape of thing a CHECK() exists to
+      // catch. Deferring to the next frame keeps each request outside the
+      // paint it would otherwise re-enter.
+      requestAnimationFrame(() => {
+        if (settled) return;
+        try {
+          canvas.requestPaint!();
+        } catch {
+          finish(failure);
+        }
+      });
     };
 
     canvas.onpaint = () => {
