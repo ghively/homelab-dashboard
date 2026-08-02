@@ -572,7 +572,16 @@ export function createFrost(
   const htmlInCanvas = Boolean(
     sourceCtx &&
     typeof sourceCtx.drawElementImage === "function" &&
-    typeof paintable.requestPaint === "function",
+    typeof paintable.requestPaint === "function" &&
+    // The content must ACTUALLY be a child of this canvas, not merely eligible
+    // to be one. The React wrapper renders content inside the canvas only in
+    // native mode and outside it otherwise, but this flag was derived purely
+    // from API presence — so whenever the API existed and native mode was off,
+    // every component installed onpaint and drew an element that was not its
+    // child, throwing InvalidStateError on every single frame. Checking the
+    // real parent makes the flag mean what its name says and keeps it in step
+    // with whatever the wrapper actually rendered.
+    content.parentElement === source,
   );
 
   let contentDirty = false;
