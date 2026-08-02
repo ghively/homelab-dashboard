@@ -912,23 +912,6 @@ button.dash-tag {
   margin: -16px -16px 14px;          /* bleed to the panel edges */
 }
 
-.cnv-dots {
-  display: flex;
-  gap: var(--space-2);
-  flex: none;
-}
-
-.cnv-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: block;
-}
-
-.cnv-dot-r { background: var(--dot-red); }
-.cnv-dot-y { background: var(--dot-yellow); }
-.cnv-dot-g { background: var(--dot-green); }
-
 /* Title is cyan and sits after the dots, per the spec. */
 .cnv-head-title { min-width: 0; }
 

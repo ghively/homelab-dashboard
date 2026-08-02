@@ -146,14 +146,12 @@ export function Surface({
   return (
     <section className={`${surfaceClass(state, surfaceStyle, gridSpan)}${className ? ` ${className}` : ""}`}>
       <header className="cnv-head">
-        {/* Traffic-light dots, per the design system's Window Header component.
-            Decorative only — the panel is not a real window — so they are
-            aria-hidden and carry no controls. */}
-        <div className="cnv-dots" aria-hidden="true">
-          <i className="cnv-dot cnv-dot-r" />
-          <i className="cnv-dot cnv-dot-y" />
-          <i className="cnv-dot cnv-dot-g" />
-        </div>
+        {/* The traffic-light dots that used to lead this header are gone at
+            Gene's request. They were borrowed from the design system's Window
+            Header, but a panel is not a window: the dots implied close/minimise
+            controls that never existed, and their red/amber/green read as a
+            status indicator while being purely decorative — actively misleading
+            beside the real state badge on the right. */}
         <div className="cnv-head-title">
           <h3>{title}</h3>
           {subtitle && <small>{subtitle}</small>}
