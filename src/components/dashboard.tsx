@@ -213,7 +213,9 @@ export function WorldCard({
   accent,
   onClick,
 }: WorldCardProps) {
-  return (
+  const glass = useEffectGate();
+
+  const card = (
     <button
       className={`dash-world-card cnv-surface tr-medium bl-md el-sm state-${state}${
         ["warning", "critical", "offline", "stale", "denied"].includes(String(state))
@@ -236,6 +238,23 @@ export function WorldCard({
         </span>
       </div>
     </button>
+  );
+
+  if (!glass) return card;
+
+  return (
+    <Glass
+      className="cnv-glass-host dash-world-glass"
+      ior={1.22}
+      blur={0.3}
+      edge={0.45}
+      bevel={0.3}
+      aberration={0.16}
+      shine={0.3}
+      reflection={0.22}
+    >
+      {card}
+    </Glass>
   );
 }
 

@@ -1306,3 +1306,14 @@ button.dash-tag {
     animation: none !important;
   }
 }
+
+/* A glass-wrapped world tile: the wrapper must carry the grid placement and the
+   button inside must fill it, or the tile collapses to content height. */
+.dash-world-glass { height: 100%; }
+.dash-world-glass .dash-world-card {
+  height: 100%;
+  width: 100%;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.03);
+}

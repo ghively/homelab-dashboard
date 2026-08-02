@@ -14,6 +14,8 @@ import {
   useFleetData,
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
+import { GlyphRain } from "@/components/canvasui/GlyphRain";
+import { useEffectGate } from "@/components/canvasui/Effect";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
@@ -111,6 +113,63 @@ export default function Home() {
 
 // ── Landing Page (Visual OS Home) ────────────────────────────
 
+
+/**
+ * The landing hero, wrapped in glyph rain.
+ *
+ * This is hand-rolled rather than the shared <Hero> because the chat-first
+ * landing needs different copy and metrics. That divergence is exactly why the
+ * rain added to <Hero> never appeared here — <Hero> is only used by the world
+ * views and the AI workspace.
+ */
+function LandingHero({
+  overall,
+}: {
+  overall: { state: string; healthy: number; total: number } | undefined;
+}) {
+  const rain = useEffectGate(true);
+
+  const inner = (
+    <header className="dash-hero dash-hero-chat cnv-surface tr-medium bl-md bg-gradient el-md">
+      <div>
+        <h1>What do you want to see?</h1>
+        <p>
+          Describe a dashboard in plain language — it is generated live from{" "}
+          {overall ? `${overall.healthy}/${overall.total} reporting adapters` : "your adapters"}.
+        </p>
+      </div>
+      {overall && (
+        <div className="dash-hero-metrics">
+          <div className={`dash-hero-metric state-${overall.state}`}>
+            <small>Fleet</small>
+            <strong>{overall.state}</strong>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+
+  if (!rain) return inner;
+
+  return (
+    <GlyphRain
+      className="dash-hero-rain"
+      charset="0123456789ABCDEFｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ"
+      cell={13}
+      color={[0, 0.62, 0.42]}
+      headColor={[0.1, 1, 0.55]}
+      speed={0.14}
+      density={0.055}
+      glow={1.15}
+      trail={0.86}
+      stir={0.35}
+      dim={0.72}
+    >
+      {inner}
+    </GlyphRain>
+  );
+}
+
 function LandingPage({
   fixtureState,
   onWorldSelect,
@@ -139,26 +198,7 @@ function LandingPage({
         The exerciser is gone from the product surface; the world tiles remain
         below as a way to browse adapters directly.
       */}
-      <header className="dash-hero dash-hero-chat cnv-surface tr-medium bl-md bg-gradient el-md">
-        <div>
-          <h1>What do you want to see?</h1>
-          <p>
-            Describe a dashboard in plain language — it is generated live from{" "}
-            {overall
-              ? `${overall.healthy}/${overall.total} reporting adapters`
-              : "your adapters"}
-            .
-          </p>
-        </div>
-        {overall && (
-          <div className="dash-hero-metrics">
-            <div className={`dash-hero-metric state-${overall.state}`}>
-              <small>Fleet</small>
-              <strong>{overall.state}</strong>
-            </div>
-          </div>
-        )}
-      </header>
+      <LandingHero overall={overall} />
 
       <GenerativeChat />
 

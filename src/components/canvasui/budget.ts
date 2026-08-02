@@ -18,7 +18,7 @@
  * a long panel list mounts first.
  */
 
-const MAX_EFFECTS = 10;
+const MAX_EFFECTS = 15;
 const RESERVED = 3; // hero, chat, sidebar — claimed via `priority`
 
 let used = 0;
