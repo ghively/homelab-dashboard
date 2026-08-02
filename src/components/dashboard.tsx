@@ -7,6 +7,7 @@ import { Surface, Metrics } from "@/visual/components";
 import { Glass } from "@/components/canvasui/Glass";
 import { GlyphRain } from "@/components/canvasui/GlyphRain";
 import { useEffectGate } from "@/components/canvasui/Effect";
+import { DecryptText } from "@/components/decrypt-text";
 import type { VisualStateValue } from "@/adapters/types";
 
 // ── Dashboard Shell ──────────────────────────────────────────
@@ -229,7 +230,9 @@ export function WorldCard({
         <span className="dash-world-icon">{icon}</span>
         <span className={`dash-world-state state-${state}`}>{state}</span>
       </div>
-      <h3>{label}</h3>
+      <h3>
+        <DecryptText text={label} duration={700} trigger="hover" />
+      </h3>
       <p>{tagline}</p>
       <div className="dash-world-card-foot">
         <span>{adapterCount} adapters</span>
