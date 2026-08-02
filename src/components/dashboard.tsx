@@ -44,6 +44,9 @@ export function DashboardShell({
 
   return (
     <div className="dash-root">
+      {/* Obsidian's signature: a hairline across the top with a travelling
+          highlight. Purely ambient — it carries no state, so it is aria-hidden. */}
+      <div className="dash-pulse" aria-hidden="true"><i /></div>
       <aside className="dash-sidebar">
         <div className="dash-brand">
           <span className="dash-brand-icon">◉</span>

@@ -62,9 +62,14 @@ html, body {
 
 /* ── Ambient ground ──────────────────────────────────────────
    Glass only reads as glass when there is something behind it to blur and
-   saturate. Against a flat fill, a translucent panel is just a slightly
-   different flat. These are three very low-intensity accent pools, fixed to
-   the viewport so panels move across them on scroll. */
+   saturate; against a flat fill a translucent panel is just a slightly
+   different flat.
+
+   backdrop.webp carries colour at the edges and stays dark through the middle,
+   which is exactly where the content sits — so panels pick up magenta, cyan and
+   amber at the margins without ever fighting the text. Fixed to the viewport so
+   panels travel across it on scroll. 40 KB, resized to 1600px: it lives behind
+   blurred glass and never needs to be sharp. */
 body::before {
   content: "";
   position: fixed;
@@ -72,9 +77,9 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(60ch 44ch at 12% 8%,  rgba(128, 0, 255, 0.16), transparent 60%),
-    radial-gradient(70ch 50ch at 88% 32%, rgba(0, 243, 255, 0.11), transparent 62%),
-    radial-gradient(55ch 40ch at 46% 96%, rgba(0, 255, 0, 0.07),  transparent 58%);
+    /* Darkening veil first so the image never overpowers foreground text. */
+    linear-gradient(rgba(11, 11, 14, 0.55), rgba(11, 11, 14, 0.72)),
+    url("/backdrop.webp") center / cover no-repeat fixed;
 }
 
 /* Everything else sits above the ambient field. */
@@ -1070,4 +1075,148 @@ button.dash-tag {
 
 @media (prefers-reduced-motion: reduce) {
   .dash-cursor { animation: none; }
+}
+
+/* ============================================================
+   Obsidian treatment, cyber-noir palette
+   ------------------------------------------------------------
+   Gene preferred the Obsidian theme's *styling* over Cyber-Noir's, but wants
+   the Cyber-Noir colours. Obsidian's structural moves are ported here and its
+   indigo accent (#6e7cff) is replaced throughout by the phosphor green/cyan
+   pair. Type stays JetBrains Mono — Obsidian's Space Grotesk + Inter would
+   undo the design system.
+   ============================================================ */
+
+/* ── Signature: pulse hairline ───────────────────────────── */
+.dash-pulse {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dash-pulse i {
+  position: absolute;
+  inset: 0;
+  width: 37%;
+  background: linear-gradient(90deg, transparent, var(--neon-green), var(--neon-cyan));
+  animation: dash-pulse 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes dash-pulse {
+  from { opacity: 0.6; transform: translateX(-8%); }
+  to   { opacity: 1;   transform: translateX(180%); }
+}
+
+/* Panel fills live in cyber-noir-visual-components-v4.css, NOT here: globals
+   @imports that sheet, but Turbopack emits it as a later chunk, so a rule
+   written here loses to the base rule at equal specificity. Overrides in this
+   file silently did nothing. */
+.dash-world-card { background: rgba(255, 255, 255, 0.04); }
+
+/* Hover lifts rather than just glowing. */
+.cnv-surface:hover,
+.dash-world-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(0, 255, 0, 0.42);
+  box-shadow: 0 0 0 1px rgba(0, 255, 0, 0.28), 0 10px 30px rgba(0, 0, 0, 0.55);
+  transform: translateY(-1px);
+}
+
+.cnv-surface,
+.dash-world-card {
+  transition:
+    border-color var(--dur-fast) var(--ease-out-quart),
+    background var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart),
+    box-shadow var(--dur-fast) var(--ease-out-quart);
+}
+
+/* ── Group headers: title · rule · count ─────────────────────
+   Replaces the purple-underline h2 with Obsidian's cleaner arrangement — the
+   rule fills the gap and the count sits right. Uses the existing markup
+   (<h2> followed by <small>) with a generated rule between them. */
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-section-header h2 {
+  order: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  border-bottom: 0;
+  display: inline;
+  padding: 0;
+}
+
+.dash-section-header::after {
+  content: "";
+  order: 1;
+  flex: 1;
+  height: 1px;
+  background: var(--border-neutral);
+}
+
+.dash-section-header small {
+  order: 2;
+  flex: none;
+  font-size: 0.7rem;
+  color: var(--text-mute);
+}
+
+/* ── Status as a glowing dot ─────────────────────────────────
+   Obsidian reads state from an 8px dot rather than a word. Keeps the badge
+   for the exact state but leads with colour. */
+.cnv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cnv-badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  flex: none;
+}
+
+/* ── Icon tiles: tinted, not outlined ────────────────────── */
+.dash-world-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 0;
+  background: rgba(0, 255, 0, 0.12);
+}
+
+/* ── Stat labels ────────────────────────────────────────── */
+.cnv-metrics small {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  font-weight: 600;
+}
+
+.cnv-track { height: 4px; border-radius: 3px; }
+
+/* ── Pill bookmarks / tags ──────────────────────────────── */
+.dash-tag { border-radius: 999px; padding: 6px 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-pulse i { animation: none; }
+  .cnv-surface:hover,
+  .dash-world-card:hover { transform: none; }
 }
