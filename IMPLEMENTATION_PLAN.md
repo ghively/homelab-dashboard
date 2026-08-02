@@ -861,11 +861,28 @@ Verified by driving the running app against the real LiteLLM proxy on gh-arm.
 Three adapters have now been run against the real services and returned correct
 data:
 
+Credentials come from 1Password (vault "Gregory"); Hermes holds a service
+account token at `OP_SERVICE_ACCOUNT_TOKEN` in `~/.hermes/.env`.
+
 | adapter | result |
 |---|---|
+| `sonarr` | 260 shows — 68 continuing, 192 ended, 190 monitored |
+| `radarr` | 533 movies — 523 released, 8 announced |
+| `sabnzbd` | v5.0.4, queue idle |
+| `syncthing` | v2.1.2, 2 folders, 1,674 files, 965 GB. **Both folders report `state: error` from Syncthing itself**, and all 3 configured devices are disconnected. |
 | `comfyui` | 1 device, NVIDIA RTX 3060, 9.2 GB / 12.5 GB VRAM, queue empty |
 | `litellm` | 22 models across the proxy |
 | `synology-dsm` | 2 volumes, 13 disks, 35.3 TB / 49.8 TB used. Correctly reported `warning`: `volume_2` is full (15.3/15.3 TB) and DSM flags it `attention`. Real drive models and per-disk temperatures. |
+
+Live contact found three defects that dead-host testing could never have:
+
+- **SABnzbd read `queue.jobs`; the API returns `queue.slots`.** `.map()` threw
+  on every call, so the panel rendered `offline` even with a valid key. The
+  schema also required numbers where SABnzbd sends strings (`"0.00"`).
+- **Syncthing read `version` off `/rest/system/status`.** That document has no
+  such field — it lives at `/rest/system/version`, so the panel always said
+  "unknown".
+- **Radarr listens on 8310**, not the 7878 default.
 
 For contrast, the mock `synology-dsm` this replaced claimed 3 volumes, 8 disks
 and 32 TB. It was wrong in every particular — which is the case for treating
