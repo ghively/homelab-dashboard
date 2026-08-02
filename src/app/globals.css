@@ -103,15 +103,19 @@ body::before {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* Portrait wireframe-mesh wallpaper. `cover` on a 240x100vh column crops to
-     the vertical centre, which is the darkest part of the artwork — the magenta
-     and cyan meshes stay at the edges where the nav labels are not. The veil is
-     stronger than the page backdrop's because nav text sits directly on top of
-     this, rather than inside a glass panel. */
+  /* Portrait wireframe-mesh wallpaper, stretched to fill the whole column.
+     `cover` cropped hard: the column is ~4.5:1 tall but the artwork is 1.78:1,
+     so covering scaled it until the height fit and threw away most of the
+     width — you only ever saw a narrow centre strip. `100% 100%` shows the
+     entire image instead. It distorts, but the artwork is abstract mesh with no
+     straight edges or faces, so the stretch is not readable.
+
+     The veil is stronger than the page backdrop's because nav text sits
+     directly on this rather than inside a glass panel. */
   position: relative;
   background:
     linear-gradient(rgba(11, 11, 14, 0.72), rgba(11, 11, 14, 0.82)),
-    url("/sidebar.webp") center / cover no-repeat,
+    url("/sidebar.webp") 0 0 / 100% 100% no-repeat,
     var(--dash-sidebar);
 }
 
