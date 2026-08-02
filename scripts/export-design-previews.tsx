@@ -138,7 +138,7 @@ function page(name: string, subtitle: string, body: string): string {
     radial-gradient(60ch 40ch at 85% 70%, rgba(0,243,255,.24), transparent 60%),
     var(--bg-dark);}
 </style></head>
-<body><div class="frame">${body}</div></body></html>
+<body><div class="frame chat-rendered">${body}</div></body></html>
 `;
 }
 

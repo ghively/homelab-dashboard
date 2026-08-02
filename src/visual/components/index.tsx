@@ -741,8 +741,14 @@ export const LineChart = defineComponent({
           aria-label={`${s.name}: ${s.points.length} points, latest ${compact(last.y)}${s.unit ?? ""}`}
         >
           <ChartFrame max={max} points={s.points} />
-          <path className="cnv-chart-area" d={areaPath(s.points, max)} fill={color} />
-          <path className="cnv-chart-line" d={linePath(s.points, max)} fill="none" stroke={color} />
+          <path className="cnv-chart-area cnv-chart-area-reveal" d={areaPath(s.points, max)} fill={color} />
+          <path
+            className="cnv-chart-line cnv-chart-line-reveal"
+            d={linePath(s.points, max)}
+            fill="none"
+            pathLength={1}
+            stroke={color}
+          />
           <Endpoint points={s.points} max={max} color={color} unit={s.unit} />
         </svg>
       </Surface>
@@ -789,12 +795,19 @@ export const MultiLine = defineComponent({
           <ChartFrame max={max} points={longest.points} />
           {shown.map((s, si) =>
             s.points?.length ? (
-              <path key={`a${s.name}`} className="cnv-chart-area cnv-chart-area-multi" d={areaPath(s.points, max)} fill={`var(--cnv-series-${si + 1})`} />
+              <path key={`a${s.name}`} className="cnv-chart-area cnv-chart-area-multi cnv-chart-area-reveal" d={areaPath(s.points, max)} fill={`var(--cnv-series-${si + 1})`} />
             ) : null,
           )}
           {shown.map((s, si) =>
             s.points?.length ? (
-              <path key={s.name} className="cnv-chart-line" d={linePath(s.points, max)} fill="none" stroke={`var(--cnv-series-${si + 1})`} />
+              <path
+                key={s.name}
+                className="cnv-chart-line cnv-chart-line-reveal"
+                d={linePath(s.points, max)}
+                fill="none"
+                pathLength={1}
+                stroke={`var(--cnv-series-${si + 1})`}
+              />
             ) : null,
           )}
           {shown.map((s, si) =>
@@ -1012,7 +1025,7 @@ export const NodeGraph = defineComponent({
           {props.edges.map((e, i) => {
             const a = props.nodes.find((n) => n.id === e.source);
             const b = props.nodes.find((n) => n.id === e.target);
-            return a && b ? <line key={i} x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
+            return a && b ? <line key={i} className="cnv-network-flow" x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
           })}
           {props.nodes.map((n) => (
             <g
@@ -1316,8 +1329,14 @@ export const Capacity = defineComponent({
                     aria-label={`${s.name} trend`}
                   >
                     <ChartFrame max={max} points={s.points} />
-                    <path className="cnv-chart-area" d={areaPath(s.points, max)} fill="var(--cnv-series-1)" />
-                    <path className="cnv-chart-line" d={linePath(s.points, max)} fill="none" stroke="var(--cnv-series-1)" />
+                    <path className="cnv-chart-area cnv-chart-area-reveal" d={areaPath(s.points, max)} fill="var(--cnv-series-1)" />
+                    <path
+                      className="cnv-chart-line cnv-chart-line-reveal"
+                      d={linePath(s.points, max)}
+                      fill="none"
+                      pathLength={1}
+                      stroke="var(--cnv-series-1)"
+                    />
                     <Endpoint points={s.points} max={max} color="var(--cnv-series-1)" unit={s.unit} />
                   </svg>
                 );
@@ -1447,7 +1466,7 @@ export const KnowledgeGraph = defineComponent({
             {props.edges.map((e, i) => {
               const a = props.nodes.find((n) => n.id === e.source);
               const b = props.nodes.find((n) => n.id === e.target);
-              return a && b ? <line key={i} x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
+              return a && b ? <line key={i} className="cnv-network-flow" x1={a.x ?? 0} y1={a.y ?? 0} x2={b.x ?? 0} y2={b.y ?? 0} /> : null;
             })}
             {props.nodes.map((n) => (
               <g key={n.id} transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}>
