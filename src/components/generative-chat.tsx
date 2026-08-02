@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback } from "react";
 import { Renderer } from "@openuidev/react-lang";
+import { DecryptReveal } from "@/components/canvasui/DecryptReveal";
+import { useEffectGate } from "@/components/canvasui/Effect";
 import { library } from "@/lib/library";
 import { createToolProvider } from "@/lib/tools";
 
@@ -170,6 +172,45 @@ const SUGGESTIONS = [
 
 // ── GenerativeChat component ─────────────────────────────────
 
+/**
+ * The dashboard mid-generation, rendered as cipher that decrypts around the
+ * cursor.
+ *
+ * Applied ONLY while streaming. Once the response settles the dashboard has to
+ * be readable and clickable, and DecryptReveal is a continuous cursor-driven
+ * effect that would fight both. This way the effect marks the exact moment the
+ * system is doing its work, then gets out of the way.
+ */
+function StreamingRender({ response }: { response: string }) {
+  const decrypt = useEffectGate(true);
+
+  const body = (
+    <Renderer
+      response={response}
+      library={library}
+      toolProvider={toolProvider}
+      isStreaming={true}
+    />
+  );
+
+  if (!decrypt) return body;
+
+  return (
+    <DecryptReveal
+      radius={320}
+      color="#00ff9c"
+      passthrough={0.42}
+      scramble={0.55}
+      scrambleSpeed={1.35}
+      edgeGlow={0.85}
+      edgeTint={0.8}
+      smoothing={0.18}
+    >
+      {body}
+    </DecryptReveal>
+  );
+}
+
 export function GenerativeChat() {
   const chat = useGenerativeChat();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -214,12 +255,7 @@ export function GenerativeChat() {
                 <span className="dash-chat-streaming-dot" />
               </div>
               <div className="dash-chat-rendered">
-                <Renderer
-                  response={chat.streamedResponse}
-                  library={library}
-                  toolProvider={toolProvider}
-                  isStreaming={true}
-                />
+                <StreamingRender response={chat.streamedResponse} />
               </div>
             </div>
           )}
