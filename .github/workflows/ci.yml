@@ -37,7 +37,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # The error backlog is cleared, so lint now FAILS the build. 68 warnings
-      # remain (mostly unused vars in legacy adapters); they are not gating yet.
-      # Do not reintroduce `|| true` to make a red build green — fix the error.
+      # Lint is fully clean: 0 errors, 0 warnings, and `--max-warnings 0` keeps
+      # it that way. Do not reintroduce `|| true`, and do not relax the
+      # threshold to make a red build green — fix the finding, or mark the
+      # symbol intentionally unused with a leading underscore.
       - run: npm run lint

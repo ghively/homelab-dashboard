@@ -39,7 +39,7 @@ export class CloudflareDNSAdapter implements DataAdapter {
   async health(): Promise<HealthCheck> {
     const start = Date.now();
     try {
-      const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${this.zoneId}`, {
+      const _response = await fetch(`https://api.cloudflare.com/client/v4/zones/${this.zoneId}`, {
         headers: {
           Authorization: `Bearer ${this.apiToken}`,
           "Content-Type": "application/json",
@@ -54,7 +54,7 @@ export class CloudflareDNSAdapter implements DataAdapter {
         stalenessSeconds: Math.floor((Date.now() - start) / 1000),
         cacheHit: false,
       };
-    } catch (error) {
+    } catch {
       return {
         adapter: this.name,
         source: "cloudflare-api",

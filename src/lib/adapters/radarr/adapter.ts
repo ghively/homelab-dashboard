@@ -11,16 +11,13 @@
  * - GET /api/v3/diskspace (disk usage)
  */
 
-import { z } from "zod";
 import type {
   VisualData,
   VisualQueryResult,
   FreshnessInfo,
   Metric,
   Item,
-  Event,
 } from "../core/contracts";
-import { VisualStateSchema } from "../core/contracts";
 import type {
   RadarrMovie,
   RadarrQueueItem,
@@ -82,9 +79,8 @@ export class RadarrAdapter {
    * Health check - fetch system status.
    */
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
     try {
-      const status = await this.fetch<RadarrSystemStatus>("/api/v3/system/status");
+      const _status = await this.fetch<RadarrSystemStatus>("/api/v3/system/status");
       return {
         timestamp: new Date().toISOString(),
         source: `Radarr:${this.baseUrl}/api/v3/system/status`,

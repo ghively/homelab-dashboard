@@ -9,16 +9,12 @@
  * - GET /api/scan-jobs (scan jobs)
  */
 
-import { z } from "zod";
 import type {
   VisualData,
   VisualQueryResult,
   FreshnessInfo,
-  Metric,
   Item,
-  Event,
 } from "../core/contracts";
-import { VisualStateSchema } from "../core/contracts";
 import type {
   RommRom,
   RommPlatform,
@@ -80,9 +76,8 @@ export class RommAdapter {
    * Health check - fetch system status.
    */
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
     try {
-      const status = await this.fetch<RommSystemStatus>("/api/status");
+      const _status = await this.fetch<RommSystemStatus>("/api/status");
       return {
         timestamp: new Date().toISOString(),
         source: `RomM:${this.baseUrl}/api/status`,

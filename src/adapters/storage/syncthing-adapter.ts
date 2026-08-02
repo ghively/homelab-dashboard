@@ -63,15 +63,24 @@ class SyncthingAdapter implements DataAdapter {
 
     try {
       const headers = { "X-API-Key": SYNECTHING_API_KEY };
-      const [statusRes, connRes, configRes] = await Promise.all([
+      // Version lives at /rest/system/version, NOT /rest/system/status — the
+      // status document has no `version` field, so reading it there always
+      // yielded "unknown". Confirmed against Syncthing v2.1.2.
+      const [statusRes, connRes, configRes, versionRes] = await Promise.all([
         fetch(`${SYNECTHING_URL}/rest/system/status`, { headers, signal: AbortSignal.timeout(8000) }),
         fetch(`${SYNECTHING_URL}/rest/system/connections`, { headers, signal: AbortSignal.timeout(8000) }),
         fetch(`${SYNECTHING_URL}/rest/config/folders`, { headers, signal: AbortSignal.timeout(8000) }),
+        fetch(`${SYNECTHING_URL}/rest/system/version`, { headers, signal: AbortSignal.timeout(8000) }),
       ]);
 
       if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
 
-      const status = (await statusRes.json()) as { myID?: string; version?: string };
+      // /rest/system/status is still fetched: a non-OK response is how an
+      // unreachable or unauthorised instance is detected (checked above). Its
+      // body carries nothing this panel displays.
+      const version = versionRes.ok
+        ? ((await versionRes.json()) as { version?: string }).version
+        : undefined;
       const connections = connRes.ok
         ? ((await connRes.json()) as { connections?: Record<string, { connected: boolean }> })
         : { connections: {} };
@@ -125,11 +134,11 @@ class SyncthingAdapter implements DataAdapter {
 
       return {
         title: "Syncthing — Continuous File Sync",
-        subtitle: `v${status.version ?? "unknown"} • ${connectedCount} devices connected`,
+        subtitle: `${version ?? "unknown version"} • ${connectedCount} devices connected`,
         state: "healthy",
         freshness: makeFreshness(SYNECTHING_URL),
         metrics: [
-          { label: "Version", value: status.version ?? "unknown" },
+          { label: "Version", value: version ?? "unknown" },
           { label: "Connected Devices", value: connectedCount, state: "healthy" },
           { label: "Folders", value: folders.length, state: "healthy" },
           { label: "Syncing", value: syncingCount, state: hasSyncing ? "warning" : "healthy" },

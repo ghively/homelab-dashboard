@@ -55,7 +55,7 @@ export class GitHubActionsAdapter implements ServiceAdapter {
   async health(): Promise<FreshnessInfo> {
     const now = new Date().toISOString();
     try {
-      const { data } = await this.client.get<GitHubRunner[]>(`/orgs/${GITHUB_OWNER}/actions/runners`);
+      const { data: _data } = await this.client.get<GitHubRunner[]>(`/orgs/${GITHUB_OWNER}/actions/runners`);
       return {
         adapter: this.name,
         source: this.host,

@@ -1,5 +1,5 @@
 import { BaseAdapter } from "./BaseAdapter";
-import type { AdapterResult, AdapterState } from "./types";
+import type { AdapterState } from "./types";
 import mqtt, { MqttClient, IClientOptions } from "mqtt";
 
 /**

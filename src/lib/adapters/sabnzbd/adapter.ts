@@ -9,16 +9,13 @@
  * - GET /api?mode=warnings (server warnings)
  */
 
-import { z } from "zod";
 import type {
   VisualData,
   VisualQueryResult,
   FreshnessInfo,
   Metric,
   Item,
-  Event,
 } from "../core/contracts";
-import { VisualStateSchema } from "../core/contracts";
 import type {
   SabQueue,
   SabHistory,
@@ -80,9 +77,8 @@ export class SabnzbdAdapter {
    * Health check - fetch server status.
    */
   async health(): Promise<FreshnessInfo> {
-    const start = Date.now();
     try {
-      const status = await this.fetch<SabServerStatus>(this.getUrl("server_stats"));
+      const _status = await this.fetch<SabServerStatus>(this.getUrl("server_stats"));
       return {
         timestamp: new Date().toISOString(),
         source: `SABnzbd:${this.baseUrl}/api?mode=server_stats`,
@@ -111,59 +107,65 @@ export class SabnzbdAdapter {
 
       const now = new Date().toISOString();
 
-      const visualItems: Item[] = queue.queue.jobs.map((item: SabQueueSlot) => ({
-        id: item.id,
-        label: item.filename,
-        subtitle: item.category || "Uncategorized",
-        image: undefined,
-        value: item.mb,
-        progress: item.percentage / 100,
-        state: item.status === "Downloading" ? "loading" : item.status === "Completed" ? "healthy" : item.status === "Failed" ? "critical" : "warning",
-        group: item.status,
+      // SABnzbd returns queue entries under `slots`, not `jobs`, and every
+      // number as a string. Reading `jobs` made this throw on every call.
+      const slots = queue.queue.slots ?? [];
+
+      const visualItems: Item[] = slots.map((item: SabQueueSlot, idx: number) => ({
+        id: item.nzo_id ?? `slot-${idx}`,
+        label: item.filename ?? "unknown",
+        subtitle: item.cat || "Uncategorized",
+        value: item.mb ?? 0,
+        ...(item.percentage != null ? { progress: item.percentage / 100 } : {}),
+        state:
+          item.status === "Downloading"
+            ? ("loading" as const)
+            : item.status === "Completed"
+              ? ("healthy" as const)
+              : item.status === "Failed"
+                ? ("critical" as const)
+                : ("warning" as const),
+        group: item.status ?? "queued",
         meta: {
           mbleft: item.mbleft,
           mb: item.mb,
           percentage: item.percentage,
-          eta: item.eta,
-          avg_age: item.avg_age,
+          timeleft: item.timeleft,
           priority: item.priority,
           size: item.size,
-          sizemb: item.sizemb,
-          downloaded: item.downloaded,
-          path: item.path,
         },
       }));
 
       const data: VisualData = {
         title: "Download Queue",
-        subtitle: `${queue.queue.noofslots} items in queue`,
-        state: queue.queue.noofslots > 0 ? "loading" : "empty",
+        subtitle: `${queue.queue.noofslots ?? slots.length} items in queue`,
+        state: (queue.queue.noofslots ?? slots.length) > 0 ? "loading" : "empty",
         items: visualItems,
         metrics: [
-          { label: "In Queue", value: queue.queue.noofslots, unit: "items" },
+          { label: "In Queue", value: queue.queue.noofslots ?? slots.length, unit: "items" },
           {
             label: "Downloading",
-            value: queue.queue.jobs.filter((j) => j.status === "Downloading").length,
+            value: slots.filter((j) => j.status === "Downloading").length,
             unit: "items",
           },
           {
             label: "Completed",
-            value: queue.queue.jobs.filter((j) => j.status === "Completed").length,
+            value: slots.filter((j) => j.status === "Completed").length,
             unit: "items",
           },
           {
             label: "Failed",
-            value: queue.queue.jobs.filter((j) => j.status === "Failed").length,
+            value: slots.filter((j) => j.status === "Failed").length,
             unit: "items",
           },
           {
             label: "Speed",
-            value: queue.queue.kbpersec,
+            value: queue.queue.kbpersec ?? 0,
             unit: "KB/s",
           },
           {
             label: "Size Left",
-            value: (queue.queue.mbleft / 1024).toFixed(2),
+            value: ((queue.queue.mbleft ?? 0) / 1024).toFixed(2),
             unit: "GB",
           },
         ],
@@ -405,28 +407,30 @@ export class SabnzbdAdapter {
 
       const data: VisualData = {
         title: "Current Speed",
-        subtitle: `${queue.queue.noofslots} items in queue`,
+        subtitle: `${queue.queue.noofslots ?? 0} items in queue`,
         state: "healthy",
         metrics: [
           {
             label: "Speed",
-            value: queue.queue.kbpersec,
+            value: queue.queue.kbpersec ?? 0,
             unit: "KB/s",
-            state: queue.queue.kbpersec > 0 ? "healthy" : "empty",
+            state: (queue.queue.kbpersec ?? 0) > 0 ? "healthy" : "empty",
           },
           {
             label: "Size Left",
-            value: (queue.queue.mbleft / 1024).toFixed(2),
+            value: ((queue.queue.mbleft ?? 0) / 1024).toFixed(2),
             unit: "GB",
           },
           {
             label: "Total Size",
-            value: (queue.queue.mb / 1024).toFixed(2),
+            value: ((queue.queue.mb ?? 0) / 1024).toFixed(2),
             unit: "GB",
           },
           {
-            label: "ETA",
-            value: queue.queue.eta || "Unknown",
+            // SABnzbd reports remaining time per slot (`timeleft`), not as a
+            // queue-level `eta` — that field does not exist in the response.
+            label: "Time Left",
+            value: queue.queue.slots?.[0]?.timeleft ?? "—",
             unit: "",
           },
         ],
