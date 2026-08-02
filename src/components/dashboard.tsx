@@ -15,6 +15,10 @@ interface ShellProps {
   children: ReactNode;
   activeWorld: WorldId | "home";
   onWorldChange: (w: WorldId | "home") => void;
+  /** Start a fresh conversation. Distinct from navigating home: pressing "New
+   *  dashboard" while already on the home page must still clear the thread,
+   *  and onWorldChange("home") is a no-op in that case. */
+  onNewChat?: () => void;
   fixtureState: VisualStateValue | null;
   onFixtureChange: (s: VisualStateValue | null) => void;
   dataSource?: "fixture" | "live";
@@ -24,6 +28,7 @@ export function DashboardShell({
   children,
   activeWorld,
   onWorldChange,
+  onNewChat,
   fixtureState,
   onFixtureChange,
   dataSource = "fixture",
@@ -64,7 +69,7 @@ export function DashboardShell({
             another destination. */}
         <button
           className="dash-new"
-          onClick={() => onWorldChange("home")}
+          onClick={() => (onNewChat ? onNewChat() : onWorldChange("home"))}
         >
           <span className="dash-new-icon" aria-hidden="true">+</span>
           New dashboard
