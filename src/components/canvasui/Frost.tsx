@@ -614,7 +614,10 @@ export function createFrost(
       // another paint instead of reporting a phantom failure.
       if (isTransientDrawElementError(err) && transientDrawRetries < 10) {
         transientDrawRetries++;
-        paintable.requestPaint?.();
+        // Deferred rather than called here: requestPaint() from inside onpaint
+        // re-enters the paint that is currently running, which is the shape of
+        // thing a renderer CHECK() exists to catch.
+        requestAnimationFrame(() => paintable.requestPaint?.());
         return;
       }
       // Was `catch {}`. Swallowing this is why enabling the Chrome flag
