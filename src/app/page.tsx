@@ -453,8 +453,14 @@ function AdapterResultCard({
       )}
 
       {!hasItems && !hasMetrics && !hasEvents && !hasNodes && (
-        <div className="dash-loading" style={{ padding: 20 }}>
-          <small>No data to display</small>
+        // Same empty treatment the generated panels use, rather than the
+        // loading spinner's styling reused as a shrug.
+        <div className="cnv-state-nodata" role="status">
+          <span className="cnv-state-glyph" aria-hidden="true">
+            ◌
+          </span>
+          <strong>No data reported</strong>
+          <small>The adapter answered with nothing to show.</small>
         </div>
       )}
     </VisualPanel>

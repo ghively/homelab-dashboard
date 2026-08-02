@@ -193,7 +193,10 @@ export function Metrics({
               {m.unit}
             </strong>
             {m.trend != null && (
-              <span>
+              // Direction is stated, never judged: a rising number is good on
+              // throughput and bad on latency, and this component cannot know
+              // which it is holding. Up reads as the accent, down as muted.
+              <span className={m.trend > 0 ? "cnv-trend cnv-trend-up" : "cnv-trend cnv-trend-down"}>
                 {m.trend > 0 ? "↗" : "↘"} {Math.abs(m.trend)}%
               </span>
             )}
@@ -209,11 +212,282 @@ export function Metrics({
   );
 }
 
-function NoData({ label = "No data" }: { label?: string }) {
+function NoData({ label = "No data", hint }: { label?: string; hint?: string }) {
   return (
-    <div className="cnv-state-nodata">
+    <div className="cnv-state-nodata" role="status">
+      <span className="cnv-state-glyph" aria-hidden="true">
+        ◌
+      </span>
       <strong>{label}</strong>
+      {hint && <small>{hint}</small>}
     </div>
+  );
+}
+
+/**
+ * Shapes a skeleton can take. Deliberately a closed set: a loading panel should
+ * pre-draw the layout it is about to become, not a generic grey block.
+ */
+type SkeletonShape = "tiles" | "rows" | "chart" | "bars" | "ring";
+
+function Skeleton({ shape = "rows" }: { shape?: SkeletonShape }) {
+  // aria-busy + a visually-hidden label: a screen reader hears "Loading", a
+  // sighted reader sees the shape of the thing that is coming.
+  return (
+    <div className={`cnv-skeleton cnv-skeleton-${shape}`} aria-busy="true" aria-live="polite">
+      <span className="cnv-sr">Loading</span>
+      {shape === "ring" ? (
+        <i className="cnv-sk-ring" />
+      ) : shape === "chart" ? (
+        <i className="cnv-sk-chart" />
+      ) : (
+        Array.from({ length: shape === "tiles" ? 4 : shape === "bars" ? 5 : 4 }, (_, i) => (
+          <i key={i} />
+        ))
+      )}
+    </div>
+  );
+}
+
+/**
+ * The one place a panel with nothing to show is rendered.
+ *
+ * Every component used to inline its own `<Surface …><NoData/></Surface>`, which
+ * meant an empty panel inherited `state` verbatim — usually undefined, so
+ * Surface defaulted it to "healthy" and a panel with no data wore a green edge
+ * and a HEALTHY badge. Absence is not health. Empty falls back to "empty", and
+ * a panel whose state IS "loading" gets a skeleton in the shape of the content
+ * it is waiting for rather than the same dashed box.
+ */
+function EmptyPanel({
+  props,
+  title,
+  label,
+  hint,
+  shape,
+}: {
+  props: { title?: string; subtitle?: string; state?: string } & SurfaceExtras;
+  title: string;
+  label: string;
+  hint?: string;
+  shape?: SkeletonShape;
+}) {
+  return (
+    <Surface
+      surfaceStyle={props.surfaceStyle}
+      gridSpan={{ span: props.span, rowSpan: props.rowSpan }}
+      title={props.title ?? title}
+      subtitle={props.subtitle}
+      state={props.state ?? "empty"}
+    >
+      {props.state === "loading" ? <Skeleton shape={shape} /> : <NoData label={label} hint={hint} />}
+    </Surface>
+  );
+}
+
+/**
+ * Props that make a non-button element behave like one.
+ *
+ * VisualTable rows, Kanban cards and ArtworkWall tiles all carried a bare
+ * `onClick` on a `<div>`/`<article>`: no tab stop, no keyboard activation, no
+ * focus ring, and nothing announcing them as interactive. A dashboard whose
+ * only drill-down path requires a mouse is a dashboard half its users cannot
+ * drill into.
+ */
+function clickable(onActivate: () => void, label: string) {
+  return {
+    className: "cnv-clickable",
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": label,
+    onClick: onActivate,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onActivate();
+      }
+    },
+  };
+}
+
+// ── Artwork ───────────────────────────────────────────────────
+
+/**
+ * Turn an adapter-supplied artwork URL into a background-image value that
+ * cannot break the panel.
+ *
+ * Two separate failures were live here:
+ *
+ *  1. `style={{ backgroundImage: `url(${i.image})` }}` overrides the whole
+ *     background-image layer, so the dark gradient `.cnv-art` paints as its
+ *     fallback was DISCARDED the moment an item carried an image — and if that
+ *     URL then 404s (Radarr hands out relative `/MediaCover/…` paths, Emby
+ *     hands out `http://<tailnet-ip>:8096/…`, and neither resolves from every
+ *     browser that opens this dashboard) the tile painted nothing at all.
+ *     Layering the gradient BEHIND the url means a failed fetch degrades to the
+ *     placeholder instead of to a hole.
+ *
+ *  2. An unescaped URL is a CSS injection: a bare `)` or `"` in a query string
+ *     terminates the declaration and can open the next one. Anything that is
+ *     not a plain http(s)/protocol-relative/site-relative/data: image is
+ *     dropped, and the survivors are quoted and escaped.
+ */
+const ART_FALLBACK =
+  "linear-gradient(145deg, rgba(128,0,255,0.20), rgba(0,243,255,0.12)), " +
+  "linear-gradient(#1b1b21, #141418)";
+
+export function artBackground(image?: string): string | undefined {
+  if (!image) return undefined;
+  const url = image.trim();
+  if (!url) return undefined;
+  // Closed list of accepted shapes. Everything else — javascript:, file:,
+  // arbitrary schemes, anything with a newline — never reaches the stylesheet.
+  const allowed =
+    /^https?:\/\//i.test(url) ||
+    /^\/\//.test(url) ||
+    /^\/[^/]/.test(url) ||
+    /^data:image\//i.test(url);
+  if (!allowed) return undefined;
+  if (/[\s"'()\\<>]/.test(url)) {
+    // Escaping is possible but a URL containing these is far more likely to be
+    // malformed adapter output than a real asset. Fall through to the tile.
+    return undefined;
+  }
+  return `url("${url}"), ${ART_FALLBACK}`;
+}
+
+/** Style + data attribute for one artwork tile. */
+function artProps(image?: string): {
+  style?: React.CSSProperties;
+  "data-art": "image" | "none";
+} {
+  const bg = artBackground(image);
+  return bg ? { style: { backgroundImage: bg }, "data-art": "image" } : { "data-art": "none" };
+}
+
+// ── Chart primitives ──────────────────────────────────────────
+//
+// One geometry for every SVG chart in the file, so a LineChart, a MultiLine and
+// a Capacity sparkline share a baseline, a gutter and a type size instead of
+// each inventing their own. All of it is pure arithmetic on a fixed viewBox —
+// no measurement, no layout effect, nothing that differs between server and
+// client render.
+
+const CHART_W = 640;
+const CHART_H = 220;
+/** Gutters: left for value labels, bottom for the x axis. */
+const PAD = { l: 48, r: 16, t: 14, b: 30 };
+const PLOT_W = CHART_W - PAD.l - PAD.r;
+const PLOT_H = CHART_H - PAD.t - PAD.b;
+const BASE_Y = PAD.t + PLOT_H;
+
+/** Round an axis maximum up to 1/2/2.5/5/10 × 10ⁿ so gridlines land on readable numbers. */
+function niceMax(v: number): number {
+  if (!Number.isFinite(v) || v <= 0) return 1;
+  const base = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / base;
+  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+  return step * base;
+}
+
+/** Axis and endpoint labels: 12400 reads as 12.4k, not as five digits in a 48px gutter. */
+function compact(v: number): string {
+  if (!Number.isFinite(v)) return "–";
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v / 1e9).toFixed(a >= 1e10 ? 0 : 1) + "G";
+  if (a >= 1e6) return (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+  if (a >= 1e3) return (v / 1e3).toFixed(a >= 1e4 ? 0 : 1) + "k";
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(a < 1 ? 2 : 1);
+}
+
+type Point = { x: string | number; y: number };
+
+const xAt = (i: number, n: number) => PAD.l + (n <= 1 ? PLOT_W / 2 : (i * PLOT_W) / (n - 1));
+const yAt = (v: number, max: number) =>
+  BASE_Y - (Math.max(0, Math.min(Number(v) || 0, max)) / max) * PLOT_H;
+
+function linePath(points: Point[], max: number): string {
+  return points.map((p, i) => `${i ? "L" : "M"} ${xAt(i, points.length)} ${yAt(p.y, max)}`).join(" ");
+}
+
+/** The line, closed down to the baseline — the area wash under a series. */
+function areaPath(points: Point[], max: number): string {
+  if (!points.length) return "";
+  const n = points.length;
+  return `${linePath(points, max)} L ${xAt(n - 1, n)} ${BASE_Y} L ${xAt(0, n)} ${BASE_Y} Z`;
+}
+
+/**
+ * Gridlines, value axis and x labels.
+ *
+ * Only three x labels are ever drawn — first, middle, last — anchored start,
+ * middle and end respectively. That is the cheapest collision-proof axis there
+ * is: 60 timestamps in a 578px plot cannot be drawn without overlapping, and a
+ * dashboard that overlaps its axis labels reads as broken rather than as dense.
+ */
+function ChartFrame({ max, points }: { max: number; points?: Point[] }) {
+  const rows = [0, 0.25, 0.5, 0.75, 1];
+  const label = (p: Point | undefined) =>
+    p == null ? "" : String(p.x).length > 12 ? String(p.x).slice(0, 11) + "…" : String(p.x);
+  const n = points?.length ?? 0;
+  const ticks: Array<[number, string, "start" | "middle" | "end"]> = [];
+  if (n) {
+    ticks.push([xAt(0, n), label(points![0]), "start"]);
+    if (n > 2) ticks.push([xAt((n - 1) >> 1, n), label(points![(n - 1) >> 1]), "middle"]);
+    if (n > 1) ticks.push([xAt(n - 1, n), label(points![n - 1]), "end"]);
+  }
+  return (
+    <g aria-hidden="true">
+      {rows.map((r) => (
+        <line
+          key={r}
+          className={r === 0 ? "cnv-chart-base" : "cnv-chart-grid"}
+          x1={PAD.l}
+          x2={PAD.l + PLOT_W}
+          y1={BASE_Y - r * PLOT_H}
+          y2={BASE_Y - r * PLOT_H}
+        />
+      ))}
+      {/* Four gridlines, three labels. Labelling every line put a number
+          against 12.5 and 37.5 on a 50-unit axis — noise in a 48px gutter. */}
+      {[0, 0.5, 1].map((r) => (
+        <text key={`t${r}`} className="cnv-chart-axis" x={PAD.l - 8} y={BASE_Y - r * PLOT_H + 4} textAnchor="end">
+          {compact(max * r)}
+        </text>
+      ))}
+      {ticks.map(([x, t, anchor]) => (
+        <text key={`x${x}`} className="cnv-chart-axis" x={x} y={CHART_H - 10} textAnchor={anchor}>
+          {t}
+        </text>
+      ))}
+    </g>
+  );
+}
+
+/** The last reading, called out — on a time series that is the number people came for. */
+function Endpoint({ points, max, color, unit }: { points: Point[]; max: number; color: string; unit?: string }) {
+  if (!points.length) return null;
+  const i = points.length - 1;
+  const x = xAt(i, points.length);
+  const y = yAt(points[i].y, max);
+  const text = compact(points[i].y) + (unit ?? "");
+  // Flip the label inside the plot when the endpoint is near the right edge.
+  const flip = x > PAD.l + PLOT_W - 60;
+  return (
+    <g>
+      <circle className="cnv-chart-halo" cx={x} cy={y} r="7" fill={color} />
+      <circle cx={x} cy={y} r="3.5" fill={color} />
+      <text
+        className="cnv-chart-endpoint"
+        x={flip ? x - 8 : x + 8}
+        y={y - 8}
+        textAnchor={flip ? "end" : "start"}
+        fill={color}
+      >
+        {text}
+      </text>
+    </g>
   );
 }
 
@@ -236,7 +510,7 @@ export const MetricStrip = defineComponent({
     "Choose this over Gauge when there are multiple independent numbers. " +
     "Choose Gauge when there is ONE bounded number (e.g. disk fill %).",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[] } & SurfaceExtras>) => {
-    if (!props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Metrics"} state={props.state}><NoData label="No metrics" /></Surface>;
+    if (!props.metrics?.length) return <EmptyPanel props={props} title="Metrics" label="No metrics" shape="tiles" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Metrics"} subtitle={props.subtitle} state={props.state}>
         <Metrics metrics={props.metrics} />
@@ -268,21 +542,62 @@ export const Gauge = defineComponent({
     "Default max is 100 (percentage). Set max for non-percentage gauges.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; value: number; max?: number; unit?: string; state?: string; thresholds?: { warning: number; critical: number } } & SurfaceExtras>) => {
     const v = Number(props.value);
-    if (!Number.isFinite(v)) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gauge"} state={props.state}><NoData label="No gauge value" /></Surface>;
+    if (!Number.isFinite(v)) return <EmptyPanel props={props} title="Gauge" label="No gauge value" shape="ring" />;
     const max = props.max ?? 100;
     const pct = Math.min(100, Math.max(0, (v / max) * 100));
     const th = props.thresholds;
     let color = "var(--cnv-series-1)";
     if (th) {
-      if (pct >= th.critical) color = "#ff5555";
-      else if (pct >= th.warning) color = "#ffc266";
+      if (pct >= th.critical) color = "var(--cnv-critical)";
+      else if (pct >= th.warning) color = "var(--cnv-warning)";
     }
+    const unit = props.unit ?? (max === 100 ? "%" : "");
+    // Threshold ticks are painted as a layer ON TOP of the fill, so the ring
+    // shows not just where the value is but where it is allowed to go. Earlier
+    // layers win in CSS, so the ticks are listed first.
+    const tick = (at: number, c: string) =>
+      `conic-gradient(transparent 0 ${at}%, ${c} ${at}% ${Math.min(100, at + 0.8)}%, transparent ${Math.min(100, at + 0.8)}%)`;
+    const fill = `conic-gradient(${color} 0 ${pct}%, var(--cnv-track) ${pct}%)`;
+    const background = th
+      ? `${tick(th.critical, "var(--cnv-critical)")}, ${tick(th.warning, "var(--cnv-warning)")}, ${fill}`
+      : fill;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gauge"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-capacity">
-          <div style={{ background: `conic-gradient(${color} 0 ${pct}%, #2b2f3a ${pct}%)` }}>
-            <strong>{v}{props.unit ?? (max === 100 ? "%" : "")}</strong>
+          <div
+            className="cnv-ring"
+            style={{ background }}
+            role="img"
+            aria-label={`${v}${unit} of ${max}${unit}`}
+          >
+            <strong>
+              {compact(v)}
+              {unit}
+              <small>of {compact(max)}{unit}</small>
+            </strong>
           </div>
+          <ul className="cnv-legend cnv-legend-block">
+            <li>
+              <i style={{ background: color }} aria-hidden="true" />
+              <span>Current</span>
+              <b>{compact(v)}{unit}</b>
+              <em>{Math.round(pct)}%</em>
+            </li>
+            {th && (
+              <li>
+                <i style={{ background: "var(--cnv-warning)" }} aria-hidden="true" />
+                <span>Warning at</span>
+                <b>{th.warning}%</b>
+              </li>
+            )}
+            {th && (
+              <li>
+                <i style={{ background: "var(--cnv-critical)" }} aria-hidden="true" />
+                <span>Critical at</span>
+                <b>{th.critical}%</b>
+              </li>
+            )}
+          </ul>
         </div>
       </Surface>
     );
@@ -308,9 +623,9 @@ export const Donut = defineComponent({
     "Choose over BarRank when proportions matter more than ranking. " +
     "Choose Capacity when there is a single used/available split.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; segments: { label: string; value: number; color?: string }[] } & SurfaceExtras>) => {
-    if (!props.segments?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Distribution"} state={props.state}><NoData label="No distribution data" /></Surface>;
+    if (!props.segments?.length) return <EmptyPanel props={props} title="Distribution" label="No distribution data" shape="ring" />;
     const total = props.segments.reduce((s, x) => s + Number(x.value) || 0, 0);
-    if (total === 0) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Distribution"} state={props.state}><NoData label="Total is zero" /></Surface>;
+    if (total === 0) return <EmptyPanel props={props} title="Distribution" label="Total is zero" shape="ring" />;
     const colors = ["var(--cnv-series-1)", "var(--cnv-series-2)", "var(--cnv-series-3)", "var(--cnv-series-4)", "#ff6b6b", "#74b9ff"];
     let acc = 0;
     const stops = props.segments.map((seg, i) => {
@@ -323,16 +638,27 @@ export const Donut = defineComponent({
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Distribution"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-capacity">
-          <div style={{ background: `conic-gradient(${grad})` }}>
-            <strong>{total}</strong>
+          <div
+            className="cnv-ring"
+            style={{ background: `conic-gradient(${grad})` }}
+            role="img"
+            aria-label={stops.map((s) => `${s.label} ${Math.round(s.pct)}%`).join(", ")}
+          >
+            <strong>
+              {compact(total)}
+              <small>total</small>
+            </strong>
           </div>
-          <section>
+          <ul className="cnv-legend cnv-legend-block">
             {stops.map((s, i) => (
-              <article key={i} style={{ borderColor: s.color }}>
-                <small style={{ color: s.color }}>●</small> <strong>{s.label}</strong> <b>{s.value} ({Math.round(s.pct)}%)</b>
-              </article>
+              <li key={i}>
+                <i style={{ background: s.color }} aria-hidden="true" />
+                <span title={s.label}>{s.label}</span>
+                <b>{typeof s.value === "number" ? compact(s.value) : s.value}</b>
+                <em>{Math.round(s.pct)}%</em>
+              </li>
             ))}
-          </section>
+          </ul>
         </div>
       </Surface>
     );
@@ -358,14 +684,23 @@ export const LineChart = defineComponent({
     "For multiple overlapping series use MultiLine. " +
     "For ranked horizontal bars use BarRank.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; series: z.infer<typeof SeriesSchema>[] } & SurfaceExtras>) => {
-    if (!props.series?.length || !props.series[0]?.points?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Line Chart"} state={props.state}><NoData label="No time-series data" /></Surface>;
+    if (!props.series?.length || !props.series[0]?.points?.length) return <EmptyPanel props={props} title="Line Chart" label="No time-series data" shape="chart" />;
     const s = props.series[0];
-    const max = Math.max(...s.points.map((p) => p.y), 1);
-    const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" ");
+    const max = niceMax(Math.max(...s.points.map((p) => Number(p.y) || 0), 0));
+    const color = "var(--cnv-series-1)";
+    const last = s.points[s.points.length - 1];
     return (
-      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? s.name} subtitle={props.subtitle} state={props.state}>
-        <svg className="cnv-chart" viewBox="0 0 640 220" role="img">
-          <path d={d} fill="none" stroke="var(--cnv-series-1)" strokeWidth="3" />
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? s.name} subtitle={props.subtitle ?? (s.unit ? `${s.name} (${s.unit})` : undefined)} state={props.state}>
+        <svg
+          className="cnv-chart"
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          role="img"
+          aria-label={`${s.name}: ${s.points.length} points, latest ${compact(last.y)}${s.unit ?? ""}`}
+        >
+          <ChartFrame max={max} points={s.points} />
+          <path className="cnv-chart-area" d={areaPath(s.points, max)} fill={color} />
+          <path className="cnv-chart-line" d={linePath(s.points, max)} fill="none" stroke={color} />
+          <Endpoint points={s.points} max={max} color={color} unit={s.unit} />
         </svg>
       </Surface>
     );
@@ -389,20 +724,54 @@ export const MultiLine = defineComponent({
     "Multi-series line chart for comparing trends across 2–4 metrics over the same axis (e.g. CPU vs memory vs network over time). " +
     "Each Series gets its own colored line. For a single metric use LineChart.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; series: z.infer<typeof SeriesSchema>[] } & SurfaceExtras>) => {
-    if (!props.series?.length || props.series.every((s) => !s.points?.length)) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Multi-Line"} state={props.state}><NoData label="No time-series data" /></Surface>;
+    if (!props.series?.length || props.series.every((s) => !s.points?.length)) return <EmptyPanel props={props} title="Multi-Line" label="No time-series data" shape="chart" />;
+    const shown = props.series.slice(0, 4);
+    const max = niceMax(
+      Math.max(...shown.flatMap((s) => (s.points ?? []).map((p) => Number(p.y) || 0)), 0),
+    );
+    // Axis ticks come from whichever series has the most readings, so a short
+    // series cannot truncate the shared time axis.
+    const longest = shown.reduce((a, b) => ((b.points?.length ?? 0) > (a.points?.length ?? 0) ? b : a));
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Multi-Line"} subtitle={props.subtitle} state={props.state}>
-        <svg className="cnv-chart" viewBox="0 0 640 220" role="img">
-          {props.series.slice(0, 4).map((s, si) => {
-            if (!s.points?.length) return null;
-            const max = Math.max(...s.points.map((p) => p.y), 1);
-            const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" ");
-            return <path key={s.name} d={d} fill="none" stroke={`var(--cnv-series-${si + 1})`} strokeWidth="3" />;
-          })}
+        <svg
+          className="cnv-chart"
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          role="img"
+          aria-label={`Comparison of ${shown.map((s) => s.name).join(", ")}`}
+        >
+          {/* One shared scale. Per-series maxima made two lines with a 100×
+              difference in magnitude sit on top of each other, which is a chart
+              that actively lies about the comparison it exists to show. */}
+          <ChartFrame max={max} points={longest.points} />
+          {shown.map((s, si) =>
+            s.points?.length ? (
+              <path key={`a${s.name}`} className="cnv-chart-area cnv-chart-area-multi" d={areaPath(s.points, max)} fill={`var(--cnv-series-${si + 1})`} />
+            ) : null,
+          )}
+          {shown.map((s, si) =>
+            s.points?.length ? (
+              <path key={s.name} className="cnv-chart-line" d={linePath(s.points, max)} fill="none" stroke={`var(--cnv-series-${si + 1})`} />
+            ) : null,
+          )}
+          {shown.map((s, si) =>
+            s.points?.length ? (
+              <Endpoint key={`e${s.name}`} points={s.points} max={max} color={`var(--cnv-series-${si + 1})`} unit={s.unit} />
+            ) : null,
+          )}
         </svg>
-        <div className="cnv-metrics">
-          {props.series.map((s, i) => <article key={i}><small style={{ color: `var(--cnv-series-${i + 1})` }}>●</small> <strong>{s.name}</strong></article>)}
-        </div>
+        <ul className="cnv-legend">
+          {shown.map((s, i) => {
+            const last = s.points?.length ? s.points[s.points.length - 1] : undefined;
+            return (
+              <li key={i}>
+                <i style={{ background: `var(--cnv-series-${i + 1})` }} aria-hidden="true" />
+                <span>{s.name}</span>
+                <b>{last ? compact(last.y) + (s.unit ?? "") : "–"}</b>
+              </li>
+            );
+          })}
+        </ul>
       </Surface>
     );
   },
@@ -426,19 +795,28 @@ export const BarRank = defineComponent({
     "Each Item needs {id, label, value}. Up to 12 bars. " +
     "For proportional parts-of-a-whole use Donut. For time-series use LineChart.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Bar Rank"} state={props.state}><NoData label="No data to rank" /></Surface>;
-    const items = props.items;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Bar Rank" label="No data to rank" shape="bars" />;
+    // A "rank" that arrives unsorted is not a ranking. Sorting here means the
+    // longest bar is always the top row, which is the whole point of the chart.
+    const items = [...props.items]
+      .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+      .slice(0, 12);
     const max = Math.max(...items.map((i) => Number(i.value) || 0), 1);
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Bar Rank"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-bars">
-          {items.slice(0, 12).map((i) => (
-            <article key={i.id}>
-              <label>{i.label}</label>
-              <div><i style={{ width: `${((Number(i.value) || 0) / max) * 100}%` }} /></div>
-              <b>{i.value}</b>
-            </article>
-          ))}
+          {items.map((i) => {
+            const v = Number(i.value) || 0;
+            return (
+              <article key={i.id} className={`state-${i.state ?? "healthy"}`}>
+                <label title={i.label}>{i.label}</label>
+                <div role="img" aria-label={`${Math.round((v / max) * 100)} percent of the largest value`}>
+                  <i style={{ width: `${(v / max) * 100}%` }} />
+                </div>
+                <b>{typeof i.value === "number" ? compact(i.value) : i.value}</b>
+              </article>
+            );
+          })}
         </div>
       </Surface>
     );
@@ -464,7 +842,7 @@ export const Timeline = defineComponent({
     "Choose over EventStream when temporal ordering is primary. " +
     "EventStream is for high-volume real-time log-like feeds.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; events: z.infer<typeof EventSchema>[] } & SurfaceExtras>) => {
-    if (!props.events?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Timeline"} state={props.state}><NoData label="No events" /></Surface>;
+    if (!props.events?.length) return <EmptyPanel props={props} title="Timeline" label="No events" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Timeline"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-timeline">
@@ -499,7 +877,7 @@ export const EventStream = defineComponent({
     "Denser than Timeline — optimized for scanning many entries. " +
     "Use LogStream for raw system logs with severity levels.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; events: z.infer<typeof EventSchema>[] } & SurfaceExtras>) => {
-    if (!props.events?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Event Stream"} state={props.state}><NoData label="No events" /></Surface>;
+    if (!props.events?.length) return <EmptyPanel props={props} title="Event Stream" label="No events" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Event Stream"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-timeline">
@@ -539,8 +917,14 @@ export const LogStream = defineComponent({
     "Each entry: {timestamp, level, message, source?}. " +
     "Use EventStream for higher-level domain events with titles and detail text.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; entries: { timestamp: string; level: string; message: string; source?: string }[] } & SurfaceExtras>) => {
-    if (!props.entries?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Log Stream"} state={props.state}><NoData label="No log entries" /></Surface>;
-    const colors: Record<string, string> = { error: "#ff5555", fatal: "#ff5555", warn: "#ffc266", info: "var(--cnv-series-1)", debug: "var(--cnv-muted)" };
+    if (!props.entries?.length) return <EmptyPanel props={props} title="Log Stream" label="No log entries" shape="rows" />;
+    const colors: Record<string, string> = {
+      error: "var(--cnv-critical)",
+      fatal: "var(--cnv-critical)",
+      warn: "var(--cnv-warning)",
+      info: "var(--cnv-series-1)",
+      debug: "var(--cnv-muted)",
+    };
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Log Stream"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
@@ -578,7 +962,7 @@ export const NodeGraph = defineComponent({
     "For sequential pipeline/flow use Flow. For proportional flow use Sankey.",
   component: function NodeGraphView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Node Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
+    if (!props.nodes?.length) return <EmptyPanel props={props} title="Node Graph" label="No graph data" shape="chart" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Network"} subtitle={props.subtitle} state={props.state}>
         <svg className="cnv-network" viewBox="0 0 800 430" role="img">
@@ -591,8 +975,7 @@ export const NodeGraph = defineComponent({
             <g
               key={n.id}
               transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}
-              className="cnv-clickable"
-              onClick={() => triggerAction(`Show details for ${n.label}`)}
+              {...clickable(() => triggerAction(`Show details for ${n.label}`), `Show details for ${n.label}`)}
             >
               <circle r="34" />
               <text textAnchor="middle" y="5">{n.label}</text>
@@ -624,7 +1007,7 @@ export const Sankey = defineComponent({
     "Choose over NodeGraph when the quantity flowing between nodes matters. " +
     "Choose Flow for simple sequential steps without branching.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] } & SurfaceExtras>) => {
-    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} state={props.state}><NoData label="No flow data" /></Surface>;
+    if (!props.nodes?.length) return <EmptyPanel props={props} title="Flow" label="No flow data" shape="tiles" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-flow">
@@ -660,7 +1043,7 @@ export const Kanban = defineComponent({
     "Use VisualTable for flat tabular data. Use RoomBoard for physical topology.",
   component: function KanbanView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Board"} state={props.state}><NoData label="No items" /></Surface>;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Board" label="No items" shape="tiles" />;
     const groups = [...new Set(props.items.map((i) => i.group || "Active"))];
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Board"} subtitle={props.subtitle} state={props.state}>
@@ -671,8 +1054,7 @@ export const Kanban = defineComponent({
               {props.items.filter((i) => (i.group || "Active") === g).map((i) => (
                 <article
                   key={i.id}
-                  className="cnv-clickable"
-                  onClick={() => triggerAction(`Show details for ${i.label}`)}
+                  {...clickable(() => triggerAction(`Show details for ${i.label}`), `Show details for ${i.label}`)}
                 ><strong>{i.label}</strong><small>{i.subtitle}</small></article>
               ))}
             </section>
@@ -704,15 +1086,14 @@ export const VisualTable = defineComponent({
     "Use DetailPanel for a single entity's key-value details.",
   component: function VisualTableView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Table"} state={props.state}><NoData label="No rows" /></Surface>;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Table" label="No rows" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
           {props.items.map((i) => (
             <article
               key={i.id}
-              className="cnv-clickable"
-              onClick={() => triggerAction(`Show details for ${i.label}`)}
+              {...clickable(() => triggerAction(`Show details for ${i.label}`), `Show details for ${i.label}`)}
             >
               <strong>{i.label}</strong>
               <small>{i.subtitle}</small>
@@ -748,17 +1129,16 @@ export const ArtworkWall = defineComponent({
     "Use PlaybackSessions for currently-playing media with stream details.",
   component: function ArtworkWallView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; square?: boolean } & SurfaceExtras>) {
     const triggerAction = useTriggerAction();
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gallery"} state={props.state}><NoData label="No items" /></Surface>;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Gallery" label="No items" shape="tiles" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
         <div className={props.square ? "cnv-albums" : "cnv-posters"}>
           {props.items.slice(0, 18).map((i) => (
             <article
               key={i.id}
-              className="cnv-clickable"
-              onClick={() => triggerAction(`Show details for ${i.label}`)}
+              {...clickable(() => triggerAction(`Show details for ${i.label}`), `Show details for ${i.label}`)}
             >
-              <div className="cnv-art" style={i.image ? { backgroundImage: `url(${i.image})` } : undefined}>
+              <div className="cnv-art" {...artProps(i.image)}>
                 <b>{i.label}</b>
               </div>
               <strong>{i.label}</strong>
@@ -790,13 +1170,13 @@ export const PlaybackSessions = defineComponent({
     "Each Item: {id, label (title), subtitle (client), image? (thumbnail), progress? (0–1), meta: {mode: 'direct'|'transcode'}}. " +
     "Use ArtworkWall for a static library browse view.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Active Sessions"} state={props.state}><NoData label="No active sessions" /></Surface>;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Active Sessions" label="No active sessions" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Active Sessions"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-playback">
           {props.items.slice(0, 8).map((i) => (
             <article key={i.id}>
-              <div className="cnv-art" style={i.image ? { backgroundImage: `url(${i.image})` } : undefined} />
+              <div className="cnv-art" {...artProps(i.image)} />
               <div>
                 <strong>{i.label}</strong>
                 <small>{i.subtitle}</small>
@@ -833,30 +1213,48 @@ export const Capacity = defineComponent({
     "Choose over Gauge when you want the fill ring + supporting detail together. " +
     "Choose Gauge for a standalone single metric.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; series?: z.infer<typeof SeriesSchema>[] } & SurfaceExtras>) => {
-    if (!props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Capacity"} state={props.state}><NoData label="No capacity data" /></Surface>;
+    if (!props.metrics?.length) return <EmptyPanel props={props} title="Capacity" label="No capacity data" shape="ring" />;
     const used = Number(props.metrics[0].value);
-    if (!Number.isFinite(used)) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Capacity"} state={props.state}><NoData label="No capacity data" /></Surface>;
+    if (!Number.isFinite(used)) return <EmptyPanel props={props} title="Capacity" label="No capacity data" shape="ring" />;
+    // A pool over 100% used is nonsense the ring should not try to draw, and a
+    // near-full pool is the one thing this panel exists to shout about.
+    const clamped = Math.max(0, Math.min(100, used));
+    const fillColor =
+      clamped >= 90 ? "var(--cnv-critical)" : clamped >= 75 ? "var(--cnv-warning)" : "var(--cnv-series-1)";
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Capacity"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-capacity">
-          <div style={{ background: `conic-gradient(var(--cnv-series-1) 0 ${used}%, #2b2f3a ${used}%)` }}>
-            <strong>{used}%</strong>
+          <div
+            className="cnv-ring"
+            style={{ background: `conic-gradient(${fillColor} 0 ${clamped}%, var(--cnv-track) ${clamped}%)` }}
+            role="img"
+            aria-label={`${clamped} percent used`}
+          >
+            <strong>
+              {Math.round(clamped)}%
+              <small>{props.metrics[0].label}</small>
+            </strong>
           </div>
           <section>
-            <div className="cnv-metrics">
-              {props.metrics.slice(0, 6).map((m, i) => (
-                <article key={i}><small>{m.label}</small><strong>{m.value}{m.unit}</strong></article>
-              ))}
-            </div>
+            <Metrics metrics={props.metrics} />
             {props.series && props.series.length > 0 && props.series[0].points?.length > 0 && (
-              <svg className="cnv-chart" viewBox="0 0 640 220" role="img">
-                {(() => {
-                  const s = props.series![0];
-                  const max = Math.max(...s.points.map((p) => p.y), 1);
-                  const d = s.points.map((p, i) => `${i ? "L" : "M"} ${20 + i * (600 / Math.max(1, s.points.length - 1))} ${190 - (p.y / max) * 150}`).join(" ");
-                  return <path d={d} fill="none" stroke="var(--cnv-series-1)" strokeWidth="3" />;
-                })()}
-              </svg>
+              (() => {
+                const s = props.series![0];
+                const max = niceMax(Math.max(...s.points.map((p) => Number(p.y) || 0), 0));
+                return (
+                  <svg
+                    className="cnv-chart cnv-chart-inset"
+                    viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+                    role="img"
+                    aria-label={`${s.name} trend`}
+                  >
+                    <ChartFrame max={max} points={s.points} />
+                    <path className="cnv-chart-area" d={areaPath(s.points, max)} fill="var(--cnv-series-1)" />
+                    <path className="cnv-chart-line" d={linePath(s.points, max)} fill="none" stroke="var(--cnv-series-1)" />
+                    <Endpoint points={s.points} max={max} color="var(--cnv-series-1)" unit={s.unit} />
+                  </svg>
+                );
+              })()
             )}
           </section>
         </div>
@@ -885,7 +1283,7 @@ export const SecurityPosture = defineComponent({
     "Each Item: {id, label, subtitle?, state}. " +
     "Use VisualTable for flat security event lists.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[]; metrics?: z.infer<typeof MetricSchema>[] } & SurfaceExtras>) => {
-    if (!props.items?.length && !props.metrics?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Security"} state={props.state}><NoData label="No security data" /></Surface>;
+    if (!props.items?.length && !props.metrics?.length) return <EmptyPanel props={props} title="Security" label="No security data" shape="tiles" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Security Posture"} subtitle={props.subtitle} state={props.state}>
         {props.metrics && props.metrics.length > 0 && (
@@ -927,8 +1325,8 @@ export const MarkdownReader = defineComponent({
     "items[] optionally populates the backlinks sidebar. " +
     "Use Callout for short alert text, not full documents.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; markdown: string; items?: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
-    const md = props.markdown || "## No content\nNo markdown provided.";
-    const lines = md.split("\n");
+    if (!props.markdown?.trim()) return <EmptyPanel props={props} title="Document" label="No document content" shape="rows" />;
+    const lines = props.markdown.split("\n");
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Document"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-knowledge-reader">
@@ -974,7 +1372,7 @@ export const KnowledgeGraph = defineComponent({
     "Same shape as NodeGraph but styled for knowledge bases with larger text labels. " +
     "Use Backlinks for a simple list of linking notes.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[]; edges: z.infer<typeof EdgeSchema>[] } & SurfaceExtras>) => {
-    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Knowledge Graph"} state={props.state}><NoData label="No graph data" /></Surface>;
+    if (!props.nodes?.length) return <EmptyPanel props={props} title="Knowledge Graph" label="No graph data" shape="chart" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Knowledge Graph"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-knowledge-graph">
@@ -1015,7 +1413,7 @@ export const Backlinks = defineComponent({
     "Each Item: {id, label, subtitle? (context), meta: {evidence?: number}}. " +
     "Use KnowledgeGraph for a visual graph view.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Backlinks"} state={props.state}><NoData label="No backlinks" /></Surface>;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Backlinks" label="No backlinks" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Backlinks"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-backlinks">
@@ -1051,7 +1449,7 @@ export const DetailPanel = defineComponent({
     "Metrics render as label/value rows. summary renders as a callout paragraph. " +
     "Use MetricStrip for dashboard KPI rows. Use DetailPanel when drilling into one entity.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; metrics: z.infer<typeof MetricSchema>[]; summary?: string } & SurfaceExtras>) => {
-    if (!props.metrics?.length && !props.summary) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Details"} state={props.state}><NoData label="No detail data" /></Surface>;
+    if (!props.metrics?.length && !props.summary) return <EmptyPanel props={props} title="Details" label="No detail data" shape="tiles" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Details"} subtitle={props.subtitle} state={props.state}>
         {props.summary && (
@@ -1087,9 +1485,10 @@ export const Callout = defineComponent({
     "summary is the main text. state colors the border (warning=amber, critical=red). " +
     "Use MarkdownReader for full documents. Use MetricStrip for data without narrative.",
   component: ({ props }: ComponentRenderProps<{ title?: string; state?: string; summary: string; metrics?: z.infer<typeof MetricSchema>[] } & SurfaceExtras>) => {
+    if (!props.summary?.trim() && !props.metrics?.length) return <EmptyPanel props={props} title="Notice" label="Nothing to report" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Notice"} state={props.state}>
-        <div className="cnv-callout">
+        <div className={`cnv-callout state-${props.state ?? "warning"}`}>
           <strong>{props.summary}</strong>
           {props.metrics && props.metrics.length > 0 && (
             <div className="cnv-metrics">
@@ -1147,7 +1546,7 @@ export const RoomBoard = defineComponent({
     "Items grouped by item.group (room name or rack position). " +
     "Use Kanban for workflow/task boards. Use NodeGraph for logical network topology.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
-    if (!props.items?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Topology"} state={props.state}><NoData label="No topology data" /></Surface>;
+    if (!props.items?.length) return <EmptyPanel props={props} title="Topology" label="No topology data" shape="tiles" />;
     const groups = [...new Set(props.items.map((i) => i.group || "Default"))];
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Topology"} subtitle={props.subtitle} state={props.state}>
@@ -1185,7 +1584,7 @@ export const Flow = defineComponent({
     "Use Sankey when the magnitude of flow between nodes matters. " +
     "Use NodeGraph for non-sequential / branching topology.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; nodes: z.infer<typeof NodeSchema>[] } & SurfaceExtras>) => {
-    if (!props.nodes?.length) return <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} state={props.state}><NoData label="No flow data" /></Surface>;
+    if (!props.nodes?.length) return <EmptyPanel props={props} title="Flow" label="No flow data" shape="tiles" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Flow"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-flow">
@@ -1280,11 +1679,16 @@ export const Section = defineComponent({
     "Use to organize a dashboard into named regions. children accepts a tight set of display components: " +
     "MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank, VisualTable, DetailPanel, Capacity, ArtworkWall. " +
     "Do NOT nest Section, Kanban, or Stack inside a Section.",
-  component: ({ props, renderNode }) => (
-    <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
-      <div className="cnv-section">{renderNode(props.children)}</div>
-    </Surface>
-  ),
+  component: ({ props, renderNode }) => {
+    // A Section whose children were dropped (an unreferenced variable, a query
+    // that returned nothing) used to render as a titled empty box. Say so.
+    if (!props.children?.length) return <EmptyPanel props={props} title="Section" label="No panels in this section" shape="tiles" />;
+    return (
+      <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Section"} subtitle={props.subtitle} state={props.state}>
+        <div className="cnv-section">{renderNode(props.children)}</div>
+      </Surface>
+    );
+  },
 });
 
 // ── DashboardGrid — 12-column responsive grid ───────────────────────────────
@@ -1315,6 +1719,7 @@ export const DashboardGrid = defineComponent({
     "Prefer this over Stack whenever panels need specific widths. " +
     "Use Stack for simple vertical stacking, Section for a titled group of panels.",
   component: ({ props, renderNode }) => {
+    if (!props.children?.length) return <EmptyPanel props={props} title="Dashboard" label="No panels to show" shape="tiles" />;
     const grid = <div className="cnv-grid">{renderNode(props.children)}</div>;
     // Only wrap in a Surface when there is a heading — a bare grid shouldn't
     // gain a panel border it didn't ask for.
