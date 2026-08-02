@@ -16,6 +16,8 @@ assert.match(artwork, /cnv-posters-layout-grid/);
 assert.match(artwork, /cnv-media-meta/);
 assert.match(artworkRail, /cnv-posters-layout-rail/);
 assert.doesNotMatch(playback, />direct</);
+assert.match(playback, />paused</);
+assert.match(playback, />active</);
 assert.match(line, /pathLength="1"/);
 assert.match(line, /cnv-chart-line-reveal/);
 assert.match(line, /cnv-chart-endpoint/);

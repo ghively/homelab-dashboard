@@ -1225,15 +1225,21 @@ export const PlaybackSessions = defineComponent({
   }),
   description:
     "Active media streams / playback sessions (Emby/Jellyfin/Plex current plays). " +
-    "Each Item: {id, label (title), subtitle? (client), image? (thumbnail), progress? (0–1), meta?: {mode?, client?, device?, user?, quality?, paused?}}. " +
+    "Each Item: {id, label (title), subtitle? (client), image? (thumbnail), progress? (0–1), meta?: {mode?, client?, device?, user?, quality?, isPaused?, paused?}}. isPaused is the live Emby pause state; paused is a legacy alias. " +
     "Use ArtworkWall for a static library browse view.",
   component: ({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; items: z.infer<typeof ItemSchema>[] } & SurfaceExtras>) => {
     if (!props.items?.length) return <EmptyPanel props={props} title="Active Sessions" label="No active sessions" shape="rows" />;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Active Sessions"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-playback">
-          {props.items.slice(0, 8).map((i) => (
-            <article key={i.id}>
+          {props.items.slice(0, 8).map((i) => {
+            const isPaused = typeof i.meta?.isPaused === "boolean"
+              ? i.meta.isPaused
+              : typeof i.meta?.paused === "boolean"
+                ? i.meta.paused
+                : undefined;
+            return (
+              <article key={i.id}>
               <div className="cnv-art cnv-playback-art" {...artProps(i.image)} />
               <div className="cnv-playback-info">
                 <strong>{i.label}</strong>
@@ -1259,14 +1265,15 @@ export const PlaybackSessions = defineComponent({
                 {typeof i.meta?.mode === "string" && (
                   <span className="cnv-media-badge">{i.meta.mode}</span>
                 )}
-                {typeof i.meta?.paused === "boolean" && (
-                  <span className={i.meta.paused ? "cnv-playback-state is-paused" : "cnv-playback-state is-active"}>
-                    {i.meta.paused ? "paused" : "active"}
+                {isPaused !== undefined && (
+                  <span className={isPaused ? "cnv-playback-state is-paused" : "cnv-playback-state is-active"}>
+                    {isPaused ? "paused" : "active"}
                   </span>
                 )}
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </Surface>
     );
