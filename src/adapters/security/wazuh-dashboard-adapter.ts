@@ -7,6 +7,7 @@ import type { FreshnessInfo, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import { insecureTls, envFlag } from "../tls";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_DASHBOARD_URL =
   process.env.WAZUH_DASHBOARD_URL || "https://100.65.126.126";
@@ -49,7 +50,7 @@ class WazuhDashboardAdapter implements DataAdapter {
       await fetch(`${WAZUH_DASHBOARD_URL}/api/status`, {
         headers: authHeaders(),
         ...insecureTls(WAZUH_TLS),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -67,7 +68,7 @@ class WazuhDashboardAdapter implements DataAdapter {
       const res = await fetch(`${WAZUH_DASHBOARD_URL}/api/status`, {
         headers: authHeaders(),
         ...insecureTls(WAZUH_TLS),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 

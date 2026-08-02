@@ -24,6 +24,7 @@ import type {
   EmbySession,
   EmbyServerInfo,
 } from "./types";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Emby adapter configuration.
@@ -78,15 +79,15 @@ export class EmbyAdapter {
    */
   private async fetch<T>(endpoint: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    try {
-      const res = await fetch(url, { headers: this.getHeaders() });
-      if (!res.ok) {
-        throw new Error(`Emby API error: ${res.status} ${res.statusText}`);
-      }
-      return (await res.json()) as T;
-    } catch (err) {
-      throw new Error(`Emby fetch failed: ${err}`);
-    }
+    // The signal is load-bearing. Node fetch has no default timeout, so a
+    // host that accepts the connection and never answers held this promise
+    // for the kernel's full TCP retry window (~130s). /api/fleet awaits every
+    // adapter in a world, so one such host pinned the whole endpoint and the
+    // world tile sat on LOADING. AdapterHttpError is thrown rather than a
+    // stringified Error so classifyError() can still tell 401 from offline.
+    const res = await fetchWithTimeout(url, { headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+    return (await res.json()) as T;
   }
 
   /**
@@ -351,7 +352,11 @@ export class EmbyAdapter {
         state: "healthy",
         metrics,
         items,
-        summary: `${libraries.length} libraries across ${libraries.reduce((sum, l) => sum + (l.ChildCount || 0), 0)} total items`,
+        // Summed from `counts`, not from lib.ChildCount. /Library/MediaFolders
+        // omits ChildCount entirely, so the old expression was a sum of
+        // undefined-coerced-to-0 and the panel always read "0 total items"
+        // while the per-library metrics above showed the real numbers.
+        summary: `${libraries.length} libraries across ${counts.reduce((sum, c) => sum + c, 0).toLocaleString()} total items`,
         updatedAt: now,
       };
 

@@ -6,6 +6,7 @@ import type { DataAdapter } from "../adapter-base";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://gh-nvidia:11434";
 
@@ -53,7 +54,7 @@ class OllamaAdapter implements DataAdapter {
 
   async health(): Promise<FreshnessInfo> {
     try {
-      await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(5000) });
+      await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) });
     } catch {
       // Unreachable — the freshness stamp still records the endpoint queried.
     }
@@ -68,8 +69,8 @@ class OllamaAdapter implements DataAdapter {
 
     try {
       const [tagsRes, psRes] = await Promise.all([
-        fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(8000) }),
-        fetch(`${OLLAMA_URL}/api/ps`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
+        fetch(`${OLLAMA_URL}/api/ps`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
       ]);
       if (!tagsRes.ok) throw new Error(`HTTP ${tagsRes.status}`);
 

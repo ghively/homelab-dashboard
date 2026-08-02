@@ -6,6 +6,7 @@ import type { DataAdapter } from "../adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const SPOOLMAN_URL =
   process.env.SPOOLMAN_URL || "http://100.116.139.100:7912";
@@ -38,7 +39,7 @@ class SpoolmanAdapter implements DataAdapter {
   async health(): Promise<FreshnessInfo> {
     try {
       await fetch(`${SPOOLMAN_URL}/api/v1/spool`, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -54,8 +55,8 @@ class SpoolmanAdapter implements DataAdapter {
 
     try {
       const [spoolsRes, vendorRes] = await Promise.all([
-        fetch(`${SPOOLMAN_URL}/api/v1/spool`, { signal: AbortSignal.timeout(8000) }),
-        fetch(`${SPOOLMAN_URL}/api/v1/vendor`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${SPOOLMAN_URL}/api/v1/spool`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
+        fetch(`${SPOOLMAN_URL}/api/v1/vendor`, { signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS) }),
       ]);
 
       if (!spoolsRes.ok) throw new Error(`HTTP ${spoolsRes.status}`);

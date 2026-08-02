@@ -5,6 +5,7 @@ import type { DataAdapter, HealthCheck } from "./adapter-base";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
 import type { Item, Metric, VisualQueryResult } from "./types";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const FAIL2BAN_API_URL = process.env.FAIL2BAN_API_URL || "";
 
@@ -27,7 +28,7 @@ class Fail2banAdapter implements DataAdapter {
     try {
       if (FAIL2BAN_API_URL) {
         const response = await fetch(`${FAIL2BAN_API_URL}/health`, {
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         });
         if (response.ok) {
           return { adapter: this.name, source: "fail2ban", queriedAt: now, stalenessSeconds: 0, cacheHit: false };
@@ -51,7 +52,7 @@ class Fail2banAdapter implements DataAdapter {
 
       if (FAIL2BAN_API_URL) {
         const response = await fetch(`${FAIL2BAN_API_URL}/status`, {
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         });
         if (response.ok) {
           const data = await response.json() as { jails?: JailStatus[] };

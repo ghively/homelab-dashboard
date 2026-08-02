@@ -3,6 +3,7 @@ import type { DataAdapter } from "./adapter-base";
 import type { FreshnessInfo, VisualQueryResult } from "./types";
 import { getFixtureForState } from "./fixtures";
 import { getFixtureState } from "./registry";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 interface ContainerInfo {
   id: string;
@@ -59,7 +60,7 @@ export class OnePanelAdapter implements DataAdapter {
     try {
       await fetch(`${this.baseUrl}/api/v1/system/info`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -84,11 +85,11 @@ export class OnePanelAdapter implements DataAdapter {
       const [systemResponse, containersResponse] = await Promise.all([
         fetch(`${this.baseUrl}/api/v1/system/info`, {
           headers: this.getHeaders(),
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
         fetch(`${this.baseUrl}/api/v1/containers`, {
           headers: this.getHeaders(),
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
       ]);
 

@@ -7,6 +7,7 @@ import type { FreshnessInfo, Metric, VisualQueryResult } from "../types";
 import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import { insecureTls, envFlag } from "../tls";
+import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_INDEXER_URL =
   process.env.WAZUH_INDEXER_URL || "https://100.65.126.126:9200";
@@ -53,7 +54,7 @@ class WazuhIndexerAdapter implements DataAdapter {
       await fetch(`${WAZUH_INDEXER_URL}/_cluster/health`, {
         headers: authHeaders(),
         ...insecureTls(WAZUH_TLS),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
       });
     } catch {
       // offline
@@ -72,12 +73,12 @@ class WazuhIndexerAdapter implements DataAdapter {
         fetch(`${WAZUH_INDEXER_URL}/_cluster/health`, {
           headers: authHeaders(),
           ...insecureTls(WAZUH_TLS),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
         fetch(`${WAZUH_INDEXER_URL}/_cat/indices?format=json&bytes=b`, {
           headers: authHeaders(),
           ...insecureTls(WAZUH_TLS),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(ADAPTER_TIMEOUT_MS),
         }),
       ]);
       if (!healthRes.ok) throw new Error(`HTTP ${healthRes.status}`);
