@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # next.config.ts no longer sets ignoreBuildErrors, so this type-checks
+      # for real. A type error fails the build.
+      - run: npm run build
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The repo carries pre-existing lint errors; --max-warnings is not set
+      # and eslint is not yet clean, so this is reported without failing the
+      # build. Tighten once the backlog is cleared.
+      - run: npm run lint || true

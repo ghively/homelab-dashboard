@@ -1,32 +1,38 @@
 import { openuiPromptOptions } from "@openuidev/react-ui/genui-lib/prompt-options";
 import type { PromptOptions } from "@openuidev/react-lang";
 import { serviceGuideText } from "@/visual/manifest-map";
+import { toolSpecs } from "@/lib/tools";
 
 export const promptOptions: PromptOptions = {
   ...openuiPromptOptions,
+  tools: toolSpecs,
   additionalRules: [
     ...(openuiPromptOptions.additionalRules ?? []),
-    "Always pass live data via Query() — never hardcode or mock values. Each service has an adapter that returns the data it needs.",
-    "Pick the component that matches the data shape: MetricStrip for KPI rows, Gauge for a single bounded %, LineChart for one time-series, MultiLine for multiple, BarRank for ranked comparison, Donut for proportions, Timeline for events, Flow for pipelines, NodeGraph for topology, SecurityPosture for status grids, Capacity for storage fill.",
+    "Always pass live data via Query() — never hardcode or mock values. Each service has an adapter that returns the data the panel needs. Literal numbers in your output are always wrong unless the user explicitly gave them.",
+    "Pick by data shape, not by service name: Gauge for a single bounded % (disk, battery, CPU); Donut for shares of a whole (media by type, spend by model); BarRank for ranked comparison (top items by size/count); LineChart for one time-series; MultiLine for 2–4 series compared; Timeline for timestamped events; EventStream for a high-volume alert feed; NodeGraph for topology; Sankey for a left-to-right pipeline; Kanban for work items grouped into columns; VisualTable for a row list; ArtworkWall for image grids; PlaybackSessions for active streams; Capacity for storage pools; SecurityPosture for severity matrices.",
+    "For numeric summaries (CPU, memory, counts, pass/fail) use MetricStrip — it renders compact KPI rows.",
+    "Auto-refresh: for live status panels (active streams, queue depth, alerts, CPU/memory) pass a 30–60 second refreshInterval as the 4th Query() argument so the panel re-fetches. For historical or static data (library size over time, spend by month, past events) OMIT the interval — it should not poll.",
     serviceGuideText,
     "Use Stack for vertical composition; for multi-column layouts use Stack with direction \"row\" and wrap set to true. There is no separate Grid component.",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
   ],
   toolExamples: [
-    `Example — CI pipeline health:
+    `Example — Ops health (monitoring overview):
 
-root = Stack([header, pipeline, jobs])
-header = CardHeader("Pipeline Health", "GitLab CI overview")
-pipeline = Flow(flowData)
-flowData = Query("gitlab", {}, {title: "Pipeline", state: "healthy", nodes: [{id: "build", label: "Build", value: "5m"}, {id: "test", label: "Test", value: "3m"}, {id: "deploy", label: "Deploy", value: "1m"}]}, 30)
-jobs = VisualTable(jobData)
-jobData = Query("gitlab", {view: "jobs"}, {title: "Recent Jobs", state: "healthy", items: [{id: "j1", label: "build-api", subtitle: "passed", state: "healthy", value: "5m"}, {id: "j2", label: "lint", subtitle: "passed", state: "healthy", value: "1m"}]}, 30)`,
+root = Stack([header, summary, targets])
+header = CardHeader("Ops Health", "Prometheus + container fleet")
+summary = MetricStrip(opsData)
+opsData = Query("prometheus", {}, {state: "healthy", metrics: []}, 30)
+targets = VisualTable(fleetData)
+fleetData = Query("docker", {view: "containers"}, {state: "healthy", items: []}, 30)`,
     `Example — Storage capacity:
 
-root = Stack([header, disk])
-header = CardHeader("Storage", "Disk allocation across bays")
-disk = Capacity(diskData)
-diskData = Query("synology", {}, {title: "Storage", state: "healthy", metrics: [{label: "Used", value: 72, unit: "%"}, {label: "Total", value: "48TB"}, {label: "Free", value: "13TB"}]}, 60)`,
+root = Stack([header, disk, items])
+header = CardHeader("Storage Usage", "Allocation across bays")
+disk = Gauge(diskData)
+diskData = Query("synology-dsm", {}, {title: "Disk Usage", value: 0, max: 100, thresholds: {warning: 75, critical: 90}}, 60)
+items = VisualTable(bayData)
+bayData = Query("synology-dsm", {view: "bays"}, {state: "healthy", items: []}, 60)`,
     `Example — AI model activity:
 
 root = Stack([header, cards])
@@ -34,9 +40,9 @@ header = CardHeader("AI Model Activity", "Inference services")
 cards = Stack([llmCard, ollamaCard], "row", "l", "stretch", "between", true)
 llmCard = Card([llmTitle, MetricStrip(llmData)])
 llmTitle = TextContent("LiteLLM", "small-heavy")
-llmData = Query("litellm", {}, {title: "LiteLLM", state: "healthy", metrics: [{label: "Requests/min", value: 142}, {label: "Active keys", value: 8}, {label: "Avg latency", value: "340ms"}]}, 30)
+llmData = Query("litellm", {}, {state: "healthy", metrics: []}, 30)
 ollamaCard = Card([ollamaTitle, MetricStrip(ollamaData)])
 ollamaTitle = TextContent("Ollama", "small-heavy")
-ollamaData = Query("ollama", {}, {title: "Ollama", state: "healthy", metrics: [{label: "Models", value: 12}, {label: "VRAM", value: "18GB"}, {label: "Load", value: "67%"}]}, 30)`,
+ollamaData = Query("ollama", {}, {state: "healthy", metrics: []}, 30)`,
   ],
 };
