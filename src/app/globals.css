@@ -36,11 +36,6 @@
   --state-denied: var(--dot-red);
 }
 
-/* The design system is monospace throughout. */
-body {
-  font-family: var(--font-mono);
-}
-
 /* One true radius — the shell previously mixed 8/10/12/14px. */
 .dash-hero,
 .dash-world-card,
@@ -55,10 +50,35 @@ body {
 html, body {
   background: var(--dash-bg);
   color: var(--dash-text);
-  font: 14px Inter, system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
+  /* The design system is monospace throughout. This was previously the `font`
+     SHORTHAND naming Inter, which sits later in the file than any
+     font-family rule and silently reset the face — JetBrains Mono was loading
+     and then being discarded. Use longhands so nothing resets the family. */
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: var(--lh-base);
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Ambient ground ──────────────────────────────────────────
+   Glass only reads as glass when there is something behind it to blur and
+   saturate. Against a flat fill, a translucent panel is just a slightly
+   different flat. These are three very low-intensity accent pools, fixed to
+   the viewport so panels move across them on scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60ch 44ch at 12% 8%,  rgba(128, 0, 255, 0.16), transparent 60%),
+    radial-gradient(70ch 50ch at 88% 32%, rgba(0, 243, 255, 0.11), transparent 62%),
+    radial-gradient(55ch 40ch at 46% 96%, rgba(0, 255, 0, 0.07),  transparent 58%);
+}
+
+/* Everything else sits above the ambient field. */
+.dash-root { position: relative; z-index: 1; }
 
 .dash-root {
   display: flex;
