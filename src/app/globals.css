@@ -99,11 +99,20 @@ body::before {
 .dash-sidebar {
   width: 240px;
   min-width: 240px;
-  background: var(--dash-sidebar);
   border-right: 1px solid var(--dash-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Portrait wireframe-mesh wallpaper. `cover` on a 240x100vh column crops to
+     the vertical centre, which is the darkest part of the artwork — the magenta
+     and cyan meshes stay at the edges where the nav labels are not. The veil is
+     stronger than the page backdrop's because nav text sits directly on top of
+     this, rather than inside a glass panel. */
+  position: relative;
+  background:
+    linear-gradient(rgba(11, 11, 14, 0.72), rgba(11, 11, 14, 0.82)),
+    url("/sidebar.webp") center / cover no-repeat,
+    var(--dash-sidebar);
 }
 
 .dash-brand {
