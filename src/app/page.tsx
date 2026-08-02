@@ -15,8 +15,6 @@ import {
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
-import { ALL_STATES } from "@/lib/visual-states";
-import { homelabSchemaComponents } from "@/visual/schemas";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
 export default function Home() {
@@ -129,49 +127,50 @@ function LandingPage({
 
   const overall = data?.overall;
 
-  // Quick Access used to be eight decorative <span>s with cursor:default and no
-  // handler — they looked clickable and did nothing, and half of them ("Energy
-  // Flow", "AI Spend") named concepts the dashboard has no notion of. They now
-  // filter the world grid by rollup state, which is something the data can
-  // actually answer.
-  const [worldFilter, setWorldFilter] = useState<"all" | "healthy" | "attention">("all");
-
-  const visibleWorlds = useMemo(() => {
-    if (worldFilter === "all") return WORLDS;
-    return WORLDS.filter((w) => {
-      const st = String(worldStates[w.id]?.state ?? "loading");
-      const needsAttention = ALERT_STATES.includes(st);
-      return worldFilter === "attention" ? needsAttention : !needsAttention;
-    });
-  }, [worldFilter, worldStates]);
-
   return (
     <>
-      <Hero
-        title="Visual OS"
-        subtitle={`Single pane of glass for the homelab fleet — ${WORLDS.length} worlds, ${
-          new Set(WORLDS.flatMap((w) => w.adapters)).size
-        } adapters, ${homelabSchemaComponents.length} visual components`}
-        accent="var(--dash-accent)"
-        metrics={
-          overall
-            ? [
-                { label: "Overall", value: overall.state, state: overall.state },
-                { label: "Adapters", value: overall.total },
-                { label: "Healthy", value: overall.healthy, state: "healthy" },
-                { label: "Worlds", value: overall.worldCount },
-              ]
-            : undefined
-        }
-      />
+      {/*
+        The chat IS the product. This page used to open on a grid of world tiles
+        with a State Fixture Exerciser underneath — a dev harness — while the
+        generative chat sat inside the "AI" world, two clicks away. The one
+        thing the system exists to do was the hardest thing to find.
+
+        Order is now: ask -> generated dashboard -> fleet status as context.
+        The exerciser is gone from the product surface; the world tiles remain
+        below as a way to browse adapters directly.
+      */}
+      <header className="dash-hero dash-hero-chat cnv-surface tr-subtle bl-sm bg-gradient el-md">
+        <div>
+          <h1>What do you want to see?</h1>
+          <p>
+            Describe a dashboard in plain language — it is generated live from{" "}
+            {overall
+              ? `${overall.healthy}/${overall.total} reporting adapters`
+              : "your adapters"}
+            .
+          </p>
+        </div>
+        {overall && (
+          <div className="dash-hero-metrics">
+            <div className={`dash-hero-metric state-${overall.state}`}>
+              <small>Fleet</small>
+              <strong>{overall.state}</strong>
+            </div>
+          </div>
+        )}
+      </header>
+
+      <GenerativeChat />
 
       <div className="dash-section-header">
-        <h2>Worlds</h2>
-        <small>{loading ? "Loading fleet status..." : "Click a world to drill in"}</small>
+        <h2>Fleet</h2>
+        <small>
+          {loading ? "Checking adapters…" : "Click a world to browse its adapters directly"}
+        </small>
       </div>
 
       <div className="dash-world-grid">
-        {visibleWorlds.map((w) => {
+        {WORLDS.map((w) => {
           const ws = worldStates[w.id];
           return (
             <WorldCard
@@ -189,40 +188,10 @@ function LandingPage({
           );
         })}
       </div>
-
-      <div className="dash-section-header">
-        <h2>Quick Access</h2>
-        <small>Filter the worlds above</small>
-      </div>
-      <div className="dash-quick-tags">
-        {(
-          [
-            { id: "all", label: "All worlds" },
-            { id: "attention", label: "Needs attention" },
-            { id: "healthy", label: "Healthy only" },
-          ] as const
-        ).map((f) => (
-          <button
-            key={f.id}
-            className={`dash-tag${worldFilter === f.id ? " active" : ""}`}
-            onClick={() => setWorldFilter(f.id)}
-          >
-            {f.label}
-            {f.id === "attention" && data
-              ? ` (${data.worlds.filter((w) => ALERT_STATES.includes(String(w.state))).length})`
-              : null}
-          </button>
-        ))}
-      </div>
-
-      <div className="dash-section-header">
-        <h2>State Fixture Exerciser</h2>
-        <small>All 8 states rendered across sample adapters</small>
-      </div>
-      <FixtureExerciser />
     </>
   );
 }
+
 
 // ── World View (generic workspace) ───────────────────────────
 
@@ -527,57 +496,5 @@ function AdapterResultCard({
         </div>
       )}
     </VisualPanel>
-  );
-}
-
-// ── Fixture Exerciser (all 8 states) ─────────────────────────
-
-function FixtureExerciser() {
-  const sampleAdapters = ["emby", "prometheus", "synology-dsm", "wazuh-manager"];
-
-  return (
-    <div className="dash-fixture-grid">
-      {ALL_STATES.map((state) => (
-        <div key={state} className="dash-fixture-cell">
-          <div className="dash-fixture-cell-head">
-            <h5>State: {state}</h5>
-            <span className={`cnv-badge state-${state}`}>{state}</span>
-          </div>
-          {sampleAdapters.map((adapter) => (
-            <FixtureStatePreview key={adapter} adapter={adapter} state={state} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FixtureStatePreview({
-  adapter,
-  state,
-}: {
-  adapter: string;
-  state: VisualStateValue;
-}) {
-  const [result, setResult] = useState<VisualQueryResult | null>(null);
-
-  useMemo(() => {
-    fetch(`/api/adapters?adapter=${adapter}&state=${state}`)
-      .then((r) => r.json())
-      .then((d) => setResult(d.result))
-      .catch(() => setResult(null));
-  }, [adapter, state]);
-
-  if (!result) return null;
-
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <small style={{ color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>
-        {adapter}
-      </small>
-      <div className={`state-${result.state}`} style={{ fontSize: 12 }}>
-        {result.title}
-      </div>
-    </div>
   );
 }
