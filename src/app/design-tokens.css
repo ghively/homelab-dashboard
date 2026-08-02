@@ -10,7 +10,10 @@
    wreck dashboard chrome. Those are intentionally not vendored; the
    dashboard's own rules are remapped onto these tokens in globals.css.
 
-   Keep this file in sync with the design project rather than editing it here.
+   Keep this file in sync with the design project rather than editing it here —
+   a local edit is silently lost on the next pull. See
+   scripts/sync-design-tokens.md for the pull procedure and the two differences
+   that must be preserved every time.
    ============================================================ */
 
 /* The JetBrains Mono @import lives at the top of globals.css, not here:
