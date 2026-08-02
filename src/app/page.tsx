@@ -16,6 +16,7 @@ import {
 import { GenerativeChat } from "@/components/generative-chat";
 import { GlyphRain } from "@/components/canvasui/GlyphRain";
 import { useEffectGate } from "@/components/canvasui/Effect";
+import { DecryptText } from "@/components/decrypt-text";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
 
@@ -132,7 +133,9 @@ function LandingHero({
   const inner = (
     <header className="dash-hero dash-hero-chat cnv-surface tr-medium bl-md bg-gradient el-md">
       <div>
-        <h1>What do you want to see?</h1>
+        <h1>
+          <DecryptText text="What do you want to see?" duration={1100} />
+        </h1>
         <p>
           Describe a dashboard in plain language — it is generated live from{" "}
           {overall ? `${overall.healthy}/${overall.total} reporting adapters` : "your adapters"}.
