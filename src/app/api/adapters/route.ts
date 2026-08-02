@@ -14,14 +14,16 @@ initAdapters();
 // GET /api/adapters — list all adapters with world mappings
 // GET /api/adapters?world=media — list adapters for a world
 // GET /api/adapters?adapter=emby — query a single adapter
+// GET /api/adapters?adapter=emby&view=sessions — select a named query
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const world = sp.get("world") as WorldId | null;
   const adapter = sp.get("adapter");
   const state = (sp.get("state") as VisualStateValue) || "healthy";
+  const view = sp.get("view") ?? undefined;
 
   if (adapter) {
-    const result = await queryAdapter(adapter, state);
+    const result = await queryAdapter(adapter, state, view);
     if (!result) {
       return NextResponse.json({ error: "Adapter not found" }, { status: 404 });
     }
