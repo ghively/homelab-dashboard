@@ -2,3 +2,21 @@
 .cnv-knowledge-reader{display:grid;grid-template-columns:170px minmax(0,1fr) 190px;gap:18px}.cnv-knowledge-reader>aside{border-right:1px solid var(--cnv-line);padding-right:12px}.cnv-knowledge-reader>aside:last-child{border:0;border-left:1px solid var(--cnv-line);padding:0 0 0 12px}.cnv-knowledge-reader aside strong,.cnv-knowledge-reader aside a{display:block}.cnv-knowledge-reader aside a{color:var(--cnv-muted);padding:5px 0;font-size:12px}.cnv-knowledge-reader article{line-height:1.7}.cnv-knowledge-reader article h2{font-size:24px}.cnv-doc-tree{display:grid;gap:5px}.cnv-doc-tree article{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:9px;border:1px solid transparent;border-radius:9px}.cnv-doc-tree article.active{border-color:var(--cnv-series-2);background:rgba(168,121,255,.1)}.cnv-doc-tree strong,.cnv-doc-tree small{display:block}.cnv-knowledge-graph{display:grid;gap:10px}.cnv-path-strip{display:flex;align-items:center;gap:6px;overflow:auto}.cnv-path-strip span{border:1px solid var(--cnv-line);background:var(--cnv-panel2);padding:7px 9px;border-radius:8px;white-space:nowrap}.cnv-path-strip b{color:var(--cnv-series-1)}.cnv-backlinks,.cnv-search-results{display:grid;gap:7px}.cnv-backlinks article,.cnv-search-results article{border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:10px;padding:10px}.cnv-backlinks strong,.cnv-backlinks small{display:block}.cnv-backlinks span{color:var(--cnv-series-1);font-size:11px}.cnv-search-results article{display:grid;grid-template-columns:auto 1fr auto;gap:9px}.cnv-search-results small,.cnv-search-results strong{display:block}.cnv-evidence-canvas{display:grid;gap:14px}.cnv-evidence-canvas>section{border-left:3px solid var(--cnv-series-2);padding:8px 15px;background:rgba(168,121,255,.06);border-radius:0 10px 10px 0}.cnv-evidence-canvas h3{font-size:24px;margin:6px 0}.cnv-diff{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cnv-diff section{border:1px solid var(--cnv-line);background:var(--cnv-panel2);border-radius:10px;padding:12px}.cnv-diff section:first-child p{color:#ff9aac}.cnv-diff section:last-child p{color:#7de9b8}@media(max-width:780px){.cnv-knowledge-reader{grid-template-columns:1fr}.cnv-knowledge-reader>aside{border:0!important;padding:0!important}.cnv-diff{grid-template-columns:1fr}}
 .cnv-state-nodata{display:flex;align-items:center;justify-content:center;min-height:120px;border:1px dashed var(--cnv-line);border-radius:11px;background:rgba(255,255,255,.02)}
 .cnv-state-nodata strong{color:var(--cnv-muted);font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── Interactivity (Phase 4) ─────────────────────────────────────────── */
+.cnv-filter { display: flex; align-items: center; gap: 8px; }
+.cnv-filter label { color: var(--cnv-muted); font-size: 13px; white-space: nowrap; }
+.cnv-filter select {
+  background: var(--cnv-panel2);
+  color: var(--cnv-text);
+  border: 1px solid var(--cnv-line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.cnv-section { display: flex; flex-direction: column; gap: 14px; }
+.cnv-clickable { cursor: pointer; }
+.cnv-clickable:hover { background: var(--cnv-panel2); }
+.cnv-clickable:focus-visible { outline: 2px solid var(--cnv-series-1); outline-offset: 2px; }
+svg .cnv-clickable:hover circle { stroke: var(--cnv-series-1); stroke-width: 2; }
