@@ -193,18 +193,42 @@ interface VisualPanelProps {
   title: string;
   subtitle?: string;
   state?: VisualStateValue;
+  /**
+   * Where the numbers came from. "fixture" means this service is not configured
+   * and the panel is showing sample data.
+   */
+  source?: "live" | "fixture" | "offline";
   children: ReactNode;
 }
 
-export function VisualPanel({ title, subtitle, state = "healthy", children }: VisualPanelProps) {
+export function VisualPanel({
+  title,
+  subtitle,
+  state = "healthy",
+  source,
+  children,
+}: VisualPanelProps) {
+  // A fixture panel MUST be visually distinct from a live one. Without this
+  // badge an unconfigured service renders exactly like a real one — RomM's
+  // sample data sat beside Emby's real 523 movies with nothing to tell them
+  // apart. Appendix C requires unconfigured services to fall back "visibly and
+  // labelled"; this is where that promise is kept.
+  const isFixture = source === "fixture";
   return (
-    <section className={`cnv cnv-surface state-${state}`}>
+    <section className={`cnv cnv-surface state-${state}${isFixture ? " is-fixture" : ""}`}>
       <header className="cnv-head">
         <div>
           <h3>{title}</h3>
           {subtitle && <small>{subtitle}</small>}
         </div>
-        <span className="cnv-badge">{state}</span>
+        <div className="cnv-badges">
+          {isFixture && (
+            <span className="cnv-badge cnv-badge-fixture" title="Sample data — this service is not configured">
+              SAMPLE DATA
+            </span>
+          )}
+          <span className="cnv-badge">{state}</span>
+        </div>
       </header>
       {children}
     </section>
@@ -252,9 +276,17 @@ interface EntityDrawerProps {
     meta?: Record<string, unknown>;
   } | null;
   adapterName?: string;
+  /** Whether the panel this entity came from was live or a fixture. */
+  entitySource?: "live" | "fixture" | "offline";
 }
 
-export function EntityDrawer({ open, onClose, entity, adapterName }: EntityDrawerProps) {
+export function EntityDrawer({
+  open,
+  onClose,
+  entity,
+  adapterName,
+  entitySource,
+}: EntityDrawerProps) {
   if (!open || !entity) return null;
   return (
     <div className="dash-drawer-overlay" onClick={onClose}>
@@ -276,8 +308,20 @@ export function EntityDrawer({ open, onClose, entity, adapterName }: EntityDrawe
           )}
           {adapterName && (
             <div className="dash-drawer-row">
-              <small>Source</small>
+              {/* Labelled "Adapter", not "Source" — `source` means live vs
+                  sample everywhere else in this codebase, and reusing the word
+                  for the adapter name made the drawer ambiguous about where
+                  the numbers actually came from. */}
+              <small>Adapter</small>
               <strong>{adapterName}</strong>
+            </div>
+          )}
+          {entitySource && (
+            <div className="dash-drawer-row">
+              <small>Data source</small>
+              <strong className={entitySource === "fixture" ? "dash-drawer-fixture" : undefined}>
+                {entitySource === "fixture" ? "SAMPLE DATA (service not configured)" : "Live"}
+              </strong>
             </div>
           )}
           {entity.meta && Object.keys(entity.meta).length > 0 && (

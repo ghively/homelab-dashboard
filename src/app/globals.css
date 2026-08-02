@@ -660,3 +660,32 @@ html, body {
 }
 
 .dash-chat-clear:hover { color: var(--dash-text); }
+
+/* ── Data-provenance badge ───────────────────────────────────── */
+/* A panel showing sample data must never look like a panel showing live data.
+   The dashed border and amber badge make an unconfigured service obvious at a
+   glance, so a demo value is never mistaken for a real one. */
+.cnv-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cnv-badge-fixture {
+  border-color: rgba(255, 194, 102, 0.45);
+  color: #ffc266;
+  background: rgba(255, 194, 102, 0.1);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.cnv-surface.is-fixture {
+  border-style: dashed;
+  border-color: rgba(255, 194, 102, 0.32);
+}
+
+/* Drawer provenance: sample data must read as sample data here too, not just
+   on the panel it was opened from. */
+.dash-drawer-fixture {
+  color: #ffc266;
+}
