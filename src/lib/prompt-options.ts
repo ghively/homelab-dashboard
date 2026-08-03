@@ -44,24 +44,25 @@ export const promptOptions: PromptOptions = {
     "Layout: use DashboardGrid for multi-panel dashboards where widths matter — set each CHILD's span (1-12) for width and rowSpan (1-3) for height. span 6 is half width, 4 a third, 12 full. Use Stack for simple vertical stacking, and Section for a titled group of panels.",
     "Visual style: every panel accepts an optional surfaceStyle object with closed enums — translucency (none|subtle|medium|strong), blur (none|sm|md|lg, the frosted-glass effect), background (solid|gradient|accent), elevation (none|sm|md|lg), glow (none|state|accent). glow \"state\" ties the glow color to the panel's health, so a critical panel glows red. Use these sparingly for emphasis; a dashboard where every panel glows reads as noise. There is no raw CSS — these enums are the only styling available.",
     "Every variable except root must be referenced by its parent's children/items array — unreferenced variables are silently dropped.",
+    "CRITICAL — arguments are POSITIONAL, never by name, and NEVER pass a whole Query result as a single argument. Every data component's first three positional args are surfaceStyle, span, rowSpan (pass null for defaults), THEN title, subtitle, state, then its data field. So a Query result `d` must be passed field-by-field: MetricStrip(null, null, null, d.title, d.subtitle, d.state, d.metrics) — NOT MetricStrip(d), which binds the whole object to surfaceStyle and renders an empty panel. Signatures: MetricStrip/…/(null, span, null, d.title, d.subtitle, d.state, d.metrics) for metrics; VisualTable/BarRank/ArtworkWall/PlaybackSessions(null, span, null, d.title, d.subtitle, d.state, d.items) for items; LineChart/MultiLine(null, span, null, d.title, d.subtitle, d.state, d.series) for series; Timeline/EventStream(null, span, null, d.title, d.subtitle, d.state, d.events) for events. Prefer MetricStrip for adapters that return a metrics array; use Gauge only when you pass an explicit scalar value.",
   ],
   toolExamples: [
     `Example — Ops health (monitoring overview):
 
 root = Stack([header, summary, targets])
 header = CardHeader("Ops Health", "Prometheus + container fleet")
-summary = MetricStrip(opsData)
 opsData = Query("prometheus", {}, {state: "healthy", metrics: []}, 30)
-targets = VisualTable(fleetData)
-fleetData = Query("docker", {view: "containers"}, {state: "healthy", items: []}, 30)`,
-    `Example — Storage capacity:
+summary = MetricStrip(null, null, null, opsData.title, opsData.subtitle, opsData.state, opsData.metrics)
+fleetData = Query("docker", {view: "containers"}, {state: "healthy", items: []}, 30)
+targets = VisualTable(null, null, null, fleetData.title, fleetData.subtitle, fleetData.state, fleetData.items)`,
+    `Example — Storage capacity (MetricStrip, not Gauge, because the adapter returns a metrics array):
 
-root = Stack([header, disk, items])
+root = Stack([header, usage, items])
 header = CardHeader("Storage Usage", "Allocation across bays")
-disk = Gauge(diskData)
-diskData = Query("synology-dsm", {}, {title: "Disk Usage", value: 0, max: 100, thresholds: {warning: 75, critical: 90}}, 60)
-items = VisualTable(bayData)
-bayData = Query("synology-dsm", {view: "bays"}, {state: "healthy", items: []}, 60)`,
+diskData = Query("synology-dsm", {}, {state: "healthy", metrics: []}, 60)
+usage = MetricStrip(null, null, null, diskData.title, diskData.subtitle, diskData.state, diskData.metrics)
+bayData = Query("synology-dsm", {view: "bays"}, {state: "healthy", items: []}, 60)
+items = VisualTable(null, null, null, bayData.title, bayData.subtitle, bayData.state, bayData.items)`,
     `Example — Dashboard with a reactive time-range filter:
 
 root = Stack([header, rangeFilter, panels])
@@ -69,10 +70,10 @@ header = CardHeader("Media Activity", "Filtered by time range")
 $range = "7d"
 rangeFilter = FilterDropdown("range", "Time range", $range, [{value: "24h", label: "Last 24 hours"}, {value: "7d", label: "Last 7 days"}, {value: "30d", label: "Last 30 days"}])
 panels = Stack([sessions, recent], "row", "l", "stretch", "between", true)
-sessions = PlaybackSessions(sessData)
 sessData = Query("emby", {view: "sessions", range: $range}, {state: "healthy", items: []}, 30)
-recent = ArtworkWall(recentData)
-recentData = Query("emby", {view: "recent-movies", range: $range}, {state: "healthy", items: []})`,
+sessions = PlaybackSessions(null, null, null, sessData.title, sessData.subtitle, sessData.state, sessData.items)
+recentData = Query("emby", {view: "recent-movies", range: $range}, {state: "healthy", items: []})
+recent = ArtworkWall(null, null, null, recentData.title, recentData.subtitle, recentData.state, recentData.items)`,
     `Example — Cinematic media dashboard:
 
 root = DashboardGrid("Media", "Live library and playback", null, null, null, null, [nowPlaying, recent, continueWatching])
@@ -87,36 +88,38 @@ continueWatching = ArtworkWall(null, 12, null, resumeData.title, resumeData.subt
 root = Stack([header, cols])
 header = CardHeader("Fleet Overview", "Grouped by concern")
 cols = Stack([leftCol, rightCol], "row", "l", "stretch", "between", true)
-leftCol = Section("Storage", null, null, [diskGauge, poolTable])
-diskGauge = Gauge(diskData)
-diskData = Query("synology-dsm", {}, {title: "Disk Usage", value: 0, max: 100, thresholds: {warning: 75, critical: 90}}, 60)
-poolTable = VisualTable(poolData)
+leftCol = Section("Storage", null, null, [diskStrip, poolTable])
+diskData = Query("synology-dsm", {}, {state: "healthy", metrics: []}, 60)
+diskStrip = MetricStrip(null, null, null, diskData.title, diskData.subtitle, diskData.state, diskData.metrics)
 poolData = Query("synology-dsm", {view: "pools"}, {state: "healthy", items: []}, 60)
+poolTable = VisualTable(null, null, null, poolData.title, poolData.subtitle, poolData.state, poolData.items)
 rightCol = Section("Media", null, null, [mediaStrip])
-mediaStrip = MetricStrip(mediaData)
-mediaData = Query("emby", {}, {state: "healthy", metrics: []}, 60)`,
+mediaData = Query("emby", {}, {state: "healthy", metrics: []}, 60)
+mediaStrip = MetricStrip(null, null, null, mediaData.title, mediaData.subtitle, mediaData.state, mediaData.metrics)`,
     `Example — Glass dashboard on a 12-column grid:
 
-root = DashboardGrid("Fleet", "Live status", null, null, null, null, [cpu, disk, events])
-cpu = Gauge(cpuData)
-cpuData = Query("prometheus", {}, {title: "CPU", value: 0, max: 100, thresholds: {warning: 70, critical: 90}}, 30)
-disk = Gauge(diskData)
-diskData = Query("synology-dsm", {}, {title: "Disk", value: 0, max: 100, thresholds: {warning: 75, critical: 90}}, 60)
-events = EventStream(alertData)
+root = DashboardGrid("Fleet", "Live status", null, null, null, null, [cpu, storage, events])
+cpuData = Query("prometheus", {}, {state: "healthy", metrics: []}, 30)
+cpu = MetricStrip(null, 3, null, cpuData.title, cpuData.subtitle, cpuData.state, cpuData.metrics)
+storageData = Query("synology-dsm", {}, {state: "healthy", metrics: []}, 60)
+storage = MetricStrip(null, 3, null, storageData.title, storageData.subtitle, storageData.state, storageData.metrics)
 alertData = Query("wazuh-manager", {}, {state: "healthy", events: []}, 30)
+events = EventStream(null, 6, null, alertData.title, alertData.subtitle, alertData.state, alertData.events)
 
-Set span on each child: cpu and disk at span 3 sit side by side, events at span 6 fills the rest.
+Each child sets span as its second arg: cpu and storage at span 3 sit side by side, events at span 6 fills the rest.
 Add surfaceStyle {blur: "md", translucency: "medium", glow: "state"} to a panel that should stand out.`,
     `Example — AI model activity:
 
 root = Stack([header, cards])
 header = CardHeader("AI Model Activity", "Inference services")
 cards = Stack([llmCard, ollamaCard], "row", "l", "stretch", "between", true)
-llmCard = Card([llmTitle, MetricStrip(llmData)])
+llmCard = Card([llmTitle, llmStrip])
 llmTitle = TextContent("LiteLLM", "small-heavy")
 llmData = Query("litellm", {}, {state: "healthy", metrics: []}, 30)
-ollamaCard = Card([ollamaTitle, MetricStrip(ollamaData)])
+llmStrip = MetricStrip(null, null, null, llmData.title, llmData.subtitle, llmData.state, llmData.metrics)
+ollamaCard = Card([ollamaTitle, ollamaStrip])
 ollamaTitle = TextContent("Ollama", "small-heavy")
-ollamaData = Query("ollama", {}, {state: "healthy", metrics: []}, 30)`,
+ollamaData = Query("ollama", {}, {state: "healthy", metrics: []}, 30)
+ollamaStrip = MetricStrip(null, null, null, ollamaData.title, ollamaData.subtitle, ollamaData.state, ollamaData.metrics)`,
   ],
 };
