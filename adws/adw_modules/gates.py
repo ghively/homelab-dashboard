@@ -14,6 +14,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from . import git_helper
 from .data_types import EnvelopeBase, GateReport
 
 TAIL_CHARS = 1000        # command output kept as evidence on a failure
@@ -59,12 +60,19 @@ def json_parses(envelope: EnvelopeBase, run) -> GateReport:
 
 
 def diff_matches_claims(envelope: EnvelopeBase, run) -> GateReport:
-    """Every file claimed changed must exist on disk."""
+    """Every file claimed changed must exist on disk, OR be a real deletion —
+    absent now, but still showing in git's uncommitted diff. A path that is
+    neither is a hallucinated or wrong claim, not a legitimate change."""
     report = GateReport()
+    deleted = set(git_helper.changed_files())
     for f in getattr(envelope, "changed_files", []):
         p = Path(f)
-        report.check(f, p.exists(),
-                     f"exists, {_size(p)}" if p.exists() else "claimed changed file does not exist")
+        if p.exists():
+            report.check(f, True, f"exists, {_size(p)}")
+        elif f in deleted:
+            report.check(f, True, "deleted (present in git's uncommitted diff)")
+        else:
+            report.check(f, False, "claimed changed file does not exist")
     return report
 
 
