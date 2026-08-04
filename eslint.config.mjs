@@ -30,6 +30,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Software-factory tooling, not application code: adws/ is sssf's own
+    // ADW scripts/extensions and .claude/skills/ is vendored skill content.
+    "adws/**",
+    ".claude/**",
   ]),
 ]);
 
