@@ -38,3 +38,9 @@ knowledge.db-wal
 .design-export/
 .worktrees/
 .superpowers/
+
+# sssf runtime
+adws/adw_data/sessions/
+adws/adw_data/sssf.db*
+__pycache__/
+*.pyc
