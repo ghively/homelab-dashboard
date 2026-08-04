@@ -136,12 +136,18 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
 # Replace every argv below. See the banner at the top of this file.
 
 def test(run) -> QualityCheckResult:
-    """Run the project's test suite. The highest-value block to wire up first."""
+    """Run the project's test suite. The highest-value block to wire up first.
+
+    No dedicated test runner exists in this repo, so this chains the two
+    fast, self-contained correctness checks it does have (parity + prompt
+    guidance) via the `test` script in package.json — not a full unit-test
+    suite, but real assertions, not a placeholder.
+    """
     return _run(QualityCheckSpec(
         name="test",
-        area="backend",
+        area="frontend",
         operation="build",
-        argv=_placeholder("test"),        # e.g. ["bun", "test"] or ["uv", "run", "pytest", "-q"]
+        argv=["npm", "run", "test"],
         timeout_seconds=600,
     ), run)
 
@@ -149,28 +155,28 @@ def test(run) -> QualityCheckResult:
 def lint(run) -> QualityCheckResult:
     return _run(QualityCheckSpec(
         name="lint",
-        area="backend",
+        area="frontend",
         operation="lint",
-        argv=_placeholder("lint"),        # e.g. ["bun", "x", "oxlint@1.36.0", "src"]
+        argv=["npm", "run", "lint"],
     ), run)
 
 
 def typecheck(run) -> QualityCheckResult:
     return _run(QualityCheckSpec(
         name="typecheck",
-        area="backend",
+        area="frontend",
         operation="typecheck",
-        argv=_placeholder("typecheck"),   # e.g. ["bun", "x", "tsc", "--noEmit"]
+        argv=["npx", "tsc", "--noEmit"],
     ), run)
 
 
 def build(run) -> QualityCheckResult:
-    output_dir = _check_dir(run, "build") / "bundle"
     return _run(QualityCheckSpec(
         name="build",
-        area="backend",
+        area="frontend",
         operation="build",
-        argv=_placeholder("build"),       # e.g. ["bun", "build", "src/index.ts", "--outdir", str(output_dir)]
+        argv=["npm", "run", "build"],
+        timeout_seconds=600,
     ), run)
 
 
