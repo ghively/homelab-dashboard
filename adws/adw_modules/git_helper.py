@@ -10,7 +10,11 @@ def _git(*args: str) -> str:
     result = subprocess.run(["git", *args], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
-    return result.stdout.strip()
+    # rstrip only: `git status --porcelain`'s leading status-code column starts
+    # with a space for a plain modify/delete, and a full .strip() eats that
+    # space on the FIRST line only — shifting changed_files()'s line[3:] slice
+    # by one character for whichever path happens to sort first.
+    return result.stdout.rstrip("\n")
 
 
 def current_branch() -> str:
