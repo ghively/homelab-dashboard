@@ -1217,6 +1217,29 @@ svg .cnv-clickable:focus-visible circle {
   border-radius: 0;
 }
 .cnv-albums .cnv-media-art { aspect-ratio: 1; }
+.cnv-media-art { position: relative; }
+.cnv-media-trailer {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(6, 6, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--cnv-text);
+  font-size: 11px;
+  text-decoration: none;
+  backdrop-filter: blur(2px);
+  transition: background var(--dur-fast) var(--ease-out-quart), border-color var(--dur-fast) var(--ease-out-quart);
+}
+.cnv-media-trailer:hover {
+  background: color-mix(in srgb, var(--cnv-series-1) 30%, rgba(6, 6, 10, 0.72));
+  border-color: var(--cnv-series-1);
+}
 .cnv-media-meta {
   display: grid;
   gap: 5px;
@@ -1406,4 +1429,79 @@ svg .cnv-clickable:focus-visible circle {
 @keyframes dash-rich-rise {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Modal — the confirm-before-mutating gate (2026-08-XX)
+   ══════════════════════════════════════════════════════════════════════════
+   Base OpenUI component, same unstyled-without-its-own-stylesheet situation
+   as Card/CardHeader/TextContent above — but Modal.tsx portals straight to
+   document.body, so it needs real position/overlay/box rules, not just a
+   look. This is now load-bearing: the OpenUI runtime has no built-in
+   confirm-before-mutate step (Mutation() fires the instant a button's
+   @Run triggers it), so gating every write action behind this Modal is the
+   ONLY confirmation a person gets before a real action fires — see the
+   MUTATIONS rule in prompt-options.ts. */
+.openui-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.openui-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 6, 10, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.openui-modal-content {
+  position: relative;
+  background: var(--cnv-panel2);
+  border: 1px solid var(--border-neutral-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  padding: var(--cnv-gap-4);
+  max-height: 85vh;
+  overflow-y: auto;
+  color: var(--cnv-text);
+}
+.openui-modal-sm { width: min(360px, 100%); }
+.openui-modal-md { width: min(480px, 100%); }
+.openui-modal-lg { width: min(680px, 100%); }
+.openui-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cnv-gap-3);
+  margin-bottom: var(--cnv-gap-3);
+}
+.openui-modal-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--neon-cyan);
+}
+.openui-modal-close {
+  background: transparent;
+  border: 1px solid var(--cnv-line);
+  border-radius: 8px;
+  color: var(--cnv-muted);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.openui-modal-close:hover {
+  color: var(--cnv-text);
+  border-color: var(--border-neutral-strong);
+}
+.openui-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cnv-gap-3);
 }
