@@ -82,6 +82,10 @@ function registerEmby(): void {
       "libraries": (a) => a.queryLibraryOverview(),
       "series": (a) => a.querySeries(),
       "albums": (a) => a.queryAlbums(),
+      // Content discovery: filters.genre / filters.search are the model's
+      // Query() args, e.g. Query("emby", {view: "by-genre", genre: "Horror"}).
+      "by-genre": (a, filters) => a.queryByGenre(typeof filters?.genre === "string" ? filters.genre : ""),
+      "search": (a, filters) => a.querySearch(typeof filters?.search === "string" ? filters.search : ""),
     },
     // Overview = library-count KPIs + recent-movie posters, so the media page
     // shows Emby's cover art like Sonarr/Radarr. `libraries` is still available
@@ -136,6 +140,10 @@ function registerRadarr(): void {
         "queue": (a) => a.queryQueue(),
         "calendar": (a) => a.queryCalendar(),
         "disk": (a) => a.queryDiskSpace(),
+        // Content discovery: the "you could download this" half — see
+        // emby's "by-genre" for the "available now" half.
+        "wanted-by-genre": (a, filters) =>
+          a.queryWantedByGenre(typeof filters?.genre === "string" ? filters.genre : ""),
       },
       defaultQuery: "movies",
     }),

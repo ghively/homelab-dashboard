@@ -183,6 +183,106 @@ export class EmbyAdapter {
   }
 
   /**
+   * Query: Movies in a genre, already in the library.
+   * Returns VisualData for ArtworkWall — the "what's available now" half of a
+   * content-discovery answer (paired with Radarr's wanted-by-genre for "what
+   * you could download"). Genres filter is case-insensitive server-side.
+   */
+  async queryByGenre(genre: string): Promise<VisualQueryResult> {
+    const start = Date.now();
+    const label = genre ? `${genre} Movies` : "Movies";
+    try {
+      const items = await this.fetchList<EmbyItem>(
+        `/Items?IncludeItemTypes=Movie&Genres=${encodeURIComponent(genre)}&Recursive=true&Limit=24&SortBy=CommunityRating&SortOrder=Descending&ImageTypes=Primary`
+      );
+
+      const now = new Date().toISOString();
+
+      const visualItems: Item[] = items.map((item) => ({
+        id: item.Id,
+        label: item.Name,
+        subtitle: item.ProductionYear?.toString(),
+        image: proxyImage("emby", item.ImageTags?.Primary
+          ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
+          : undefined),
+        value: item.CommunityRating,
+        state: "healthy",
+        meta: { type: "Movie", premiered: item.PremiereDate, genres: item.Genres, studios: item.Studios },
+      }));
+
+      const data: VisualData = {
+        title: label,
+        subtitle: `${items.length} in your library`,
+        state: items.length > 0 ? "healthy" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Available", value: items.length, unit: "movies" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Emby:${this.baseUrl}/Items?Genres=${encodeURIComponent(genre)}`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult(label, err, start);
+    }
+  }
+
+  /**
+   * Query: Free-text title search across movies and TV shows.
+   * Returns VisualData for ArtworkWall.
+   */
+  async querySearch(term: string): Promise<VisualQueryResult> {
+    const start = Date.now();
+    const label = term ? `"${term}"` : "Search";
+    try {
+      const items = await this.fetchList<EmbyItem>(
+        `/Items?SearchTerm=${encodeURIComponent(term)}&IncludeItemTypes=Movie,Series&Recursive=true&Limit=24&ImageTypes=Primary`
+      );
+
+      const now = new Date().toISOString();
+
+      const visualItems: Item[] = items.map((item) => ({
+        id: item.Id,
+        label: item.Name,
+        subtitle: item.ProductionYear?.toString(),
+        image: proxyImage("emby", item.ImageTags?.Primary
+          ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
+          : undefined),
+        value: item.CommunityRating,
+        state: "healthy",
+        meta: { type: item.Type, premiered: item.PremiereDate, genres: item.Genres },
+      }));
+
+      const data: VisualData = {
+        title: label,
+        subtitle: `${items.length} result${items.length === 1 ? "" : "s"} in your library`,
+        state: items.length > 0 ? "healthy" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Results", value: items.length, unit: "" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Emby:${this.baseUrl}/Items?SearchTerm=${encodeURIComponent(term)}`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult(label, err, start);
+    }
+  }
+
+  /**
    * Query: Continue watching.
    * Returns VisualData for PlaybackSessionCards or ContinueWatchingRail.
    */

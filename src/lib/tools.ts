@@ -22,6 +22,9 @@ import { WORLDS } from "@/lib/workspace-config";
  * Compact input schema shared by every adapter tool.
  * The model passes a `view` to select between queries an adapter exposes
  * (e.g. emby "recent-movies" vs "sessions"); omitting it uses the default.
+ * Any other property is forwarded verbatim to the adapter as a filter (e.g.
+ * `genre` for emby's "by-genre" view or romm's "roms" view) — see
+ * serviceGuideText in prompt-options.ts for which view accepts which filter.
  */
 const inputSchema = {
   type: "object",
@@ -29,6 +32,14 @@ const inputSchema = {
     view: {
       type: "string",
       description: "Optional query selector for multi-view adapters",
+    },
+    genre: {
+      type: "string",
+      description: "Optional genre filter, for views that support it (e.g. emby \"by-genre\", romm \"roms\")",
+    },
+    search: {
+      type: "string",
+      description: "Optional free-text search term, for views that support it (e.g. emby \"search\", romm \"roms\")",
     },
   },
 } as const;
@@ -82,9 +93,15 @@ export function createToolProvider(): Record<
 
   for (const name of adapterNames) {
     provider[name] = async (args) => {
-      const view =
-        typeof args?.view === "string" ? `&view=${encodeURIComponent(args.view)}` : "";
-      const res = await fetch(`/api/adapters?adapter=${encodeURIComponent(name)}${view}`);
+      // Forward every arg the model passed — not just `view` — so a filter
+      // like `genre` reaches the API route generically. /api/adapters treats
+      // `view` as the query selector and everything else as a filter.
+      const params = new URLSearchParams({ adapter: name });
+      for (const [key, value] of Object.entries(args ?? {})) {
+        if (value == null) continue;
+        params.set(key, String(value));
+      }
+      const res = await fetch(`/api/adapters?${params}`);
       if (!res.ok) {
         // Surface the failure as an offline-shaped result rather than throwing,
         // so the panel shows the offline state instead of a render error.

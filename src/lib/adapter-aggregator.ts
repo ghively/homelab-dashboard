@@ -404,6 +404,7 @@ export async function queryAdapter(
   adapterName: string,
   state: VisualStateValue | null = null,
   view?: string,
+  filters?: Record<string, unknown>,
 ): Promise<VisualQueryResult | null> {
   const entry = ADAPTER_INVENTORY.find((a) => a.name === adapterName);
   if (!entry) return null;
@@ -420,7 +421,10 @@ export async function queryAdapter(
   const liveAdapter = getAdapter(adapterName);
   if (liveAdapter) {
     try {
-      const result = await liveAdapter.query(view ? { query: view } : {});
+      const params: { query?: string; filters?: Record<string, unknown> } = {};
+      if (view) params.query = view;
+      if (filters && Object.keys(filters).length) params.filters = filters;
+      const result = await liveAdapter.query(params);
       return { ...result, source: "live" };
     } catch (err) {
       // Classify rather than blanket-`offline`. "Credentials rejected",

@@ -30,7 +30,14 @@ export const promptOptions: PromptOptions = {
   tools: toolSpecs,
   additionalRules: [
     ...(openuiPromptOptions.additionalRules ?? []),
+    "YOUR JOB — you are a chat assistant that answers with real, live visual components, not a dashboard generator that always produces a multi-panel overview. Read what the user actually asked. A narrow, conversational question (\"what horror movies do I have\", \"is Emby up\", \"how's the disk looking\") gets the smallest layout that answers exactly that — one or two panels, real data, done. Reserve DashboardGrid and multi-Section layouts for when the user asks for an overview, a dashboard, or explicitly names several services to compare. Defaulting every reply to a full dashboard is the wrong behavior even though it is the safer-looking one.",
     `ADAPTER NAMES — the first argument to Query() must be one of these exact names, and nothing else. An unrecognised name returns no data and renders an empty panel, so an invented name is always a broken dashboard:\n${ADAPTER_NAMES}`,
+    "CONTENT DISCOVERY — for \"what/recommend/find me some X\" questions about media or games, do not answer from your own trained knowledge (that produces a plain text list with no posters and nothing that is actually in this homelab). Use the filterable views below, which return real, poster-bearing items:\n" +
+      '  Query("emby", {view: "by-genre", genre: "Horror"}) — movies in that genre already in the Emby library (posters via items).\n' +
+      '  Query("emby", {view: "search", search: "some title"}) — free-text title search across movies/TV already in the library.\n' +
+      '  Query("radarr", {view: "wanted-by-genre", genre: "Horror"}) — movies Radarr is tracking in that genre but has not downloaded yet: the "you could grab this" half. It does not discover titles Radarr has never heard of.\n' +
+      '  Query("romm", {view: "roms", genre: "Platformer"}) or Query("romm", {view: "roms", search: "mario"}) — ROMs with cover art, genre- or title-filtered.\n' +
+      "A genre/discovery answer should show BOTH halves where relevant — what's available now (Emby, ArtworkWall) and what's missing but trackable (Radarr, ArtworkWall) — as two clearly labeled panels in one Stack/Section with matching surfaceStyle, not two disconnected dashboards. If a panel comes back with zero items, say so in its subtitle rather than hiding the panel — an empty genre is real information.",
     `WORLDS — this homelab is organised into exactly these worlds: ${WORLD_NAMES}. Use these names when grouping or summarising by world. Never invent a world name.`,
     "Always pass live data via Query() — never hardcode or mock values. Each service has an adapter that returns the data the panel needs. Literal numbers in your output are always wrong unless the user explicitly gave them.",
     "Pick by data shape, not by service name: Gauge for a single bounded % (disk, battery, CPU); Donut for shares of a whole (media by type, spend by model); BarRank for ranked comparison (top items by size/count); LineChart for one time-series; MultiLine for 2–4 series compared; Timeline for timestamped events; EventStream for a high-volume alert feed; NodeGraph for topology; Sankey for a left-to-right pipeline; Kanban for work items grouped into columns; VisualTable for a row list; ArtworkWall for image grids; PlaybackSessions for active streams; Capacity for storage pools; SecurityPosture for severity matrices.",
@@ -47,6 +54,17 @@ export const promptOptions: PromptOptions = {
     "CRITICAL — arguments are POSITIONAL, never by name, and NEVER pass a whole Query result as a single argument. Every data component's first three positional args are surfaceStyle, span, rowSpan (pass null for defaults), THEN title, subtitle, state, then its data field. So a Query result `d` must be passed field-by-field: MetricStrip(null, null, null, d.title, d.subtitle, d.state, d.metrics) — NOT MetricStrip(d), which binds the whole object to surfaceStyle and renders an empty panel. Signatures: MetricStrip/…/(null, span, null, d.title, d.subtitle, d.state, d.metrics) for metrics; VisualTable/BarRank/ArtworkWall/PlaybackSessions(null, span, null, d.title, d.subtitle, d.state, d.items) for items; LineChart/MultiLine(null, span, null, d.title, d.subtitle, d.state, d.series) for series; Timeline/EventStream(null, span, null, d.title, d.subtitle, d.state, d.events) for events. Prefer MetricStrip for adapters that return a metrics array; use Gauge only when you pass an explicit scalar value.",
   ],
   toolExamples: [
+    `Example — Content discovery ("recommend some horror movies"): a narrow conversational ask gets a small, direct answer — real posters from what's actually in the library, not a text list from training knowledge, and not a full dashboard:
+
+root = Stack([header, cols])
+header = CardHeader("Horror", "In your library, and what you could grab")
+cols = Stack([available, downloadable], "row", "l", "stretch", "between", true)
+availableData = Query("emby", {view: "by-genre", genre: "Horror"}, {state: "healthy", items: []})
+available = ArtworkWall(null, 6, null, availableData.title, availableData.subtitle, availableData.state, availableData.items, false, "grid")
+downloadableData = Query("radarr", {view: "wanted-by-genre", genre: "Horror"}, {state: "healthy", items: []})
+downloadable = ArtworkWall(null, 6, null, downloadableData.title, downloadableData.subtitle, downloadableData.state, downloadableData.items, false, "grid")
+
+Both panels share span 6 (side by side) and the same layout ("grid") so they read as one matched pair, not two unrelated widgets. If the user asks for games instead of movies, use Query("romm", {view: "roms", genre: "..."}) the same way — one ArtworkWall, no Radarr half (RomM has no separate "wanted" concept).`,
     `Example — Ops health (monitoring overview):
 
 root = Stack([header, summary, targets])
