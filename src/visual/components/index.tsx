@@ -402,12 +402,31 @@ function ArtworkTile({
   const firstGenre = Array.isArray(genres) && typeof genres[0] === "string" ? genres[0] : undefined;
   if (firstGenre) metadata.push(["genre", firstGenre] as const);
   const clickProps = clickable(onActivate, `Show details for ${item.label}`);
+  // A real trailer link (Emby/Radarr/RomM metadata) when one exists; a plain
+  // YouTube search otherwise — every suggestion gets a usable trailer link,
+  // honestly distinguished by icon rather than claiming a search is the real
+  // thing.
+  const realTrailer = typeof item.meta?.trailerUrl === "string" ? item.meta.trailerUrl : undefined;
+  const trailerHref = realTrailer || (item.label ? `https://www.youtube.com/results?search_query=${encodeURIComponent(`${item.label} trailer`)}` : undefined);
   return (
     <article
       {...clickProps}
       className={`${featured ? "cnv-media-tile cnv-media-tile-feature" : "cnv-media-tile"} ${clickProps.className}`}
     >
-      <div className="cnv-art cnv-media-art" {...artProps(item.image)} />
+      <div className="cnv-art cnv-media-art" {...artProps(item.image)}>
+        {trailerHref && (
+          <a
+            className="cnv-media-trailer"
+            href={trailerHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={realTrailer ? "Watch trailer" : "Search for trailer"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {realTrailer ? "▶" : "🔍"}
+          </a>
+        )}
+      </div>
       <div className="cnv-media-meta">
         <strong>{item.label}</strong>
         {item.subtitle && <small>{item.subtitle}</small>}

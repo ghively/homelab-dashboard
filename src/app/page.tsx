@@ -11,17 +11,25 @@ import {
   useFleetData,
   type FleetData,
 } from "@/components/dashboard";
-import { GenerativeChat } from "@/components/generative-chat";
+import { GenerativeChat, useGenerativeChat, type UseGenerativeChat } from "@/components/generative-chat";
 import { RichWorld } from "@/components/rich-world";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
 import type { VisualStateValue } from "@/adapters/types";
 
 export default function Home() {
   const [activeWorld, setActiveWorld] = useState<WorldId | "home">("home");
-  // Remounts the chat, which is how the conversation is cleared. Chat state
-  // lives inside GenerativeChat, so bumping its key is both the simplest reset
-  // and the one that cannot leave a half-cleared thread behind.
-  const [chatKey, setChatKey] = useState(0);
+  // Owned here, not inside GenerativeChat, and not per-world either: both
+  // conversations previously lived and died with whichever component
+  // rendered <GenerativeChat>, so navigating to any other world (clicking
+  // "Media" in the sidebar to check something, say) unmounted it and coming
+  // back started over with no warning anything had been lost. Home() itself
+  // never unmounts across activeWorld changes, so state living here survives
+  // navigation. Two separate conversations (home's general chat, the AI
+  // workspace's) rather than one shared thread — different context, and
+  // conflating them would mean an AI-infra question shows up mid movie-night
+  // conversation.
+  const homeChat = useGenerativeChat();
+  const aiChat = useGenerativeChat();
   const [fixtureState, setFixtureState] = useState<VisualStateValue | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [drawerEntity, setDrawerEntity] = useState<{
@@ -51,12 +59,12 @@ export default function Home() {
       <DashboardShell
         activeWorld={activeWorld}
         onWorldChange={setActiveWorld}
-        onNewChat={() => setChatKey((k) => k + 1)}
+        onNewChat={() => homeChat.clear()}
         fixtureState={fixtureState}
         onFixtureChange={setFixtureState}
         dataSource={dataSource}
       >
-        <LandingPage key={chatKey} fleet={fleet} />
+        <LandingPage chat={homeChat} fleet={fleet} />
       </DashboardShell>
     );
   }
@@ -67,7 +75,7 @@ export default function Home() {
         activeWorld={activeWorld}
         onWorldChange={setActiveWorld}
         onNewChat={() => {
-          setChatKey((k) => k + 1);
+          homeChat.clear();
           setActiveWorld("home");
         }}
         fixtureState={fixtureState}
@@ -75,6 +83,7 @@ export default function Home() {
         dataSource={dataSource}
       >
         <AIWorkspace
+          chat={aiChat}
           fixtureState={fixtureState}
           activeTag={activeTag}
           onTagClick={setActiveTag}
@@ -130,7 +139,7 @@ export default function Home() {
 // ── Landing Page (Visual OS Home) ────────────────────────────
 
 
-function LandingPage({ fleet }: { fleet: FleetData | null }) {
+function LandingPage({ chat, fleet }: { chat: UseGenerativeChat; fleet: FleetData | null }) {
   const overall = fleet?.overall;
 
   /*
@@ -148,6 +157,7 @@ function LandingPage({ fleet }: { fleet: FleetData | null }) {
   */
   return (
     <GenerativeChat
+      chat={chat}
       subtitle={
         overall
           ? `Live from ${overall.healthy}/${overall.total} reporting adapters · fleet ${overall.state}`
@@ -314,11 +324,13 @@ function WorldView({
 // ── AI Workspace (NL composition) ────────────────────────────
 
 function AIWorkspace({
+  chat,
   fixtureState,
   activeTag,
   onTagClick,
   onEntityClick,
 }: {
+  chat: UseGenerativeChat;
   fixtureState: VisualStateValue | null;
   activeTag: string | null;
   onTagClick: (tag: string) => void;
@@ -348,7 +360,7 @@ function AIWorkspace({
         }
       />
 
-      <GenerativeChat />
+      <GenerativeChat chat={chat} />
 
       <QuickTags
         tags={worldConfig.quickTags}
