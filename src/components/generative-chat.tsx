@@ -44,7 +44,39 @@ export interface UseGenerativeChat {
 
 // ── Streaming chat hook ──────────────────────────────────────
 
-export function useGenerativeChat(): UseGenerativeChat {
+/** Read a persisted conversation. Guarded for SSR (no `window`) and for a
+ *  corrupt/foreign value in the slot (falls back to empty, never throws). */
+function loadPersisted(storageKey: string | undefined): ChatMessage[] {
+  if (!storageKey || typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * `storageKey` persists the conversation to localStorage (undefined = no
+ * persistence, in-memory only, the prior behavior). Every message this app
+ * has ever generated lived only in React state — closing the tab, a hard
+ * refresh, or any unrecoverable render error wiped the whole conversation
+ * with nothing to fall back to. This does not explain why the composer would
+ * disappear while the tab stays open, but it means that whatever the actual
+ * cause turns out to be, a reload recovers the conversation instead of
+ * starting over blank.
+ */
+export function useGenerativeChat(storageKey?: string): UseGenerativeChat {
+  // Always starts empty — server and client's first render must match, or
+  // React discards the server-rendered markup and re-renders client-side
+  // (a hydration mismatch, with its own console warning and a visible
+  // flash). Loading straight into useState's initializer would do exactly
+  // that: the server has no `window` and always produces [], but the client
+  // pass would read localStorage and could produce a populated array on that
+  // very first render. Loading in an effect below (client-only, runs after
+  // hydration) keeps the first paint identical on both sides.
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -52,6 +84,40 @@ export function useGenerativeChat(): UseGenerativeChat {
   const [error, setError] = useState<string | null>(null);
   const [toolError, setToolError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Real state, not a ref: on mount this and `messages` are set together in
+  // the same effect, so React batches them into one re-render. A ref would
+  // flip to true synchronously mid-effect, before the batched setMessages
+  // applies — the persist-effect below (same commit, same flush) would then
+  // see hydrated=true paired with the still-stale empty `messages`, and
+  // briefly write [] over a real saved conversation before the correct
+  // value landed a tick later. As state, the persist-effect simply doesn't
+  // run at all until BOTH are applied together, so there's nothing to race.
+  const [hydrated, setHydrated] = useState(false);
+
+  // One-time load, right after mount. Wrapped rather than called directly:
+  // this sets state, and calling a state-setting function synchronously in
+  // an effect body is what react-hooks flags as a cascading-render risk —
+  // same pattern used for the identical reason in dashboard.tsx's
+  // useWorldData(). The scheduling is equivalent either way.
+  useEffect(() => {
+    void (async () => {
+      const loaded = loadPersisted(storageKey);
+      if (loaded.length > 0) setMessages(loaded);
+      setHydrated(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist on every change. try/catch: a full or disabled localStorage
+  // should degrade to "conversation won't survive a reload", not throw.
+  useEffect(() => {
+    if (!storageKey || typeof window === "undefined" || !hydrated) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(messages));
+    } catch {
+      // quota exceeded or storage disabled — silently in-memory-only for this session
+    }
+  }, [messages, storageKey, hydrated]);
 
   const sendMessage = useCallback(
     (text?: string, context?: Record<string, unknown>) => {
@@ -165,7 +231,14 @@ export function useGenerativeChat(): UseGenerativeChat {
     setStreamedResponse("");
     setError(null);
     setToolError(null);
-  }, []);
+    if (storageKey && typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        // storage disabled — nothing to clean up
+      }
+    }
+  }, [storageKey]);
 
   return {
     messages,
