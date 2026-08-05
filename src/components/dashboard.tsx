@@ -39,6 +39,12 @@ export function DashboardShell({
   dataSource = "unknown",
 }: ShellProps) {
   const [clock, setClock] = useState("");
+  // The sidebar was a fixed 240px column with no narrow-viewport behavior at
+  // all — on a phone it ate more than half the screen permanently, leaving
+  // the chat itself too cramped to use. Below the CSS breakpoint it becomes
+  // an off-canvas drawer, toggled from the waybar; above it this state is
+  // simply unused (the CSS makes the sidebar static there regardless).
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   useEffect(() => {
     const tick = () =>
       setClock(
@@ -60,7 +66,13 @@ export function DashboardShell({
       {/* Obsidian's signature: a hairline across the top with a travelling
           highlight. Purely ambient — it carries no state, so it is aria-hidden. */}
       <div className="dash-pulse" aria-hidden="true"><i /></div>
-      <aside className="dash-sidebar">
+      {/* Backdrop only exists (and only intercepts clicks) while the drawer is
+          open — tapping outside the sidebar on mobile closes it, same as any
+          off-canvas nav. Invisible and inert above the mobile breakpoint. */}
+      {isMobileNavOpen && (
+        <div className="dash-nav-backdrop" onClick={() => setIsMobileNavOpen(false)} aria-hidden="true" />
+      )}
+      <aside className={`dash-sidebar${isMobileNavOpen ? " is-open" : ""}`}>
         <div className="dash-brand">
           <span className="dash-brand-icon">◉</span>
           <div>
@@ -74,7 +86,11 @@ export function DashboardShell({
             another destination. */}
         <button
           className="dash-new"
-          onClick={() => (onNewChat ? onNewChat() : onWorldChange("home"))}
+          onClick={() => {
+            if (onNewChat) onNewChat();
+            else onWorldChange("home");
+            setIsMobileNavOpen(false);
+          }}
         >
           <span className="dash-new-icon" aria-hidden="true">+</span>
           New dashboard
@@ -86,7 +102,10 @@ export function DashboardShell({
             <button
               key={w.id}
               className={`dash-nav-item ${activeWorld === w.id ? "active" : ""}`}
-              onClick={() => onWorldChange(w.id)}
+              onClick={() => {
+                onWorldChange(w.id);
+                setIsMobileNavOpen(false);
+              }}
               style={activeWorld === w.id ? { borderLeftColor: w.accent } : undefined}
             >
               <span className="dash-nav-icon">{w.icon}</span>
@@ -119,6 +138,17 @@ export function DashboardShell({
             clock is client-only and rendered after mount so server and client
             markup match — a live time in SSR output hydrates mismatched. */}
         <div className="dash-waybar">
+          {/* Only rendered content on narrow viewports where the sidebar is
+              off-canvas by default — CSS hides this button entirely above
+              the breakpoint, where the sidebar is already always visible. */}
+          <button
+            className="dash-nav-toggle"
+            onClick={() => setIsMobileNavOpen((v) => !v)}
+            aria-label={isMobileNavOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={isMobileNavOpen}
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
           <span className="dash-waybar-host">gh-ai</span>
           <span className="dash-waybar-prompt">
             <span className="p">gene@gh-ai:~$</span> dashboard --live{" "}
