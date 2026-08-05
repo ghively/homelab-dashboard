@@ -27,7 +27,7 @@ import type {
   SonarrSystemStatus,
   SonarrDiskSpace,
 } from "./types";
-import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Sonarr adapter configuration.
@@ -243,7 +243,9 @@ export class SonarrAdapter {
         subtitle: item.episode?.title || item.series?.title,
         image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         value: item.size,
-        progress: item.sizeleft ? 1 - item.sizeleft / item.size : undefined,
+        // sizeleft === 0 means the download is complete — `item.sizeleft ? …`
+        // treated that as falsy and dropped the progress bar right at 100%.
+        progress: typeof item.sizeleft === "number" && item.size ? 1 - item.sizeleft / item.size : undefined,
         state: item.status === "downloading" ? "loading" : item.status === "completed" ? "healthy" : "warning",
         group: item.status,
         meta: {
@@ -437,19 +439,23 @@ export class SonarrAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 401/403 (Sonarr is up, the API key is wrong) renders
+    // `denied` and names the fix, rather than the generic `offline` that
+    // reads as "the service is down" for every failure regardless of cause.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `Sonarr:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },
