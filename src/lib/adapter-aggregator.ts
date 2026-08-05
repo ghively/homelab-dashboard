@@ -25,6 +25,7 @@ const HOST_MAP: Record<string, string> = {
   romm: "gh-media",
   tdarr: "gh-media",
   "disc-ripper": "gh-media",
+  omdb: "external (omdbapi.com)",
   omniroute: "gh-arm",
   litellm: "gh-arm",
   ollama: "gh-nvidia",
@@ -462,6 +463,38 @@ export async function queryAdapter(
     ...worldSpecificFixture(adapterName, entry.world, state ?? "healthy"),
     source: "fixture",
   };
+}
+
+/**
+ * Run a write action against a live adapter. Unlike queryAdapter(), this
+ * NEVER falls back to a fixture — a fixture "succeeding" a mutation would be
+ * a fabricated result for a real-world action, which is a different order of
+ * dishonesty than a fixture standing in for a read. No live adapter
+ * registered, or an adapter that doesn't support mutations, is a hard
+ * failure with a message naming why, not a silent no-op success.
+ */
+export async function mutateAdapter(
+  adapterName: string,
+  action: string,
+  args: Record<string, unknown>,
+): Promise<{ success: boolean; message: string }> {
+  const entry = ADAPTER_INVENTORY.find((a) => a.name === adapterName);
+  if (!entry) return { success: false, message: `Unknown adapter "${adapterName}".` };
+
+  const liveAdapter = getAdapter(adapterName);
+  if (!liveAdapter) {
+    return { success: false, message: `${adapterName} is not configured — nothing to act on.` };
+  }
+  if (!liveAdapter.mutate) {
+    return { success: false, message: `${adapterName} does not support write actions.` };
+  }
+
+  try {
+    return await liveAdapter.mutate(action, args);
+  } catch (err) {
+    const c = classifyError(err);
+    return { success: false, message: c.message };
+  }
 }
 
 // Query all adapters for a world.

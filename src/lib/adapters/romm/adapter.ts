@@ -61,6 +61,35 @@ export interface RommRomFilters {
 }
 
 /**
+ * Colloquial genre name -> the real IGDB tag RomM actually stores. Verified
+ * against the live instance's real genre taxonomy (sampled across ~150 roms):
+ * ['Adventure', 'Arcade', "Beat 'em Up", 'Card & Board Game', 'Fighting',
+ * "Hack and slash/Beat 'em up", 'Music', 'Pinball', 'Platform',
+ * 'Point-and-click', 'Puzzle', 'Quiz/Trivia', 'Racing',
+ * 'Real Time Strategy (RTS)', 'Role-Playing', 'Role-playing (RPG)',
+ * 'Shooter', 'Simulator', 'Sport', 'Strategy']. A conversational "recommend
+ * a platformer" sent as-is matches nothing — same class of bug as Emby's
+ * Sci-Fi/Science Fiction mismatch (see emby/adapter.ts GENRE_SYNONYMS).
+ */
+const GENRE_SYNONYMS: Record<string, string> = {
+  "platformer": "Platform",
+  "platformers": "Platform",
+  "rpg": "Role-playing (RPG)",
+  "rpgs": "Role-playing (RPG)",
+  "sports": "Sport",
+  "beat em up": "Beat 'em Up",
+  "beat 'em up": "Beat 'em Up",
+  "beat-em-up": "Beat 'em Up",
+  "point and click": "Point-and-click",
+  "rts": "Real Time Strategy (RTS)",
+  "real time strategy": "Real Time Strategy (RTS)",
+  "quiz": "Quiz/Trivia",
+  "trivia": "Quiz/Trivia",
+  "shooting": "Shooter",
+  "shmup": "Shooter",
+};
+
+/**
  * RomM class.
  */
 export class RommAdapter {
@@ -79,8 +108,11 @@ export class RommAdapter {
     const headers: HeadersInit = {
       "Accept": "application/json",
     };
+    // Verified live: RomM 5.x's own generated API keys are bearer tokens
+    // (X-API-Key 403s even with a valid key) — a different auth scheme from
+    // every other adapter in this app, which all use a static header key.
     if (this.config.apiKey) {
-      headers["X-API-Key"] = this.config.apiKey;
+      headers["Authorization"] = `Bearer ${this.config.apiKey}`;
     }
     return headers;
   }
@@ -133,6 +165,32 @@ export class RommAdapter {
     return proxyImage("romm", rom.path_cover_large || rom.path_cover_small || undefined) ?? rom.url_cover ?? undefined;
   }
 
+  /** Real genres — igdb_metadata first (IGDB's own taxonomy), RomM's own metadatum as fallback. */
+  private romGenres(rom: RommRom): string[] | undefined {
+    return rom.igdb_metadata?.genres ?? rom.metadatum?.genres;
+  }
+
+  /**
+   * A real critic/audience-style score (0-100, IGDB's aggregation) — not
+   * fabricated. total_rating first (IGDB's blended critic+user score),
+   * aggregated_rating next (external critic aggregate only), RomM's own
+   * average_rating last. IGDB's two fields come back as strings.
+   */
+  private romRating(rom: RommRom): number | undefined {
+    const igdb = rom.igdb_metadata?.total_rating ?? rom.igdb_metadata?.aggregated_rating;
+    if (igdb) {
+      const n = Number.parseFloat(igdb);
+      if (Number.isFinite(n)) return n;
+    }
+    return rom.metadatum?.average_rating ?? undefined;
+  }
+
+  /** Real trailer link when RomM/IGDB has one for this game. */
+  private romTrailerUrl(rom: RommRom): string | undefined {
+    const id = rom.youtube_video_id ?? rom.igdb_metadata?.youtube_video_id;
+    return id ? `https://www.youtube.com/watch?v=${id}` : undefined;
+  }
+
   /**
    * Query: ROMs — filterable browse/search, the actual "show me the games"
    * view. Requires ROMM_API_KEY (/api/roms 403s without one, same as
@@ -145,7 +203,14 @@ export class RommAdapter {
     const start = Date.now();
     const { genre, search, missing, platformId, limit = 24 } = filters;
     const params = new URLSearchParams({ limit: String(Math.min(limit, 100)) });
-    if (genre) params.append("genres", genre);
+    // Comma-separated genre = a compound ask ("platformer RPG" ->
+    // "Platformer,RPG"). RomM's own API supports this natively —
+    // genres_logic=all makes repeated genres= params an AND, not its OR
+    // default — unlike Emby/Radarr/Sonarr, which need client-side filtering
+    // for the same ask because their APIs have no AND mode.
+    const genreList = genre?.split(",").map((g) => g.trim()).filter(Boolean) ?? [];
+    for (const g of genreList) params.append("genres", GENRE_SYNONYMS[g.toLowerCase()] ?? g);
+    if (genreList.length > 1) params.set("genres_logic", "all");
     if (search) params.set("search_term", search);
     if (missing != null) params.set("missing", String(missing));
     if (platformId != null) params.append("platform_ids", String(platformId));
@@ -160,11 +225,14 @@ export class RommAdapter {
         label: rom.name || rom.fs_name_no_tags || rom.fs_name,
         subtitle: [rom.platform_display_name, rom.regions?.[0]].filter(Boolean).join(" · ") || undefined,
         image: this.romImage(rom),
-        value: rom.fs_size_bytes,
+        value: this.romRating(rom),
         state: rom.missing_from_fs ? "critical" : "healthy",
         group: rom.platform_display_name,
         meta: {
           platform: rom.platform_display_name,
+          genres: this.romGenres(rom),
+          rating: this.romRating(rom),
+          trailerUrl: this.romTrailerUrl(rom),
           regions: rom.regions,
           languages: rom.languages,
           tags: rom.tags,
@@ -177,6 +245,14 @@ export class RommAdapter {
           missingFromDisk: rom.missing_from_fs,
         },
       }));
+
+      // RomM's own order_by param does not reliably sort by rating (verified
+      // live — it silently falls back to name ordering for any field it does
+      // not recognize, and rating lives on a joined metadata table, not a
+      // sortable rom column). Highest-rated first, unrated items last, so a
+      // "recommend a good one" pick is actually the best of what was fetched
+      // rather than whatever came back alphabetically first.
+      visualItems.sort((a, b) => (typeof b.value === "number" ? b.value : -1) - (typeof a.value === "number" ? a.value : -1));
 
       const data: VisualData = {
         title: label,

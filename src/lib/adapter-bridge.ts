@@ -42,6 +42,15 @@ export interface BridgeAdapterOpts<T extends BridgedAdapter = BridgedAdapter> {
     (a: T, filters?: Record<string, unknown>) => Promise<{ data: VisualData; freshness: ContractsFreshnessInfo }>
   >;
   defaultQuery?: string;
+  // Write actions. Optional — most adapters stay read-only. Each handler
+  // returns success:false with a message on an expected failure (bad id,
+  // service rejects it) rather than throwing, since a mutation's result is
+  // shown to the user directly, not classified through classifyError() the
+  // way a query failure is.
+  mutationMap?: Record<
+    string,
+    (a: T, args: Record<string, unknown>) => Promise<{ success: boolean; message: string }>
+  >;
 }
 
 function mapFreshness(f: ContractsFreshnessInfo, adapterName: string): TypesFreshnessInfo {
@@ -78,7 +87,7 @@ function flattenResult(
 }
 
 export function bridgeAdapter<T extends BridgedAdapter>(opts: BridgeAdapterOpts<T>): DataAdapter {
-  const { name, description, category, adapter, queryMap, defaultQuery } = opts;
+  const { name, description, category, adapter, queryMap, defaultQuery, mutationMap } = opts;
 
   return {
     name,
@@ -102,5 +111,18 @@ export function bridgeAdapter<T extends BridgedAdapter>(opts: BridgeAdapterOpts<
       const nested = await handler(adapter, params?.filters);
       return flattenResult(name, nested);
     },
+
+    ...(mutationMap
+      ? {
+          async mutate(action: string, args: Record<string, unknown>) {
+            const handler = mutationMap[action];
+            if (!handler) {
+              const available = Object.keys(mutationMap).join(", ");
+              return { success: false, message: `Unknown action "${action}" for adapter "${name}". Available: ${available}` };
+            }
+            return handler(adapter, args);
+          },
+        }
+      : {}),
   };
 }
