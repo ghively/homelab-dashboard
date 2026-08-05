@@ -296,6 +296,20 @@ function EmptyPanel({
  * only drill-down path requires a mouse is a dashboard half its users cannot
  * drill into.
  */
+/**
+ * Everything already known about a clicked entity — its meta plus the fields
+ * that live outside meta (label, subtitle, value, state). Passed as the click
+ * action's `params`, which the chat wires into the follow-up message (see
+ * generative-chat.tsx's onAction) so the model can render a real DetailPanel
+ * from data already in hand instead of guessing a new Query() and hoping the
+ * same item comes back. Adapters already fetch rich fields (genres, overview,
+ * ratings, studio, …) into item.meta; this is the one place that makes all of
+ * it reachable, for every adapter, without touching each one individually.
+ */
+function entityParams(item: z.infer<typeof ItemSchema>): Record<string, unknown> {
+  return { ...item.meta, label: item.label, subtitle: item.subtitle, value: item.value, state: item.state };
+}
+
 function clickable(onActivate: () => void, label: string) {
   return {
     className: "cnv-clickable",
@@ -381,6 +395,12 @@ function ArtworkTile({
     const value = item.meta?.[key];
     return typeof value === "string" || typeof value === "number" ? [[key, value] as const] : [];
   });
+  // Adapters already fetch genres for most media items (Emby, Radarr, RomM);
+  // this was sitting in meta unused. First genre only — a tile is small, and
+  // the full list is still there in the drill-down detail.
+  const genres = item.meta?.genres;
+  const firstGenre = Array.isArray(genres) && typeof genres[0] === "string" ? genres[0] : undefined;
+  if (firstGenre) metadata.push(["genre", firstGenre] as const);
   const clickProps = clickable(onActivate, `Show details for ${item.label}`);
   return (
     <article
@@ -902,7 +922,7 @@ export const Timeline = defineComponent({
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Timeline"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-timeline">
-          {props.events.map((e) => (
+          {props.events.slice(0, 12).map((e) => (
             <article key={e.id}>
               <time>{e.at}</time>
               <i />
@@ -1031,7 +1051,10 @@ export const NodeGraph = defineComponent({
             <g
               key={n.id}
               transform={`translate(${n.x ?? 0} ${n.y ?? 0})`}
-              {...clickable(() => triggerAction(`Show details for ${n.label}`), `Show details for ${n.label}`)}
+              {...clickable(
+                () => triggerAction(`Show details for ${n.label}`, undefined, { params: { label: n.label, value: n.value, state: n.state } }),
+                `Show details for ${n.label}`,
+              )}
             >
               <circle r="34" />
               <text textAnchor="middle" y="5">{n.label}</text>
@@ -1107,10 +1130,13 @@ export const Kanban = defineComponent({
           {groups.map((g) => (
             <section key={g}>
               <h4>{g}</h4>
-              {props.items.filter((i) => (i.group || "Active") === g).map((i) => (
+              {props.items.filter((i) => (i.group || "Active") === g).slice(0, 15).map((i) => (
                 <article
                   key={i.id}
-                  {...clickable(() => triggerAction(`Show details for ${i.label}`), `Show details for ${i.label}`)}
+                  {...clickable(
+                    () => triggerAction(`Show details for ${i.label}`, undefined, { params: entityParams(i) }),
+                    `Show details for ${i.label}`,
+                  )}
                 ><strong>{i.label}</strong><small>{i.subtitle}</small></article>
               ))}
             </section>
@@ -1146,10 +1172,13 @@ export const VisualTable = defineComponent({
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Table"} subtitle={props.subtitle} state={props.state}>
         <div className="cnv-table">
-          {props.items.map((i) => (
+          {props.items.slice(0, 15).map((i) => (
             <article
               key={i.id}
-              {...clickable(() => triggerAction(`Show details for ${i.label}`), `Show details for ${i.label}`)}
+              {...clickable(
+                () => triggerAction(`Show details for ${i.label}`, undefined, { params: entityParams(i) }),
+                `Show details for ${i.label}`,
+              )}
             >
               <strong>{i.label}</strong>
               <small>{i.subtitle}</small>
@@ -1205,16 +1234,72 @@ export const ArtworkWall = defineComponent({
         <div className={`cnv-posters cnv-posters-layout-${layout}${props.square ? " cnv-albums" : ""}`}>
           {layout === "feature" ? (
             <>
-              <ArtworkTile item={items[0]} featured onActivate={() => triggerAction(`Show details for ${items[0].label}`)} />
+              <ArtworkTile item={items[0]} featured onActivate={() => triggerAction(`Show details for ${items[0].label}`, undefined, { params: entityParams(items[0]) })} />
               {items.slice(1).map((item) => (
-                <ArtworkTile key={item.id} item={item} onActivate={() => triggerAction(`Show details for ${item.label}`)} />
+                <ArtworkTile key={item.id} item={item} onActivate={() => triggerAction(`Show details for ${item.label}`, undefined, { params: entityParams(item) })} />
               ))}
             </>
           ) : items.map((item) => (
-            <ArtworkTile key={item.id} item={item} onActivate={() => triggerAction(`Show details for ${item.label}`)} />
+            <ArtworkTile key={item.id} item={item} onActivate={() => triggerAction(`Show details for ${item.label}`, undefined, { params: entityParams(item) })} />
           ))}
         </div>
       </Surface>
+    );
+  },
+});
+
+// ── 14b. MediaTile ────────────────────────────────────────────
+//
+// One ArtworkTile, standalone — not a grid. ArtworkWall forces every result
+// into an 18-item wall even when the answer is "here are the 3 I'd pick",
+// and that wall runs ~900px tall (Surface chrome + a grid of full tiles).
+// The tile itself was never the problem; the grid around it was. This reuses
+// the exact same ArtworkTile the wall already renders, so 2-4 of these in a
+// row Stack look identical to wall tiles but cost none of the grid's height.
+
+export const MediaTile = defineComponent({
+  name: "MediaTile",
+  props: z.object({
+    surfaceStyle: SurfaceStyleSchema.optional(),
+    span: SpanSchema,
+    rowSpan: RowSpanSchema,
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    state: VisualStateSchema.optional(),
+    image: z.string().optional(),
+    value: z.union([z.string(), z.number()]).optional(),
+    progress: z.number().min(0).max(1).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
+  }),
+  description:
+    "ONE small poster/title tile — a single Item, not a collection. Use for 2-5 handpicked or curated " +
+    "results, a comparison, or a single suggestion, placed side by side in a Stack(\"row\"). " +
+    "Use ArtworkWall instead for browsing a whole library/category (6+ items) — do not use several " +
+    "MediaTiles to reimplement a browse view. " +
+    "title is the item name, image is its poster URL, value is a rating/score, meta carries genre/overview/etc " +
+    "for the badge row and for drill-down detail. Pull individual entries out of an already-fetched Query() " +
+    "result with bracket indexing, e.g. someData.items[0].label, someData.items[0].image, someData.items[0].meta — " +
+    "no second Query() needed per tile.",
+  component: function MediaTileView({ props }: ComponentRenderProps<{ title?: string; subtitle?: string; state?: string; image?: string; value?: string | number; progress?: number; meta?: Record<string, unknown> } & SurfaceExtras>) {
+    const triggerAction = useTriggerAction();
+    if (!props.title && !props.image) return <EmptyPanel props={props} title="Tile" label="No item" shape="tiles" />;
+    const item: z.infer<typeof ItemSchema> = {
+      id: props.title ?? "tile",
+      label: props.title ?? "Untitled",
+      subtitle: props.subtitle,
+      image: props.image,
+      value: props.value,
+      state: props.state as z.infer<typeof ItemSchema>["state"],
+      progress: props.progress,
+      meta: props.meta,
+    };
+    return (
+      <div className="cnv-media-tile-standalone">
+        <ArtworkTile
+          item={item}
+          onActivate={() => triggerAction(`Show details for ${item.label}`, undefined, { params: entityParams(item) })}
+        />
+      </div>
     );
   },
 });
@@ -1559,7 +1644,7 @@ export const DetailPanel = defineComponent({
         )}
         {props.metrics && props.metrics.length > 0 && (
           <div className="cnv-metrics">
-            {props.metrics.map((m, i) => (
+            {props.metrics.slice(0, 10).map((m, i) => (
               <article key={i}><small>{m.label}</small><strong>{m.value}{m.unit}</strong></article>
             ))}
           </div>
@@ -1843,7 +1928,7 @@ export const DashboardGrid = defineComponent({
 const allComponents = [
   MetricStrip, Gauge, Donut, LineChart, MultiLine, BarRank,
   Timeline, EventStream, LogStream, NodeGraph, Sankey,
-  Kanban, VisualTable, ArtworkWall, PlaybackSessions,
+  Kanban, VisualTable, ArtworkWall, MediaTile, PlaybackSessions,
   Capacity, SecurityPosture, MarkdownReader, KnowledgeGraph,
   Backlinks, DetailPanel, Callout, EmptyState, RoomBoard, Flow,
   FilterDropdown, Section, DashboardGrid,
