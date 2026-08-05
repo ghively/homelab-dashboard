@@ -16,13 +16,19 @@ const toolProvider = createToolProvider();
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  /** What the bubble shows, if different from `content` (sent to the model).
+   *  Drill-down messages append the clicked entity's real data to `content`
+   *  so the model can answer from it directly instead of re-querying and
+   *  guessing which result matches — but that JSON has no business appearing
+   *  in the transcript, so the bubble shows `display` instead. */
+  display?: string;
 }
 
 interface UseGenerativeChat {
   messages: ChatMessage[];
   inputValue: string;
   setInputValue: (v: string) => void;
-  sendMessage: (text?: string) => void;
+  sendMessage: (text?: string, context?: Record<string, unknown>) => void;
   stop: () => void;
   clear: () => void;
   isStreaming: boolean;
@@ -41,11 +47,17 @@ export function useGenerativeChat(): UseGenerativeChat {
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    (text?: string) => {
+    (text?: string, context?: Record<string, unknown>) => {
       const query = (text ?? inputValue).trim();
       if (!query || isStreaming) return;
 
-      const userMsg: ChatMessage = { role: "user", content: query };
+      // Drill-down (a click's entity data) rides along in `content`, which is
+      // what reaches the model; `display` keeps the bubble reading as the
+      // plain "Show details for X" the user actually saw happen.
+      const hasContext = context && Object.keys(context).length > 0;
+      const userMsg: ChatMessage = hasContext
+        ? { role: "user", content: `${query}\n\n[Data already fetched for this entity — use it directly, do not call Query() again: ${JSON.stringify(context)}]`, display: query }
+        : { role: "user", content: query };
       const priorMessages = [...messages, userMsg];
       setMessages(priorMessages);
       setInputValue("");
@@ -300,14 +312,17 @@ export function GenerativeChat({ subtitle }: { subtitle?: string }) {
                       toolProvider={toolProvider}
                       isStreaming={false}
                       // Drill-down: clicking a row/card/node sends its label
-                      // back as a follow-up so the model can answer with a
-                      // detail view. Only on settled messages — a live stream
-                      // is still arriving.
-                      onAction={(event) => chat.sendMessage(event.humanFriendlyMessage)}
+                      // back as a follow-up, along with whatever data that
+                      // component already had for it (event.params — see
+                      // entityParams() in visual/components/index.tsx), so
+                      // the model can answer from real data instead of
+                      // re-querying and guessing which result matches. Only
+                      // on settled messages — a live stream is still arriving.
+                      onAction={(event) => chat.sendMessage(event.humanFriendlyMessage, event.params)}
                     />
                   </div>
                 ) : (
-                  <div className="chat-msg-text">{msg.content}</div>
+                  <div className="chat-msg-text">{msg.display ?? msg.content}</div>
                 )}
               </article>
             ))}

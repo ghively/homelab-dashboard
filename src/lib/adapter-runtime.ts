@@ -84,7 +84,11 @@ function registerEmby(): void {
       "albums": (a) => a.queryAlbums(),
       // Content discovery: filters.genre / filters.search are the model's
       // Query() args, e.g. Query("emby", {view: "by-genre", genre: "Horror"}).
-      "by-genre": (a, filters) => a.queryByGenre(typeof filters?.genre === "string" ? filters.genre : ""),
+      "by-genre": (a, filters) =>
+        a.queryByGenre(
+          typeof filters?.genre === "string" ? filters.genre : "",
+          filters?.mediaType === "movie" || filters?.mediaType === "series" ? filters.mediaType : undefined,
+        ),
       "search": (a, filters) => a.querySearch(typeof filters?.search === "string" ? filters.search : ""),
     },
     // Overview = library-count KPIs + recent-movie posters, so the media page
@@ -115,6 +119,10 @@ function registerSonarr(): void {
         "queue": (a) => a.queryQueue(),
         "calendar": (a) => a.queryCalendar(),
         "disk": (a) => a.queryDiskSpace(),
+        // Content discovery: the TV "you could download this" half — see
+        // emby's "by-genre" (mediaType: "series") for the "available now" half.
+        "wanted-by-genre": (a, filters) =>
+          a.queryWantedByGenre(typeof filters?.genre === "string" ? filters.genre : ""),
       },
       defaultQuery: "series",
     }),
