@@ -18,6 +18,7 @@ import { RadarrAdapter } from "@/lib/adapters/radarr/adapter";
 import { SabnzbdAdapter } from "@/lib/adapters/sabnzbd/adapter";
 import { TdarrAdapter } from "@/lib/adapters/tdarr/adapter";
 import { RommAdapter } from "@/lib/adapters/romm/adapter";
+import { OmdbAdapter } from "@/lib/adapters/omdb/adapter";
 import { PiHoleAdapter } from "@/adapters/pihole-adapter";
 import { UnifiAdapter } from "@/adapters/unifi-adapter";
 import watchtowerVps from "@/adapters/storage/watchtower-vps-adapter";
@@ -82,11 +83,28 @@ function registerEmby(): void {
       "libraries": (a) => a.queryLibraryOverview(),
       "series": (a) => a.querySeries(),
       "albums": (a) => a.queryAlbums(),
+      // Content discovery: filters.genre / filters.search are the model's
+      // Query() args, e.g. Query("emby", {view: "by-genre", genre: "Horror"}).
+      "by-genre": (a, filters) =>
+        a.queryByGenre(
+          typeof filters?.genre === "string" ? filters.genre : "",
+          filters?.mediaType === "movie" || filters?.mediaType === "series" ? filters.mediaType : undefined,
+          filters?.unwatched === true || filters?.unwatched === "true",
+        ),
+      "search": (a, filters) => a.querySearch(typeof filters?.search === "string" ? filters.search : ""),
+      // The "something like X" / "more like that" half of a real
+      // recommendation flow — see querySimilar() for why this needs a
+      // resolved Emby user and fails honestly (not a 500) without one.
+      "similar": (a, filters) => a.querySimilar(typeof filters?.itemId === "string" ? filters.itemId : ""),
     },
     // Overview = library-count KPIs + recent-movie posters, so the media page
     // shows Emby's cover art like Sonarr/Radarr. `libraries` is still available
     // by name for a counts-only view.
     defaultQuery: "overview",
+    mutationMap: {
+      "set-watched": (a, args) =>
+        a.setWatched(String(args?.itemId ?? ""), args?.watched !== false),
+    },
   });
 
   registry.set("emby", bridged);
@@ -111,8 +129,19 @@ function registerSonarr(): void {
         "queue": (a) => a.queryQueue(),
         "calendar": (a) => a.queryCalendar(),
         "disk": (a) => a.queryDiskSpace(),
+        // Content discovery: the TV "you could download this" half — see
+        // emby's "by-genre" (mediaType: "series") for the "available now" half.
+        "wanted-by-genre": (a, filters) =>
+          a.queryWantedByGenre(typeof filters?.genre === "string" ? filters.genre : ""),
+        "lookup": (a, filters) =>
+          a.lookupSeries(typeof filters?.search === "string" ? filters.search : ""),
       },
       defaultQuery: "series",
+      mutationMap: {
+        "search-episode": (a, args) => a.searchEpisode(Number(args?.episodeId)),
+        "remove-queue-item": (a, args) => a.removeQueueItem(Number(args?.queueId)),
+        "add-series": (a, args) => a.addSeries(Number(args?.tvdbId), String(args?.title ?? ""), Number(args?.year)),
+      },
     }),
   );
 }
@@ -136,8 +165,19 @@ function registerRadarr(): void {
         "queue": (a) => a.queryQueue(),
         "calendar": (a) => a.queryCalendar(),
         "disk": (a) => a.queryDiskSpace(),
+        // Content discovery: the "you could download this" half — see
+        // emby's "by-genre" for the "available now" half.
+        "wanted-by-genre": (a, filters) =>
+          a.queryWantedByGenre(typeof filters?.genre === "string" ? filters.genre : ""),
+        "lookup": (a, filters) =>
+          a.lookupMovie(typeof filters?.search === "string" ? filters.search : ""),
       },
       defaultQuery: "movies",
+      mutationMap: {
+        "search-movie": (a, args) => a.searchMovie(Number(args?.movieId)),
+        "remove-queue-item": (a, args) => a.removeQueueItem(Number(args?.queueId)),
+        "add-movie": (a, args) => a.addMovie(Number(args?.tmdbId), String(args?.title ?? ""), Number(args?.year)),
+      },
     }),
   );
 }
@@ -163,6 +203,11 @@ function registerSabnzbd(): void {
         "speed": (a) => a.querySpeed(),
       },
       defaultQuery: "queue",
+      mutationMap: {
+        "set-queue-paused": (a, args) => a.setQueuePaused(args?.paused !== false),
+        "set-item-paused": (a, args) => a.setItemPaused(String(args?.nzoId ?? ""), args?.paused !== false),
+        "delete-item": (a, args) => a.deleteItem(String(args?.nzoId ?? "")),
+      },
     }),
   );
 }
@@ -221,11 +266,56 @@ function registerRomm(): void {
         // rather than a misleading offline when no key is set.
         "heartbeat": (a) => a.queryHeartbeat(),
         "platforms": (a) => a.queryPlatforms(),
-        "status": (a) => a.querySystemStatus(),
-        "scans": (a) => a.queryScanJobs(),
-        "missing": (a) => a.queryMissingRoms(),
+        "stats": (a) => a.queryStats(),
+        "tasks": (a) => a.queryTasks(),
+        // Real ROM browsing with cover art. filters.genre/search/missing are
+        // the model's Query() args, e.g. Query("romm", {view: "roms", genre: "Platformer"}).
+        "roms": (a, filters) =>
+          a.queryRoms({
+            genre: typeof filters?.genre === "string" ? filters.genre : undefined,
+            search: typeof filters?.search === "string" ? filters.search : undefined,
+          }),
+        "missing": (a) => a.queryRoms({ missing: true }),
       },
       defaultQuery: "heartbeat",
+    }),
+  );
+}
+
+/**
+ * OMDb is a public external API, not a homelab service — no URL to
+ * configure, it's always www.omdbapi.com. Real Rotten Tomatoes/Metacritic/
+ * IMDb critic+audience scores, for enriching a recommendation with what
+ * critics actually said, not just what's tagged in Emby/Radarr.
+ */
+function registerOmdb(): void {
+  const apiKey = process.env.OMDB_API_KEY;
+  if (!apiKey) return;
+
+  const adapter = new OmdbAdapter({ apiKey });
+
+  registry.set(
+    "omdb",
+    bridgeAdapter({
+      name: "omdb",
+      description: "OMDb critic/audience ratings (IMDb, Rotten Tomatoes, Metacritic)",
+      category: "media",
+      adapter,
+      queryMap: {
+        // Default: a static "ready" state, not a real lookup — see
+        // queryReady()'s comment for why (no sensible title to default to
+        // on a bare world-page load).
+        "ready": (a) => a.queryReady(),
+        // filters.search is the title (reusing the same field name every
+        // other adapter's title-search view uses); filters.year narrows a
+        // same-titled match — e.g. Query("omdb", {search: "Get Out", year: "2017"}).
+        "ratings": (a, filters) =>
+          a.queryRatings(
+            typeof filters?.search === "string" ? filters.search : "",
+            typeof filters?.year === "string" ? filters.year : undefined,
+          ),
+      },
+      defaultQuery: "ready",
     }),
   );
 }
@@ -331,6 +421,7 @@ export function initAdapters(): void {
   registerSabnzbd();
   registerTdarr();
   registerRomm();
+  registerOmdb();
   registerPihole();
   registerUnifi();
   registerWatchtowers();

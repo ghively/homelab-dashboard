@@ -40,6 +40,7 @@ export const WORLDS: WorldConfig[] = [
       "romm",
       "tdarr",
       "disc-ripper",
+      "omdb",
     ],
     quickTags: ["library", "queue", "downloads", "transcode", "health"],
     defaultRenderer: "artwork-wall",

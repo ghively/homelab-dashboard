@@ -454,6 +454,55 @@ export class SabnzbdAdapter {
   }
 
   /**
+   * Mutation: pause or resume the whole queue. Fully reversible either
+   * direction, no data loss — SABnzbd resumes exactly where it left off.
+   */
+  async setQueuePaused(paused: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+      const result = await this.fetch<{ status: boolean }>(this.getUrl(paused ? "pause" : "resume"));
+      if (!result.status) return { success: false, message: "SABnzbd rejected the request." };
+      return { success: true, message: paused ? "Queue paused." : "Queue resumed." };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not ${paused ? "pause" : "resume"} the queue: ${c.message}` };
+    }
+  }
+
+  /**
+   * Mutation: pause or resume ONE item in the queue, by nzo_id (see
+   * SabQueueSlot.nzo_id, already surfaced from queryQueue()). Reversible.
+   */
+  async setItemPaused(nzoId: string, paused: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+      const result = await this.fetch<{ status: boolean }>(
+        this.getUrl("queue", { name: paused ? "pause" : "resume", value: nzoId }),
+      );
+      if (!result.status) return { success: false, message: "SABnzbd rejected the request." };
+      return { success: true, message: paused ? `Paused ${nzoId}.` : `Resumed ${nzoId}.` };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not ${paused ? "pause" : "resume"} item: ${c.message}` };
+    }
+  }
+
+  /**
+   * Mutation: remove one item from the queue entirely. Unlike pause/resume,
+   * this is NOT reversible — the download is gone, not just paused.
+   */
+  async deleteItem(nzoId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const result = await this.fetch<{ status: boolean }>(
+        this.getUrl("queue", { name: "delete", value: nzoId }),
+      );
+      if (!result.status) return { success: false, message: "SABnzbd rejected the request." };
+      return { success: true, message: `Deleted ${nzoId} from the queue.` };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not delete item: ${c.message}` };
+    }
+  }
+
+  /**
    * Create an error result for failed queries.
    */
   private errorResult(

@@ -289,6 +289,27 @@ export const ArtworkWallSchema = defineComponent({
   component: null as never,
 });
 
+export const MediaTileSchema = defineComponent({
+  name: "MediaTile",
+  props: z.object({
+    ...baseFields,
+    image: z.string().optional(),
+    value: z.union([z.string(), z.number()]).optional(),
+    progress: z.number().min(0).max(1).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
+  }),
+  description:
+    "ONE small poster/title tile — a single Item, not a collection. Use for 2-5 handpicked or curated " +
+    "results, a comparison, or a single suggestion, placed side by side in a Stack(\"row\"). " +
+    "Use ArtworkWall instead for browsing a whole library/category (6+ items) — do not use several " +
+    "MediaTiles to reimplement a browse view. " +
+    "title is the item name, image is its poster URL, value is a rating/score, meta carries genre/overview/etc " +
+    "for the badge row and for drill-down detail. Pull individual entries out of an already-fetched Query() " +
+    "result with bracket indexing, e.g. someData.items[0].label, someData.items[0].image, someData.items[0].meta — " +
+    "no second Query() needed per tile.",
+  component: null as never,
+});
+
 export const PlaybackSessionsSchema = defineComponent({
   name: "PlaybackSessions",
   props: z.object({ ...baseFields, items: z.array(ItemSchema) }),
@@ -484,7 +505,7 @@ export const DashboardGridSchema = defineComponent({
 export const homelabSchemaComponents = [
   MetricStripSchema, GaugeSchema, DonutSchema, LineChartSchema, MultiLineSchema, BarRankSchema,
   TimelineSchema, EventStreamSchema, LogStreamSchema, NodeGraphSchema, SankeySchema,
-  KanbanSchema, VisualTableSchema, ArtworkWallSchema, PlaybackSessionsSchema,
+  KanbanSchema, VisualTableSchema, ArtworkWallSchema, MediaTileSchema, PlaybackSessionsSchema,
   CapacitySchema, SecurityPostureSchema, MarkdownReaderSchema, KnowledgeGraphSchema,
   BacklinksSchema, DetailPanelSchema, CalloutSchema, EmptyStateSchema, RoomBoardSchema, FlowSchema,
   FilterDropdownSchema, SectionSchema, DashboardGridSchema,

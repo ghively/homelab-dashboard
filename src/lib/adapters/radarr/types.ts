@@ -51,7 +51,14 @@ export const RadarrMovieSchema = z.object({
   genres: z.array(z.string()).optional(),
   tags: z.array(z.number()).optional(),
   added: z.string(),
-  ratings: z.object({ votes: z.number(), value: z.number() }).optional(),
+  // Verified against the live instance: this is per-provider
+  // ({tmdb: {votes, value, type}}, imdb/rottenTomatoes/metacritic keyed the
+  // same way, each optional), not the flat {votes, value} previously
+  // modeled here — that shape doesn't exist in the real API, so every read
+  // of `.ratings.value` was silently undefined.
+  ratings: z
+    .record(z.string(), z.object({ votes: z.number().optional(), value: z.number(), type: z.string().optional() }).optional())
+    .optional(),
   hasFile: z.boolean(),
   movieFile: z
     .object({
@@ -116,15 +123,13 @@ export type RadarrQueueItem = z.infer<typeof RadarrQueueItemSchema>;
 
 /**
  * Radarr wanted item (missing movies).
+ *
+ * Verified against the live instance: /api/v3/wanted/missing returns full
+ * movie records directly — the same shape as /api/v3/movie — not a
+ * {id, movieId, movie: {...}} wrapper. There is no separate queue-style
+ * envelope here; the record's own `id` IS the movie id MoviesSearch expects.
  */
-export const RadarrWantedItemSchema = z.object({
-  id: z.number(),
-  movieId: z.number(),
-  movie: RadarrMovieSchema.optional(),
-  inCinemas: z.string().optional(),
-  physicalRelease: z.string().optional(),
-  digitalRelease: z.string().optional(),
-});
+export const RadarrWantedItemSchema = RadarrMovieSchema;
 export type RadarrWantedItem = z.infer<typeof RadarrWantedItemSchema>;
 
 /**
@@ -177,6 +182,33 @@ export const RadarrSystemStatusSchema = z.object({
   migrationVersion: z.number(),
 });
 export type RadarrSystemStatus = z.infer<typeof RadarrSystemStatusSchema>;
+
+/**
+ * Radarr movie lookup result — GET /api/v3/movie/lookup(?term=|/tmdb?tmdbId=).
+ * Verified against the live instance: this is genuinely a different shape
+ * from RadarrMovieSchema, not a subset of it — it carries `remotePoster` (an
+ * absolute TMDB CDN URL, since nothing has been downloaded to Radarr's own
+ * /MediaCover cache yet) instead of a usable `images[].url`, and has no
+ * library-assigned `id`/`hasFile`/`monitored` because the movie may not be
+ * tracked at all yet. This is the metadata Radarr itself returns for "here's
+ * what a movie with this tmdbId/title looks like if you were to add it".
+ */
+export const RadarrLookupResultSchema = z.object({
+  title: z.string(),
+  year: z.number(),
+  tmdbId: z.number(),
+  imdbId: z.string().optional(),
+  overview: z.string().optional(),
+  genres: z.array(z.string()).optional(),
+  runtime: z.number().optional(),
+  studio: z.string().optional(),
+  youTubeTrailerId: z.string().optional(),
+  certification: z.string().optional(),
+  remotePoster: z.string().optional(),
+  status: RadarrMovieStatusSchema.optional(),
+  ratings: RadarrMovieSchema.shape.ratings,
+});
+export type RadarrLookupResult = z.infer<typeof RadarrLookupResultSchema>;
 
 /**
  * Radarr disk space.
