@@ -229,9 +229,16 @@ function registerRomm(): void {
         // rather than a misleading offline when no key is set.
         "heartbeat": (a) => a.queryHeartbeat(),
         "platforms": (a) => a.queryPlatforms(),
-        "status": (a) => a.querySystemStatus(),
-        "scans": (a) => a.queryScanJobs(),
-        "missing": (a) => a.queryMissingRoms(),
+        "stats": (a) => a.queryStats(),
+        "tasks": (a) => a.queryTasks(),
+        // Real ROM browsing with cover art. filters.genre/search/missing are
+        // the model's Query() args, e.g. Query("romm", {view: "roms", genre: "Platformer"}).
+        "roms": (a, filters) =>
+          a.queryRoms({
+            genre: typeof filters?.genre === "string" ? filters.genre : undefined,
+            search: typeof filters?.search === "string" ? filters.search : undefined,
+          }),
+        "missing": (a) => a.queryRoms({ missing: true }),
       },
       defaultQuery: "heartbeat",
     }),
