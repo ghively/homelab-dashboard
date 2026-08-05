@@ -1731,3 +1731,40 @@ button.dash-tag {
 @media (prefers-reduced-motion: reduce) {
   .dash-new:hover { transform: none; }
 }
+
+.app-crash-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100vh;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-primary, #e5e5e5);
+  background: var(--bg-dark, #0a0a0c);
+}
+
+.app-crash-fallback strong {
+  font-size: 1.1rem;
+}
+
+.app-crash-fallback p {
+  color: var(--text-dim, #888);
+  max-width: 480px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.app-crash-fallback button {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+.app-crash-fallback button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
