@@ -73,6 +73,42 @@ export function pickPanels(result: VisualQueryResult): string[] {
 }
 
 /**
+ * Which Query-result field(s) each component in `pickPanels`'s output set
+ * consumes, in the order they follow `state` in the component's positional
+ * signature. NodeGraph is the only component pickPanels emits that takes two
+ * data fields.
+ */
+const DATA_FIELDS: Record<string, string[]> = {
+  MetricStrip: ["metrics"],
+  PlaybackSessions: ["items"],
+  ArtworkWall: ["items"],
+  BarRank: ["items"],
+  VisualTable: ["items"],
+  LineChart: ["series"],
+  MultiLine: ["series"],
+  Timeline: ["events"],
+  NodeGraph: ["nodes", "edges"],
+};
+
+/**
+ * The renderer binds a component call's arguments POSITIONALLY — every data
+ * component's signature is (surfaceStyle, span, rowSpan, title, subtitle,
+ * state, ...data). Passing the whole Query result as a single argument binds
+ * it to surfaceStyle and leaves the data fields undefined, so every panel
+ * renders its frame but nothing inside (see src/lib/prompt-options.ts, which
+ * hit and fixed the identical bug in the chat-generation prompt).
+ */
+function panelCall(component: string, q: string): string {
+  const fields = DATA_FIELDS[component] ?? [];
+  const args = [
+    "null", "null", "null",
+    `${q}.title`, `${q}.subtitle`, `${q}.state`,
+    ...fields.map((f) => `${q}.${f}`),
+  ];
+  return `${component}(${args.join(", ")})`;
+}
+
+/**
  * Build the full program for one world from its (already filtered) results.
  * Returns the DSL source; render it through <Renderer> with an inline
  * toolProvider that returns each adapter's result for `Query(adapter)`.
@@ -93,11 +129,7 @@ export function buildWorldProgram(
     lines.push(`${q} = Query(${lit(entry.adapter)}, {}, {state: "empty", title: ${lit(entry.result.title)}})`);
     pickPanels(entry.result).forEach((component, j) => {
       const v = `p${i}_${j}`;
-      // Single-argument short form: the Query result's fields map to the
-      // component's props by name (title, subtitle, state, items/series/…).
-      // This deliberately avoids the positional form, whose interleaved
-      // surface args are easy to misorder.
-      lines.push(`${v} = ${component}(${q})`);
+      lines.push(`${v} = ${panelCall(component, q)}`);
       childVars.push(v);
     });
   });
