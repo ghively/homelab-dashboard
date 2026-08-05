@@ -11,6 +11,7 @@
  * - GET /System/Info (server info)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -24,7 +25,7 @@ import type {
   EmbySession,
   EmbyServerInfo,
 } from "./types";
-import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Emby adapter configuration.
@@ -130,9 +131,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.ProductionYear?.toString(),
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         value: item.CommunityRating,
         state: "healthy",
         meta: {
@@ -150,13 +151,19 @@ export class EmbyAdapter {
         items: visualItems,
         metrics: [
           { label: "Total", value: items.length, unit: "movies" },
-          {
-            label: "Avg Rating",
-            value:
-              items.reduce((sum, i) => sum + (i.CommunityRating || 0), 0) /
-                items.length,
-            unit: "★",
-          },
+          // items.length === 0 divides to NaN — omit the metric rather than
+          // rendering "NaN ★" for an empty recently-added result.
+          ...(items.length > 0
+            ? [
+                {
+                  label: "Avg Rating",
+                  value:
+                    items.reduce((sum, i) => sum + (i.CommunityRating || 0), 0) /
+                      items.length,
+                  unit: "★",
+                },
+              ]
+            : []),
         ],
         updatedAt: now,
       };
@@ -196,9 +203,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.ProductionYear?.toString(),
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         progress: item.UserData?.PlayedPercentage
           ? item.UserData.PlayedPercentage / 100
           : undefined,
@@ -246,9 +253,9 @@ export class EmbyAdapter {
         id: session.Id,
         label: session.NowPlayingItem?.Name || "Unknown",
         subtitle: session.NowPlayingItem?.Type,
-        image: session.NowPlayingItem?.ImageTags?.Primary
+        image: proxyImage("emby", session.NowPlayingItem?.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${session.NowPlayingItem.Id}/Images/Primary?tag=${session.NowPlayingItem.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         progress: session.PlayState?.PositionTicks && session.NowPlayingItem?.RunTimeTicks
           ? session.PlayState.PositionTicks / session.NowPlayingItem.RunTimeTicks
           : undefined,
@@ -375,6 +382,59 @@ export class EmbyAdapter {
   }
 
   /**
+   * Query: Overview — the default view.
+   *
+   * The library view alone returns counts but no artwork, so on the media page
+   * Emby rendered as ranked bars while Sonarr/Radarr showed poster walls. This
+   * keeps the per-library count KPIs (which the picker turns into a MetricStrip)
+   * AND attaches the recently-added movie posters (which it turns into an
+   * ArtworkWall), so Emby leads with its numbers and shows its cover art like
+   * the other media services. Both sub-queries already exist and already fail
+   * softly; this only composes them.
+   */
+  async queryOverview(): Promise<VisualQueryResult> {
+    const start = Date.now();
+    try {
+      const [libs, recent] = await Promise.all([
+        this.queryLibraryOverview(),
+        this.queryRecentlyAddedMovies(),
+      ]);
+      const now = new Date().toISOString();
+      // Both sub-queries fail softly (they catch internally and resolve with
+      // state "offline" rather than rejecting), so this never sees a thrown
+      // error to catch even when Emby is completely unreachable. The overview
+      // must read their states back explicitly instead of assuming "healthy" —
+      // otherwise a fully-down Emby still shows a healthy badge with zero data.
+      const libsOk = libs.data?.state === "healthy";
+      const recentOk = recent.data?.state === "healthy";
+      const state = libsOk && recentOk ? "healthy" : libsOk || recentOk ? "warning" : "offline";
+      const data: VisualData = {
+        title: "Emby",
+        subtitle: libs.data?.summary ?? recent.data?.subtitle,
+        state,
+        // Library counts drive the KPI strip; recent movies (with proxied
+        // posters) drive the wall. If either sub-query failed softly its field
+        // is simply absent and the panel drops that half rather than erroring.
+        metrics: libs.data?.metrics,
+        items: recent.data?.items,
+        summary: libs.data?.summary,
+        updatedAt: now,
+      };
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Emby:${this.baseUrl}/overview`,
+          state,
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult("Emby", err, start);
+    }
+  }
+
+  /**
    * Query: Series list.
    * Returns VisualData for SeriesWall component.
    */
@@ -391,9 +451,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.ProductionYear?.toString(),
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         state: "healthy",
         meta: {
           unplayedCount: item.UserData?.UnplayedItemCount,
@@ -453,9 +513,9 @@ export class EmbyAdapter {
         id: item.Id,
         label: item.Name,
         subtitle: item.Genres?.[0],
-        image: item.ImageTags?.Primary
+        image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
-          : undefined,
+          : undefined),
         state: "healthy",
         meta: {
           albumArtist: item.AlbumArtist,
@@ -494,19 +554,23 @@ export class EmbyAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 401/403 (Emby is up, the token is wrong) renders `denied`
+    // and names the fix, rather than the generic `offline` that reads as "the
+    // service is down" for every failure regardless of cause.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `Emby:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },

@@ -9,6 +9,7 @@
  * - GET /api/scan-jobs (scan jobs)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -124,7 +125,7 @@ export class RommAdapter {
         id: rom.id.toString(),
         label: rom.name,
         subtitle: rom.region || "Unknown Region",
-        image: rom.image_path || undefined,
+        image: proxyImage("romm", rom.image_path),
         value: rom.size || 0,
         state: rom.status === "Available" ? "healthy" : rom.status === "Missing" ? "critical" : "warning",
         group: rom.status || "Unknown",

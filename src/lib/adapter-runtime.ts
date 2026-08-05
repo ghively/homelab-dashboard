@@ -75,6 +75,7 @@ function registerEmby(): void {
     category: "media",
     adapter,
     queryMap: {
+      "overview": (a) => a.queryOverview(),
       "recent-movies": (a) => a.queryRecentlyAddedMovies(),
       "continue-watching": (a) => a.queryContinueWatching(),
       "sessions": (a) => a.queryPlaybackSessions(),
@@ -82,7 +83,10 @@ function registerEmby(): void {
       "series": (a) => a.querySeries(),
       "albums": (a) => a.queryAlbums(),
     },
-    defaultQuery: "libraries",
+    // Overview = library-count KPIs + recent-movie posters, so the media page
+    // shows Emby's cover art like Sonarr/Radarr. `libraries` is still available
+    // by name for a counts-only view.
+    defaultQuery: "overview",
   });
 
   registry.set("emby", bridged);
