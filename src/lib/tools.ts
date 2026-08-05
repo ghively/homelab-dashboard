@@ -179,6 +179,13 @@ export const mutationToolSpecs: ToolSpec[] = [
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
+    name: "emby_play",
+    description: "Start playing an item on a specific device right now — the real 'watch this' action. sessionId must come from a prior Query(\"emby\", {view: \"devices\"}) result (only sessions that actually accept remote play show up there), never guessed. Interrupts whatever is already on that device's screen.",
+    inputSchema: { type: "object", properties: { sessionId: { type: "string" }, itemId: { type: "string" } }, required: ["sessionId", "itemId"] },
+    outputSchema: mutationOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  {
     name: "sonarr_add_series",
     description: "Add a TV series Sonarr does not track yet and start searching for missing episodes — the real 'download this' action, for a show not already in the library. Get tvdbId/title/year from a prior Query(\"sonarr\", {view:\"lookup\", search:\"<title>\"}) result first — never guess a tvdbId.",
     inputSchema: { type: "object", properties: { tvdbId: { type: "number" }, title: { type: "string" }, year: { type: "number" } }, required: ["tvdbId", "title", "year"] },
@@ -196,6 +203,7 @@ const mutationTools: Record<string, { adapter: string; action: string }> = {
   sabnzbd_set_item_paused: { adapter: "sabnzbd", action: "set-item-paused" },
   sabnzbd_delete_item: { adapter: "sabnzbd", action: "delete-item" },
   emby_set_watched: { adapter: "emby", action: "set-watched" },
+  emby_play: { adapter: "emby", action: "play" },
   radarr_add_movie: { adapter: "radarr", action: "add-movie" },
   sonarr_add_series: { adapter: "sonarr", action: "add-series" },
 };

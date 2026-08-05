@@ -191,6 +191,17 @@ export class EmbyAdapter {
     if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
   }
 
+  /** POST with a JSON body — used by mutations that need a payload (e.g. remote-play). */
+  private async postJson(endpoint: string, body: unknown): Promise<void> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const res = await fetchWithTimeout(
+      url,
+      { method: "POST", headers: { ...this.getHeaders(), "Content-Type": "application/json" }, body: JSON.stringify(body) },
+      ADAPTER_TIMEOUT_MS,
+    );
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+  }
+
   /** DELETE with no body — used by mutations (e.g. marking an item unplayed). */
   private async del(endpoint: string): Promise<void> {
     const url = `${this.baseUrl}${endpoint}`;
@@ -669,6 +680,61 @@ export class EmbyAdapter {
   }
 
   /**
+   * Query: devices that can actually be cast to right now — the picker for
+   * "watch this on X". Verified live against the real session list: a
+   * session's SupportedCommands only includes "PlayMediaSource" for clients
+   * that accept a direct remote-play push (native apps, web, Xbox, Roku) —
+   * Chromecast entries are real active sessions but do NOT accept it (a cast
+   * target is driven by its own sender app via the Cast SDK, not this
+   * command channel), so offering them here would be a button that silently
+   * does nothing. Filtering to real capability rather than listing every
+   * session avoids exactly that.
+   */
+  async queryDevices(): Promise<VisualQueryResult> {
+    const start = Date.now();
+    try {
+      const sessions = await this.fetch<EmbySession[]>("/Sessions");
+      const castable = sessions.filter((s) => s.SupportedCommands?.includes("PlayMediaSource"));
+
+      const now = new Date().toISOString();
+
+      const visualItems: Item[] = castable.map((s) => ({
+        id: s.Id,
+        label: s.DeviceName,
+        subtitle: s.Client,
+        state: s.NowPlayingItem ? "warning" : "healthy",
+        meta: {
+          user: s.UserName,
+          deviceId: s.DeviceId,
+          nowPlaying: s.NowPlayingItem?.Name,
+          lastActive: s.LastActivityDate,
+        },
+      }));
+
+      const data: VisualData = {
+        title: "Devices",
+        subtitle: `${castable.length} available to cast to`,
+        state: castable.length > 0 ? "healthy" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Available", value: castable.length, unit: "devices" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Emby:${this.baseUrl}/Sessions`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult("Devices", err, start);
+    }
+  }
+
+  /**
    * Query: Library overview.
    * Returns VisualData for LibraryCounts or MediaHero component.
    */
@@ -921,6 +987,28 @@ export class EmbyAdapter {
     } catch (err) {
       const c = classifyError(err);
       return { success: false, message: `Could not update watched status: ${c.message}` };
+    }
+  }
+
+  /**
+   * Mutation: start playing an item on a specific session/device right now —
+   * the real "watch this" action. sessionId comes from queryDevices()'s own
+   * items (a session that already proved it accepts PlayMediaSource);
+   * itemId is whatever title the user picked. Interrupts anything already
+   * playing on that device, so this is exactly the kind of action the
+   * confirm-modal pattern exists for — not reversible the way pause/resume
+   * is, in the sense that it changes what's on someone's screen right now.
+   */
+  async playOnDevice(sessionId: string, itemId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.postJson(`/Sessions/${encodeURIComponent(sessionId)}/Playing`, {
+        ItemIds: [itemId],
+        PlayCommand: "PlayNow",
+      });
+      return { success: true, message: "Now playing." };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not start playback: ${c.message}` };
     }
   }
 
