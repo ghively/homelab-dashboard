@@ -57,15 +57,16 @@ export const promptOptions: PromptOptions = {
       '  TRAILERS: item.meta.trailerUrl already carries a real YouTube link on Emby/Radarr/RomM items when one exists — nothing to Query, MediaTile and ArtworkWall render it themselves as a small trailer button (a plain YouTube-search link when there is no real one on file). Just pass meta through the way you already do for genre/overview badges; do not invent a separate trailer view or component.',
     "MUTATIONS — write actions exist now, and every one of them is real: it hits the actual service. These are the ONLY write actions available; the first argument to Mutation() must be one of these exact names, never an adapter name, and nothing outside this list — there is no Docker/container control, no restart-a-service action, no capability beyond what's listed here. ONLY reach for this when the user's ask actually names a write action (pause, resume, delete, remove, search-for-and-grab, mark watched) — a purely informational ask (\"show me\", \"what's\", \"is X healthy\") gets ZERO Mutation/Modal/Button/$showConfirm anywhere in the response, not even an unused or empty one. A Modal with nothing in it, or a $showConfirm no button ever sets, means you added mutation scaffolding to a read-only answer — delete it:\n" +
       MUTATION_TOOL_LIST +
-      "\n\nHARD RULE, NO EXCEPTIONS — a button may NEVER wire Action([@Run(mutationRef)]) directly. The OpenUI runtime fires a Mutation the instant @Run triggers it; there is no confirmation step built in anywhere. This app supplies the confirmation itself, and it is mandatory: the triggering button opens a Modal ($variable-bound), and only the Modal's own confirm button runs the mutation (then closes the modal). Full pattern, root included — CRITICAL: confirmModal MUST appear in root's children (or some ancestor reachable from root) exactly like every other panel; a Modal that exists as a variable but is never referenced is silently dropped by the same rule as any other unreferenced variable, and then the confirm step you just built literally cannot open:\n" +
+      "\n\nHARD RULE, NO EXCEPTIONS — a button may NEVER wire Action([@Run(mutationRef)]) directly. The OpenUI runtime fires a Mutation the instant @Run triggers it; there is no confirmation step built in anywhere. This app supplies the confirmation itself, and it is mandatory: the triggering button opens a Modal ($variable-bound), and only the Modal's own confirm button runs the mutation (then closes the modal). Full pattern, root included — CRITICAL: confirmModal MUST appear in root's children (or some ancestor reachable from root) exactly like every other panel; a Modal that exists as a variable but is never referenced is silently dropped by the same rule as any other unreferenced variable, and then the confirm step you just built literally cannot open. ALSO CRITICAL — Modal's children accept TextContent/CardHeader/Callout/Table/Form/Buttons/etc, but NEVER a bare Button — wrap it: Buttons([confirmBtn]), not confirmBtn directly:\n" +
       "```\n" +
       "root = Stack([intro, openBtn, statusText, confirmModal])\n" +
       'intro = TextContent("...")\n' +
       "$showConfirm = false\n" +
       'openBtn = Button("Pause downloads", Action([@Set($showConfirm, true)]))\n' +
       'pauseResult = Mutation("sabnzbd_set_queue_paused", {paused: true})\n' +
-      'confirmModal = Modal("Pause downloads?", $showConfirm, [confirmText, confirmBtn])\n' +
+      'confirmModal = Modal("Pause downloads?", $showConfirm, [confirmText, confirmBtnGroup])\n' +
       'confirmText = TextContent("This pauses the whole SABnzbd queue — you can resume anytime.")\n' +
+      'confirmBtnGroup = Buttons([confirmBtn])\n' +
       'confirmBtn = Button("Yes, pause it", Action([@Run(pauseResult), @Set($showConfirm, false)]))\n' +
       'statusText = pauseResult.status == "success" ? TextContent(pauseResult.data.message) : pauseResult.status == "error" ? TextContent(pauseResult.error) : TextContent("")\n' +
       "```\n" +
@@ -134,8 +135,9 @@ preview = MediaTile(null, null, null, lookupData.items[0].label, lookupData.item
 $showConfirm = false
 addBtn = Button("Download this", Action([@Set($showConfirm, true)]))
 addResult = Mutation("radarr_add_movie", {tmdbId: lookupData.items[0].meta.tmdbId, title: lookupData.items[0].label, year: lookupData.items[0].meta.year})
-confirmModal = Modal("Add to Radarr?", $showConfirm, [confirmText, confirmBtn])
+confirmModal = Modal("Add to Radarr?", $showConfirm, [confirmText, confirmBtnGroup])
 confirmText = TextContent("This adds it to your library and starts searching indexers right away.")
+confirmBtnGroup = Buttons([confirmBtn])
 confirmBtn = Button("Yes, grab it", Action([@Run(addResult), @Set($showConfirm, false)]))
 statusText = addResult.status == "success" ? TextContent(addResult.data.message) : addResult.status == "error" ? TextContent(addResult.error) : TextContent("")
 
