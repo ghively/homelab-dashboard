@@ -25,7 +25,7 @@ import type {
   EmbySession,
   EmbyServerInfo,
 } from "./types";
-import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Emby adapter configuration.
@@ -151,13 +151,19 @@ export class EmbyAdapter {
         items: visualItems,
         metrics: [
           { label: "Total", value: items.length, unit: "movies" },
-          {
-            label: "Avg Rating",
-            value:
-              items.reduce((sum, i) => sum + (i.CommunityRating || 0), 0) /
-                items.length,
-            unit: "★",
-          },
+          // items.length === 0 divides to NaN — omit the metric rather than
+          // rendering "NaN ★" for an empty recently-added result.
+          ...(items.length > 0
+            ? [
+                {
+                  label: "Avg Rating",
+                  value:
+                    items.reduce((sum, i) => sum + (i.CommunityRating || 0), 0) /
+                      items.length,
+                  unit: "★",
+                },
+              ]
+            : []),
         ],
         updatedAt: now,
       };
@@ -394,10 +400,18 @@ export class EmbyAdapter {
         this.queryRecentlyAddedMovies(),
       ]);
       const now = new Date().toISOString();
+      // Both sub-queries fail softly (they catch internally and resolve with
+      // state "offline" rather than rejecting), so this never sees a thrown
+      // error to catch even when Emby is completely unreachable. The overview
+      // must read their states back explicitly instead of assuming "healthy" —
+      // otherwise a fully-down Emby still shows a healthy badge with zero data.
+      const libsOk = libs.data?.state === "healthy";
+      const recentOk = recent.data?.state === "healthy";
+      const state = libsOk && recentOk ? "healthy" : libsOk || recentOk ? "warning" : "offline";
       const data: VisualData = {
         title: "Emby",
         subtitle: libs.data?.summary ?? recent.data?.subtitle,
-        state: "healthy",
+        state,
         // Library counts drive the KPI strip; recent movies (with proxied
         // posters) drive the wall. If either sub-query failed softly its field
         // is simply absent and the panel drops that half rather than erroring.
@@ -411,7 +425,7 @@ export class EmbyAdapter {
         freshness: {
           timestamp: now,
           source: `Emby:${this.baseUrl}/overview`,
-          state: "healthy",
+          state,
           cacheAgeMs: Date.now() - start,
         },
       };
@@ -540,19 +554,23 @@ export class EmbyAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 401/403 (Emby is up, the token is wrong) renders `denied`
+    // and names the fix, rather than the generic `offline` that reads as "the
+    // service is down" for every failure regardless of cause.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `Emby:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },

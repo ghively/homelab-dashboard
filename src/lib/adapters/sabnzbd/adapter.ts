@@ -22,7 +22,7 @@ import type {
   SabServerStatus,
   SabQueueSlot,
 } from "./types";
-import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * SABnzbd adapter configuration.
@@ -461,19 +461,23 @@ export class SabnzbdAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 401/403 (SABnzbd is up, the API key is wrong) renders
+    // `denied` and names the fix, rather than the generic `offline` that
+    // reads as "the service is down" for every failure regardless of cause.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `SABnzbd:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },
