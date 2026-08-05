@@ -96,6 +96,7 @@ function registerEmby(): void {
       // recommendation flow — see querySimilar() for why this needs a
       // resolved Emby user and fails honestly (not a 500) without one.
       "similar": (a, filters) => a.querySimilar(typeof filters?.itemId === "string" ? filters.itemId : ""),
+      "devices": (a) => a.queryDevices(),
     },
     // Overview = library-count KPIs + recent-movie posters, so the media page
     // shows Emby's cover art like Sonarr/Radarr. `libraries` is still available
@@ -104,6 +105,8 @@ function registerEmby(): void {
     mutationMap: {
       "set-watched": (a, args) =>
         a.setWatched(String(args?.itemId ?? ""), args?.watched !== false),
+      "play": (a, args) =>
+        a.playOnDevice(String(args?.sessionId ?? ""), String(args?.itemId ?? "")),
     },
   });
 
