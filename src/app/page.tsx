@@ -28,8 +28,8 @@ export default function Home() {
   // workspace's) rather than one shared thread — different context, and
   // conflating them would mean an AI-infra question shows up mid movie-night
   // conversation.
-  const homeChat = useGenerativeChat();
-  const aiChat = useGenerativeChat();
+  const homeChat = useGenerativeChat("dashboard-chat:home");
+  const aiChat = useGenerativeChat("dashboard-chat:ai");
   const [fixtureState, setFixtureState] = useState<VisualStateValue | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [drawerEntity, setDrawerEntity] = useState<{
