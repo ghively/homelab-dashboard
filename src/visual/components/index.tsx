@@ -1190,7 +1190,16 @@ export const ArtworkWall = defineComponent({
     const triggerAction = useTriggerAction();
     if (!props.items?.length) return <EmptyPanel props={props} title="Gallery" label="No items" shape="tiles" />;
     const items = props.items.slice(0, 18);
-    const layout = props.layout ?? "grid";
+    // Auto-select a layout when the caller did not name one. The model almost
+    // always emits the short `ArtworkWall(data)` form and never reaches the
+    // 9th positional `layout` arg, so without this the cinematic feature/rail
+    // treatments were unreachable in practice. A wall worth spotlighting —
+    // several posters, the first with art to feature — gets `feature`; a short
+    // strip reads as a browsing `rail`; anything else stays a `grid`.
+    const withArt = items.filter((i) => i.image).length;
+    const autoLayout: z.infer<typeof ArtworkLayoutSchema> =
+      withArt >= 4 && items[0]?.image ? "feature" : items.length <= 4 ? "rail" : "grid";
+    const layout = props.layout ?? autoLayout;
     return (
       <Surface surfaceStyle={props.surfaceStyle} gridSpan={{ span: props.span, rowSpan: props.rowSpan }} title={props.title ?? "Gallery"} subtitle={props.subtitle} state={props.state}>
         <div className={`cnv-posters cnv-posters-layout-${layout}${props.square ? " cnv-albums" : ""}`}>

@@ -11,6 +11,7 @@
  * - GET /api/v3/diskspace (disk usage)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -26,7 +27,7 @@ import type {
   SonarrSystemStatus,
   SonarrDiskSpace,
 } from "./types";
-import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Sonarr adapter configuration.
@@ -114,7 +115,7 @@ export class SonarrAdapter {
         id: s.id.toString(),
         label: s.title,
         subtitle: s.year?.toString(),
-        image: s.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", s.images?.find((img) => img.coverType === "poster")?.url),
         value: s.year,
         state: s.monitored ? "healthy" : "warning",
         group: s.status,
@@ -186,7 +187,7 @@ export class SonarrAdapter {
         id: item.id.toString(),
         label: item.series?.title || "Unknown Series",
         subtitle: `S${item.episode?.seasonNumber}E${item.episode?.episodeNumber}`,
-        image: item.series?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         state: "critical",
         group: item.airDate,
         meta: {
@@ -240,9 +241,11 @@ export class SonarrAdapter {
         id: item.id.toString(),
         label: item.title,
         subtitle: item.episode?.title || item.series?.title,
-        image: item.series?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         value: item.size,
-        progress: item.sizeleft ? 1 - item.sizeleft / item.size : undefined,
+        // sizeleft === 0 means the download is complete — `item.sizeleft ? …`
+        // treated that as falsy and dropped the progress bar right at 100%.
+        progress: typeof item.sizeleft === "number" && item.size ? 1 - item.sizeleft / item.size : undefined,
         state: item.status === "downloading" ? "loading" : item.status === "completed" ? "healthy" : "warning",
         group: item.status,
         meta: {
@@ -322,7 +325,7 @@ export class SonarrAdapter {
         id: item.id.toString(),
         label: item.series?.title || "Unknown Series",
         subtitle: `S${item.seasonNumber}E${item.episodeNumber}: ${item.title}`,
-        image: item.series?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
         state: item.hasFile ? "healthy" : "warning",
         group: item.airDate,
         meta: {
@@ -436,19 +439,23 @@ export class SonarrAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 401/403 (Sonarr is up, the API key is wrong) renders
+    // `denied` and names the fix, rather than the generic `offline` that
+    // reads as "the service is down" for every failure regardless of cause.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `Sonarr:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },

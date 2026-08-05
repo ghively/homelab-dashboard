@@ -11,6 +11,7 @@
  * - GET /api/v3/diskspace (disk usage)
  */
 
+import { proxyImage } from "@/lib/image-proxy";
 import type {
   VisualData,
   VisualQueryResult,
@@ -26,7 +27,7 @@ import type {
   RadarrSystemStatus,
   RadarrDiskSpace,
 } from "./types";
-import { ADAPTER_TIMEOUT_MS, AdapterHttpError, fetchWithTimeout } from "@/lib/adapter-http";
+import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
 /**
  * Radarr adapter configuration.
@@ -114,7 +115,7 @@ export class RadarrAdapter {
         id: m.id.toString(),
         label: m.title,
         subtitle: m.year?.toString(),
-        image: m.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", m.images?.find((img) => img.coverType === "poster")?.url),
         value: m.year,
         state: m.monitored ? "healthy" : "warning",
         group: m.status,
@@ -186,7 +187,7 @@ export class RadarrAdapter {
         id: item.id.toString(),
         label: item.movie?.title || "Unknown Movie",
         subtitle: item.movie?.year?.toString(),
-        image: item.movie?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
         state: "critical",
         group: item.digitalRelease || item.physicalRelease || "Unknown",
         meta: {
@@ -240,9 +241,11 @@ export class RadarrAdapter {
         id: item.id.toString(),
         label: item.title,
         subtitle: item.movie?.title,
-        image: item.movie?.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
         value: item.size,
-        progress: item.sizeleft ? 1 - item.sizeleft / item.size : undefined,
+        // sizeleft === 0 means the download is complete — `item.sizeleft ? …`
+        // treated that as falsy and dropped the progress bar right at 100%.
+        progress: typeof item.sizeleft === "number" && item.size ? 1 - item.sizeleft / item.size : undefined,
         state: item.status === "downloading" ? "loading" : item.status === "completed" ? "healthy" : "warning",
         group: item.status,
         meta: {
@@ -322,7 +325,7 @@ export class RadarrAdapter {
         id: item.id.toString(),
         label: item.title,
         subtitle: item.year?.toString(),
-        image: item.images?.find((img) => img.coverType === "poster")?.url,
+        image: proxyImage("radarr", item.images?.find((img) => img.coverType === "poster")?.url),
         state: item.hasFile ? "healthy" : "warning",
         group: item.physicalRelease || item.digitalRelease || "Unknown",
         meta: {
@@ -438,19 +441,23 @@ export class RadarrAdapter {
     err: unknown,
     startTime: number
   ): VisualQueryResult {
+    // Classify so a 401/403 (Radarr is up, the API key is wrong) renders
+    // `denied` and names the fix, rather than the generic `offline` that
+    // reads as "the service is down" for every failure regardless of cause.
+    const c = classifyError(err);
     return {
       data: {
         title,
-        subtitle: "Failed to load data",
-        state: "offline",
+        subtitle: c.message,
+        state: c.state,
         items: [],
-        metrics: [],
+        metrics: [{ label: "Status", value: c.kind.toUpperCase().replace(/-/g, " "), state: c.state }],
         updatedAt: new Date().toISOString(),
       },
       freshness: {
         timestamp: new Date().toISOString(),
         source: `Radarr:${this.baseUrl}`,
-        state: "offline",
+        state: c.state === "healthy" ? "healthy" : "offline",
         lastError: String(err),
         cacheAgeMs: Date.now() - startTime,
       },

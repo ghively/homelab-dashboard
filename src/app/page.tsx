@@ -5,8 +5,6 @@ import {
   DashboardShell,
   Hero,
   QuickTags,
-  VisualPanel,
-  MetricStrip,
   EntityDrawer,
   SavedViews,
   useWorldData,
@@ -14,8 +12,9 @@ import {
   type FleetData,
 } from "@/components/dashboard";
 import { GenerativeChat } from "@/components/generative-chat";
+import { RichWorld } from "@/components/rich-world";
 import { WORLDS, type WorldId } from "@/lib/workspace-config";
-import type { VisualStateValue, VisualQueryResult } from "@/adapters/types";
+import type { VisualStateValue } from "@/adapters/types";
 
 export default function Home() {
   const [activeWorld, setActiveWorld] = useState<WorldId | "home">("home");
@@ -301,16 +300,12 @@ function WorldView({
           </div>
         </div>
       ) : (
-        <div className="dash-adapter-grid">
-          {filteredResults.map(({ adapter, result }) => (
-            <AdapterResultCard
-              key={adapter}
-              adapterName={adapter}
-              result={result}
-              onItemClick={(item) => onEntityClick(item, adapter, result.source)}
-            />
-          ))}
-        </div>
+        <RichWorld
+          entries={filteredResults}
+          title={worldConfig.label}
+          subtitle={worldConfig.tagline}
+          onEntityClick={onEntityClick}
+        />
       )}
     </>
   );
@@ -367,106 +362,15 @@ function AIWorkspace({
           Loading AI adapters...
         </div>
       ) : (
-        <div className="dash-adapter-grid">
-          {data.results
-            .filter(({ adapter, result }) => !activeTag || matchesTag(adapter, result, activeTag))
-            .map(({ adapter, result }) => (
-              <AdapterResultCard
-                key={adapter}
-                adapterName={adapter}
-                result={result}
-                onItemClick={(item) => onEntityClick(item, adapter, result.source)}
-              />
-            ))}
-        </div>
+        <RichWorld
+          entries={data.results.filter(
+            ({ adapter, result }) => !activeTag || matchesTag(adapter, result, activeTag),
+          )}
+          title={worldConfig.label}
+          subtitle={worldConfig.tagline}
+          onEntityClick={onEntityClick}
+        />
       )}
     </>
-  );
-}
-
-// ── Adapter Result Card ──────────────────────────────────────
-
-function AdapterResultCard({
-  result,
-  onItemClick,
-}: {
-  adapterName: string;
-  result: VisualQueryResult;
-  onItemClick: (item: Record<string, unknown>) => void;
-}) {
-  const hasItems = result.items && result.items.length > 0;
-  const hasMetrics = result.metrics && result.metrics.length > 0;
-  const hasEvents = result.events && result.events.length > 0;
-  const hasNodes = result.nodes && result.nodes.length > 0;
-
-  return (
-    <VisualPanel
-      title={result.title}
-      subtitle={result.subtitle}
-      state={result.state}
-      source={result.source}
-    >
-      {hasMetrics && <MetricStrip metrics={result.metrics!} />}
-
-      {hasItems && (
-        <div className="dash-adapter-items" style={{ marginTop: hasMetrics ? 12 : 0 }}>
-          {result.items!.slice(0, 6).map((item) => (
-            <div
-              key={item.id}
-              className="dash-adapter-item"
-              onClick={() => onItemClick(item as Record<string, unknown>)}
-            >
-              <div>
-                <strong>{item.label}</strong>
-                {item.subtitle && <small style={{ display: "block" }}>{item.subtitle}</small>}
-                {item.progress != null && (
-                  <div className="dash-progress-bar">
-                    <i style={{ width: `${item.progress * 100}%` }} />
-                  </div>
-                )}
-              </div>
-              {item.value != null && <span>{item.value}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {hasEvents && (
-        <div className="dash-adapter-items" style={{ marginTop: hasMetrics ? 12 : 0 }}>
-          {result.events!.slice(0, 4).map((evt) => (
-            <div key={evt.id} className="dash-adapter-item" onClick={() => onItemClick(evt as unknown as Record<string, unknown>)}>
-              <div>
-                <strong>{evt.title}</strong>
-                {evt.detail && <small style={{ display: "block" }}>{evt.detail}</small>}
-              </div>
-              <small>{evt.at}</small>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {hasNodes && (
-        <div className="dash-adapter-items" style={{ marginTop: hasMetrics ? 12 : 0 }}>
-          {result.nodes!.slice(0, 6).map((node) => (
-            <div key={node.id} className="dash-adapter-item" onClick={() => onItemClick(node as unknown as Record<string, unknown>)}>
-              <strong>{node.label}</strong>
-              <span className={`state-${node.state ?? "healthy"}`}>{node.state ?? "healthy"}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!hasItems && !hasMetrics && !hasEvents && !hasNodes && (
-        // Same empty treatment the generated panels use, rather than the
-        // loading spinner's styling reused as a shrug.
-        <div className="cnv-state-nodata" role="status">
-          <span className="cnv-state-glyph" aria-hidden="true">
-            ◌
-          </span>
-          <strong>No data reported</strong>
-          <small>The adapter answered with nothing to show.</small>
-        </div>
-      )}
-    </VisualPanel>
   );
 }
