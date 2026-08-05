@@ -226,6 +226,69 @@ export class RadarrAdapter {
   }
 
   /**
+   * Query: Wanted/missing movies in one genre — the "you could download this"
+   * half of a content-discovery answer (paired with Emby's by-genre for
+   * "available now"). These are movies Radarr already tracks and will grab
+   * automatically once found; this does not discover titles Radarr has never
+   * heard of (that needs a movie lookup against TMDB, a separate capability).
+   * Filtered client-side: /api/v3/wanted/missing has no genre query param, but
+   * `movie.genres` is already present on every record it returns.
+   */
+  async queryWantedByGenre(genre: string): Promise<VisualQueryResult> {
+    const start = Date.now();
+    const label = genre ? `${genre} — Could Download` : "Could Download";
+    try {
+      const response = await this.fetch<{ page: number; pageSize: number; totalRecords: number; records: RadarrWantedItem[] }>("/api/v3/wanted/missing?pageSize=200");
+      const wanted = genre
+        ? response.records.filter((item) =>
+            item.movie?.genres?.some((g) => g.toLowerCase() === genre.toLowerCase()),
+          )
+        : response.records;
+
+      const now = new Date().toISOString();
+
+      // "warning", not "critical" — this is a discovery list (things you
+      // could grab), not an alert about missing library content.
+      const visualItems: Item[] = wanted.slice(0, 24).map((item) => ({
+        id: item.id.toString(),
+        label: item.movie?.title || "Unknown Movie",
+        subtitle: item.movie?.year?.toString(),
+        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
+        state: "warning",
+        meta: {
+          movieId: item.movieId,
+          genres: item.movie?.genres,
+          overview: item.movie?.overview,
+          inCinemas: item.inCinemas,
+          physicalRelease: item.physicalRelease,
+          digitalRelease: item.digitalRelease,
+        },
+      }));
+
+      const data: VisualData = {
+        title: label,
+        subtitle: `${wanted.length} tracked but not yet downloaded`,
+        state: wanted.length > 0 ? "warning" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Could Download", value: wanted.length, unit: "movies" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Radarr:${this.baseUrl}/api/v3/wanted/missing`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult(label, err, start);
+    }
+  }
+
+  /**
    * Query: Download queue.
    * Returns VisualData for Queue component.
    */

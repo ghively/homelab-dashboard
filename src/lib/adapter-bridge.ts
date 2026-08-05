@@ -34,7 +34,13 @@ export interface BridgeAdapterOpts<T extends BridgedAdapter = BridgedAdapter> {
   description: string;
   category: "ai" | "media" | "ops" | "host" | "home" | "security" | "network" | "knowledge" | "personal";
   adapter: T;
-  queryMap: Record<string, (a: T) => Promise<{ data: VisualData; freshness: ContractsFreshnessInfo }>>;
+  // `filters` is whatever the model passed via Query()'s second argument
+  // (minus `view`, which selects the map key itself) — e.g. {genre: "Horror"}.
+  // Most handlers ignore the second param entirely; JS/TS allow that.
+  queryMap: Record<
+    string,
+    (a: T, filters?: Record<string, unknown>) => Promise<{ data: VisualData; freshness: ContractsFreshnessInfo }>
+  >;
   defaultQuery?: string;
 }
 
@@ -93,7 +99,7 @@ export function bridgeAdapter<T extends BridgedAdapter>(opts: BridgeAdapterOpts<
           `Unknown query "${queryName ?? "(none)"}" for adapter "${name}". Available: ${available}`,
         );
       }
-      const nested = await handler(adapter);
+      const nested = await handler(adapter, params?.filters);
       return flattenResult(name, nested);
     },
   };
