@@ -1264,6 +1264,15 @@ svg .cnv-clickable:focus-visible circle {
   flex: 0 0 min(42vw, 180px);
   scroll-snap-align: start;
 }
+/* MediaTile: a single ArtworkTile rendered outside any .cnv-posters grid. The
+   tile's own CSS has no intrinsic width (only min-width: 0, which lets it
+   shrink but not fill), so without this it would collapse or stretch
+   unpredictably depending on its container. Same footprint as the rail
+   layout's compact mode, so a standalone tile and a wall's rail tile match. */
+.cnv-media-tile-standalone {
+  width: min(42vw, 180px);
+  flex: 0 0 auto;
+}
 .cnv-posters-layout-feature {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(118px, 0.7fr));
