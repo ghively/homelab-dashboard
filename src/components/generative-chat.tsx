@@ -16,18 +16,30 @@ const toolProvider = createToolProvider();
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  /** What the bubble shows, if different from `content` (sent to the model).
+   *  Drill-down messages append the clicked entity's real data to `content`
+   *  so the model can answer from it directly instead of re-querying and
+   *  guessing which result matches — but that JSON has no business appearing
+   *  in the transcript, so the bubble shows `display` instead. */
+  display?: string;
 }
 
-interface UseGenerativeChat {
+export interface UseGenerativeChat {
   messages: ChatMessage[];
   inputValue: string;
   setInputValue: (v: string) => void;
-  sendMessage: (text?: string) => void;
+  sendMessage: (text?: string, context?: Record<string, unknown>) => void;
   stop: () => void;
   clear: () => void;
   isStreaming: boolean;
   streamedResponse: string;
   error: string | null;
+  /** Tool/Mutation failures from the settled Renderer's onError — previously
+   *  never wired up, so a failed mutation (a bad id, a service rejecting the
+   *  request) was invisible: the button just did nothing, with no feedback
+   *  anywhere. Separate from `error` (SSE/transport failures only). */
+  toolError: string | null;
+  setToolError: (msg: string | null) => void;
 }
 
 // ── Streaming chat hook ──────────────────────────────────────
@@ -38,14 +50,21 @@ export function useGenerativeChat(): UseGenerativeChat {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamedResponse, setStreamedResponse] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [toolError, setToolError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    (text?: string) => {
+    (text?: string, context?: Record<string, unknown>) => {
       const query = (text ?? inputValue).trim();
       if (!query || isStreaming) return;
 
-      const userMsg: ChatMessage = { role: "user", content: query };
+      // Drill-down (a click's entity data) rides along in `content`, which is
+      // what reaches the model; `display` keeps the bubble reading as the
+      // plain "Show details for X" the user actually saw happen.
+      const hasContext = context && Object.keys(context).length > 0;
+      const userMsg: ChatMessage = hasContext
+        ? { role: "user", content: `${query}\n\n[Data already fetched for this entity — use it directly, do not call Query() again: ${JSON.stringify(context)}]`, display: query }
+        : { role: "user", content: query };
       const priorMessages = [...messages, userMsg];
       setMessages(priorMessages);
       setInputValue("");
@@ -145,6 +164,7 @@ export function useGenerativeChat(): UseGenerativeChat {
     setMessages([]);
     setStreamedResponse("");
     setError(null);
+    setToolError(null);
   }, []);
 
   return {
@@ -157,6 +177,8 @@ export function useGenerativeChat(): UseGenerativeChat {
     isStreaming,
     streamedResponse,
     error,
+    toolError,
+    setToolError,
   };
 }
 
@@ -200,9 +222,16 @@ function StreamingRender({ response }: { response: string }) {
  * Generated dashboards render inline in the thread as real components, not as
  * code blocks or images: a panel in the transcript is the same live panel a
  * world view would show, drill-down and all.
+ *
+ * `chat` is owned by the caller (via useGenerativeChat()), not created here.
+ * It used to be created here, which meant the conversation lived and died
+ * with this component's mount — navigating to any other world (clicking
+ * "Media" in the sidebar to check something, say) unmounted it, and coming
+ * back to Home started a blank conversation with no warning that anything
+ * had been lost. The hook now lives in the page-level component that never
+ * unmounts across world navigation; this component just renders it.
  */
-export function GenerativeChat({ subtitle }: { subtitle?: string }) {
-  const chat = useGenerativeChat();
+export function GenerativeChat({ chat, subtitle }: { chat: UseGenerativeChat; subtitle?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const empty = chat.messages.length === 0 && !chat.isStreaming;
@@ -300,14 +329,23 @@ export function GenerativeChat({ subtitle }: { subtitle?: string }) {
                       toolProvider={toolProvider}
                       isStreaming={false}
                       // Drill-down: clicking a row/card/node sends its label
-                      // back as a follow-up so the model can answer with a
-                      // detail view. Only on settled messages — a live stream
-                      // is still arriving.
-                      onAction={(event) => chat.sendMessage(event.humanFriendlyMessage)}
+                      // back as a follow-up, along with whatever data that
+                      // component already had for it (event.params — see
+                      // entityParams() in visual/components/index.tsx), so
+                      // the model can answer from real data instead of
+                      // re-querying and guessing which result matches. Only
+                      // on settled messages — a live stream is still arriving.
+                      onAction={(event) => chat.sendMessage(event.humanFriendlyMessage, event.params)}
+                      // A failed Mutation() (a bad id, a service rejecting the
+                      // request) used to be invisible — the button just did
+                      // nothing, no feedback anywhere. onError fires with []
+                      // once resolved, so this clears itself the same way it
+                      // set itself, not just on the next send.
+                      onError={(errors) => chat.setToolError(errors.length ? errors.map((e) => e.message).join("; ") : null)}
                     />
                   </div>
                 ) : (
-                  <div className="chat-msg-text">{msg.content}</div>
+                  <div className="chat-msg-text">{msg.display ?? msg.content}</div>
                 )}
               </article>
             ))}
@@ -327,6 +365,7 @@ export function GenerativeChat({ subtitle }: { subtitle?: string }) {
         )}
 
         {chat.error && <div className="chat-error">{chat.error}</div>}
+        {chat.toolError && <div className="chat-error">{chat.toolError}</div>}
       </div>
 
       {/* Docked composer, only once a conversation exists. In the empty state

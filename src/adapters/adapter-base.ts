@@ -17,6 +17,13 @@ export interface DataAdapter {
   // Query for normalized visual data (Level 2+ integration).
   // Returns fixture data if configured, otherwise fetches from real source.
   query(params?: { query?: string; filters?: Record<string, unknown>; limit?: number }): Promise<VisualQueryResult>;
+
+  // Write action (Level 3). Optional — most adapters are read-only. `action`
+  // selects which mutation (mirrors `query`'s `query` selector); `args` are
+  // the model-supplied Mutation() arguments. Never throws for an expected
+  // failure (bad id, service rejects the request) — returns success:false
+  // with a message instead, so the caller always has something to show.
+  mutate?(action: string, args: Record<string, unknown>): Promise<{ success: boolean; message: string }>;
 }
 
 // Helper to compute freshness state from age.

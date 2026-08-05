@@ -137,14 +137,27 @@ export type SonarrQueueItem = z.infer<typeof SonarrQueueItemSchema>;
 
 /**
  * Sonarr wanted item (missing episodes).
+ *
+ * Verified against the live instance: /api/v3/wanted/missing returns flat
+ * episode records — {seriesId, seasonNumber, episodeNumber, title, airDate,
+ * overview, id, ...} — not a {id, seriesId, episodeId, series: {...}}
+ * wrapper. There is no embedded series object and therefore no genre data on
+ * this record at all; genre-filtering needs a separate /api/v3/series
+ * lookup joined by seriesId (see queryWantedByGenre).
  */
 export const SonarrWantedItemSchema = z.object({
   id: z.number(),
   seriesId: z.number(),
-  episodeId: z.number(),
-  series: SonarrSeriesSchema.optional(),
-  episode: SonarrEpisodeSchema.optional(),
-  airDate: z.string(),
+  tvdbId: z.number().optional(),
+  episodeFileId: z.number().optional(),
+  seasonNumber: z.number(),
+  episodeNumber: z.number(),
+  title: z.string(),
+  airDate: z.string().optional(),
+  airDateUtc: z.string().optional(),
+  overview: z.string().optional(),
+  hasFile: z.boolean().optional(),
+  monitored: z.boolean().optional(),
 });
 export type SonarrWantedItem = z.infer<typeof SonarrWantedItemSchema>;
 
@@ -166,6 +179,30 @@ export const SonarrCalendarItemSchema = z.object({
   series: SonarrSeriesSchema.optional(),
 });
 export type SonarrCalendarItem = z.infer<typeof SonarrCalendarItemSchema>;
+
+/**
+ * Sonarr series lookup result — GET /api/v3/series/lookup?term=(text|tvdb:ID).
+ * Verified against the live instance: no trailer field exists here (TheTVDB,
+ * Sonarr's metadata source, doesn't supply one the way TMDB does for
+ * Radarr) — genuinely absent, not missed. Like Radarr's lookup, this carries
+ * `remotePoster` (absolute TVDB CDN URL) rather than a usable local
+ * `images[].url`, since nothing has been added to Sonarr's library yet.
+ */
+export const SonarrLookupResultSchema = z.object({
+  title: z.string(),
+  year: z.number().optional(),
+  tvdbId: z.number(),
+  imdbId: z.string().optional(),
+  overview: z.string().optional(),
+  genres: z.array(z.string()).optional(),
+  runtime: z.number().optional(),
+  network: z.string().optional(),
+  certification: z.string().optional(),
+  remotePoster: z.string().optional(),
+  status: SonarrSeriesStatusSchema.optional(),
+  ratings: z.object({ votes: z.number(), value: z.number() }).optional(),
+});
+export type SonarrLookupResult = z.infer<typeof SonarrLookupResultSchema>;
 
 /**
  * Sonarr health check response.
