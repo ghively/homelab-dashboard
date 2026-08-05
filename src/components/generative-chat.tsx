@@ -29,6 +29,15 @@ export interface UseGenerativeChat {
   inputValue: string;
   setInputValue: (v: string) => void;
   sendMessage: (text?: string, context?: Record<string, unknown>) => void;
+  /** Re-run generation for the assistant message at `assistantIndex`,
+   *  discarding it and everything after, and resending the same messages
+   *  up to (and including) the user message that prompted it. For "that
+   *  came back wrong, try again" without retyping the question. */
+  regenerate: (assistantIndex: number) => void;
+  /** Edit the user message at `userIndex` to `newText` and resend it,
+   *  discarding that message and everything after. Only meaningful for a
+   *  plain user message (no drill-down context riding along). */
+  editAndResend: (userIndex: number, newText: string) => void;
   stop: () => void;
   clear: () => void;
   isStreaming: boolean;
@@ -119,20 +128,15 @@ export function useGenerativeChat(storageKey?: string): UseGenerativeChat {
     }
   }, [messages, storageKey, hydrated]);
 
-  const sendMessage = useCallback(
-    (text?: string, context?: Record<string, unknown>) => {
-      const query = (text ?? inputValue).trim();
-      if (!query || isStreaming) return;
-
-      // Drill-down (a click's entity data) rides along in `content`, which is
-      // what reaches the model; `display` keeps the bubble reading as the
-      // plain "Show details for X" the user actually saw happen.
-      const hasContext = context && Object.keys(context).length > 0;
-      const userMsg: ChatMessage = hasContext
-        ? { role: "user", content: `${query}\n\n[Data already fetched for this entity — use it directly, do not call Query() again: ${JSON.stringify(context)}]`, display: query }
-        : { role: "user", content: query };
-      const priorMessages = [...messages, userMsg];
-      setMessages(priorMessages);
+  // Shared by sendMessage, regenerate, and editAndResend: given the full
+  // messages array ENDING in the user message to answer, replace it in
+  // state, then POST + stream the reply. The three callers differ only in
+  // how they build that array (append a new message; truncate back to a
+  // prior user message; truncate and replace one) — the fetch/stream/error
+  // handling is identical either way, so it lives here once.
+  const runGeneration = useCallback(
+    (nextMessages: ChatMessage[]) => {
+      setMessages(nextMessages);
       setInputValue("");
       setError(null);
       setStreamedResponse("");
@@ -145,7 +149,7 @@ export function useGenerativeChat(storageKey?: string): UseGenerativeChat {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: priorMessages.map((m) => ({ role: m.role, content: m.content })),
+          messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
         }),
         signal: controller.signal,
       })
@@ -219,7 +223,46 @@ export function useGenerativeChat(storageKey?: string): UseGenerativeChat {
           abortRef.current = null;
         });
     },
-    [inputValue, isStreaming, messages],
+    [],
+  );
+
+  const sendMessage = useCallback(
+    (text?: string, context?: Record<string, unknown>) => {
+      const query = (text ?? inputValue).trim();
+      if (!query || isStreaming) return;
+
+      // Drill-down (a click's entity data) rides along in `content`, which is
+      // what reaches the model; `display` keeps the bubble reading as the
+      // plain "Show details for X" the user actually saw happen.
+      const hasContext = context && Object.keys(context).length > 0;
+      const userMsg: ChatMessage = hasContext
+        ? { role: "user", content: `${query}\n\n[Data already fetched for this entity — use it directly, do not call Query() again: ${JSON.stringify(context)}]`, display: query }
+        : { role: "user", content: query };
+      runGeneration([...messages, userMsg]);
+    },
+    [inputValue, isStreaming, messages, runGeneration],
+  );
+
+  const regenerate = useCallback(
+    (assistantIndex: number) => {
+      if (isStreaming) return;
+      const truncated = messages.slice(0, assistantIndex);
+      const last = truncated[truncated.length - 1];
+      if (!last || last.role !== "user") return;
+      runGeneration(truncated);
+    },
+    [messages, isStreaming, runGeneration],
+  );
+
+  const editAndResend = useCallback(
+    (userIndex: number, newText: string) => {
+      if (isStreaming) return;
+      const trimmed = newText.trim();
+      if (!trimmed) return;
+      const before = messages.slice(0, userIndex);
+      runGeneration([...before, { role: "user", content: trimmed }]);
+    },
+    [messages, isStreaming, runGeneration],
   );
 
   const stop = useCallback(() => {
@@ -245,6 +288,8 @@ export function useGenerativeChat(storageKey?: string): UseGenerativeChat {
     inputValue,
     setInputValue,
     sendMessage,
+    regenerate,
+    editAndResend,
     stop,
     clear,
     isStreaming,
@@ -308,6 +353,43 @@ export function GenerativeChat({ chat, subtitle }: { chat: UseGenerativeChat; su
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const empty = chat.messages.length === 0 && !chat.isStreaming;
+  // Which message index (if any) is mid-edit, and its draft text — local UI
+  // state, not part of the hook: nothing outside this component cares while
+  // it's being typed, only once "Resend" commits it via editAndResend.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  // Which message index was just copied, to flash "Copied" briefly instead
+  // of leaving a permanently-changed label with no way to tell it happened.
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const copyMessage = useCallback((index: number, text: string) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex((cur) => (cur === index ? null : cur)), 1500);
+    }).catch(() => {
+      // Clipboard API unavailable/denied — no fallback needed, this is a
+      // convenience action, not a critical path.
+    });
+  }, []);
+
+  const startEdit = useCallback((index: number, text: string) => {
+    setEditingIndex(index);
+    setEditText(text);
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditingIndex(null);
+    setEditText("");
+  }, []);
+
+  const commitEdit = useCallback(
+    (index: number) => {
+      chat.editAndResend(index, editText);
+      setEditingIndex(null);
+      setEditText("");
+    },
+    [chat, editText],
+  );
 
   // Follow the stream. Only when already near the bottom, so scrolling up to
   // read an earlier panel is not yanked back every time a token lands.
@@ -389,39 +471,103 @@ export function GenerativeChat({ chat, subtitle }: { chat: UseGenerativeChat; su
           </div>
         ) : (
           <div className="chat-thread">
-            {chat.messages.map((msg, i) => (
-              <article key={i} className={`chat-msg chat-msg-${msg.role}`}>
-                <div className="chat-msg-role">
-                  {msg.role === "user" ? "You" : "Visual OS"}
-                </div>
-                {msg.role === "assistant" ? (
-                  <div className="chat-rendered">
-                    <Renderer
-                      response={msg.content}
-                      library={library}
-                      toolProvider={toolProvider}
-                      isStreaming={false}
-                      // Drill-down: clicking a row/card/node sends its label
-                      // back as a follow-up, along with whatever data that
-                      // component already had for it (event.params — see
-                      // entityParams() in visual/components/index.tsx), so
-                      // the model can answer from real data instead of
-                      // re-querying and guessing which result matches. Only
-                      // on settled messages — a live stream is still arriving.
-                      onAction={(event) => chat.sendMessage(event.humanFriendlyMessage, event.params)}
-                      // A failed Mutation() (a bad id, a service rejecting the
-                      // request) used to be invisible — the button just did
-                      // nothing, no feedback anywhere. onError fires with []
-                      // once resolved, so this clears itself the same way it
-                      // set itself, not just on the next send.
-                      onError={(errors) => chat.setToolError(errors.length ? errors.map((e) => e.message).join("; ") : null)}
-                    />
+            {chat.messages.map((msg, i) => {
+              // A drill-down message's `display` is a synthesized "Show
+              // details for X" — there's no typed text behind it to hand
+              // back into a textarea, so editing only applies to a message
+              // the user actually wrote themselves.
+              const isEditableUser = msg.role === "user" && msg.display == null;
+              const isEditing = editingIndex === i;
+              return (
+                <article key={i} className={`chat-msg chat-msg-${msg.role}`}>
+                  <div className="chat-msg-role">
+                    {msg.role === "user" ? "You" : "Visual OS"}
                   </div>
-                ) : (
-                  <div className="chat-msg-text">{msg.display ?? msg.content}</div>
-                )}
-              </article>
-            ))}
+                  {isEditing ? (
+                    <div className="chat-edit">
+                      <textarea
+                        className="chat-edit-textarea"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if (editText.trim()) commitEdit(i);
+                          } else if (e.key === "Escape") {
+                            cancelEdit();
+                          }
+                        }}
+                        autoFocus
+                        rows={2}
+                      />
+                      <div className="chat-edit-actions">
+                        <button className="chat-msg-action" onClick={cancelEdit}>Cancel</button>
+                        <button
+                          className="chat-msg-action is-primary"
+                          onClick={() => commitEdit(i)}
+                          disabled={!editText.trim()}
+                        >
+                          Resend
+                        </button>
+                      </div>
+                    </div>
+                  ) : msg.role === "assistant" ? (
+                    <div className="chat-rendered">
+                      <Renderer
+                        response={msg.content}
+                        library={library}
+                        toolProvider={toolProvider}
+                        isStreaming={false}
+                        // Drill-down: clicking a row/card/node sends its label
+                        // back as a follow-up, along with whatever data that
+                        // component already had for it (event.params — see
+                        // entityParams() in visual/components/index.tsx), so
+                        // the model can answer from real data instead of
+                        // re-querying and guessing which result matches. Only
+                        // on settled messages — a live stream is still arriving.
+                        onAction={(event) => chat.sendMessage(event.humanFriendlyMessage, event.params)}
+                        // A failed Mutation() (a bad id, a service rejecting the
+                        // request) used to be invisible — the button just did
+                        // nothing, no feedback anywhere. onError fires with []
+                        // once resolved, so this clears itself the same way it
+                        // set itself, not just on the next send.
+                        onError={(errors) => chat.setToolError(errors.length ? errors.map((e) => e.message).join("; ") : null)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="chat-msg-text">{msg.display ?? msg.content}</div>
+                  )}
+                  {!isEditing && (
+                    <div className="chat-msg-actions">
+                      <button
+                        className="chat-msg-action"
+                        onClick={() => copyMessage(i, msg.display ?? msg.content)}
+                      >
+                        {copiedIndex === i ? "Copied" : "Copy"}
+                      </button>
+                      {isEditableUser && (
+                        <button
+                          className="chat-msg-action"
+                          onClick={() => startEdit(i, msg.display ?? msg.content)}
+                          disabled={chat.isStreaming}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {msg.role === "assistant" && (
+                        <button
+                          className="chat-msg-action"
+                          onClick={() => chat.regenerate(i)}
+                          disabled={chat.isStreaming}
+                        >
+                          Regenerate
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
 
             {chat.isStreaming && (
               <article className="chat-msg chat-msg-assistant">
