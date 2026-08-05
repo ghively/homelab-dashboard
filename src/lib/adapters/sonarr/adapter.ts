@@ -128,6 +128,7 @@ export class SonarrAdapter {
           imdbId: s.imdbId,
           monitored: s.monitored,
           seasonFolder: s.seasonFolder,
+          rating: s.ratings?.value,
         },
       }));
 
@@ -222,6 +223,71 @@ export class SonarrAdapter {
       };
     } catch (err) {
       return this.errorResult("Missing Episodes", err, start);
+    }
+  }
+
+  /**
+   * Query: Missing episodes in one genre — the "you could download this"
+   * half of a TV content-discovery answer (paired with Emby's by-genre for
+   * "available now"). Mirrors Radarr's queryWantedByGenre: these are shows
+   * Sonarr already tracks and will grab automatically; this does not
+   * discover series Sonarr has never heard of. Filtered client-side —
+   * /api/v3/wanted/missing has no genre param, but `series.genres` is
+   * already present on every record it returns.
+   */
+  async queryWantedByGenre(genre: string): Promise<VisualQueryResult> {
+    const start = Date.now();
+    const label = genre ? `${genre} — Could Download` : "Could Download";
+    try {
+      const response = await this.fetch<{ page: number; pageSize: number; totalRecords: number; records: SonarrWantedItem[] }>("/api/v3/wanted/missing?pageSize=200");
+      const wanted = genre
+        ? response.records.filter((item) =>
+            item.series?.genres?.some((g) => g.toLowerCase() === genre.toLowerCase()),
+          )
+        : response.records;
+
+      const now = new Date().toISOString();
+
+      // "warning", not "critical" — this is a discovery list (things you
+      // could grab), not an alert about missing library content.
+      const visualItems: Item[] = wanted.slice(0, 24).map((item) => ({
+        id: item.id.toString(),
+        label: item.series?.title || "Unknown Series",
+        subtitle: `S${item.episode?.seasonNumber}E${item.episode?.episodeNumber}`,
+        image: proxyImage("sonarr", item.series?.images?.find((img) => img.coverType === "poster")?.url),
+        state: "warning",
+        meta: {
+          seriesId: item.seriesId,
+          episodeId: item.episodeId,
+          episodeTitle: item.episode?.title,
+          airDate: item.airDate,
+          genres: item.series?.genres,
+          overview: item.series?.overview,
+          network: item.series?.network,
+          rating: item.series?.ratings?.value,
+        },
+      }));
+
+      const data: VisualData = {
+        title: label,
+        subtitle: `${wanted.length} episodes tracked but not yet downloaded`,
+        state: wanted.length > 0 ? "warning" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Could Download", value: wanted.length, unit: "episodes" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Sonarr:${this.baseUrl}/api/v3/wanted/missing`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult(label, err, start);
     }
   }
 

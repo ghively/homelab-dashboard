@@ -39,6 +39,34 @@ export interface EmbyConfig {
 /**
  * Emby class.
  */
+/**
+ * Emby's /Items returns a near-empty BaseItemDto by default — not even
+ * ProductionYear survives without an explicit &Fields= request, let alone
+ * Genres/Overview/CommunityRating/Studios. Every /Items call below was
+ * silently missing this (subtitle read as "undefined" for the year on every
+ * poster in production), because none of them asked for it. Verified against
+ * the live instance: identical request with and without &Fields= — one comes
+ * back with 4 fields, the other with the genres/overview/rating/year actually
+ * available in the library.
+ */
+const ITEM_FIELDS = "Genres,Overview,CommunityRating,ProductionYear,Studios,PremiereDate";
+
+/**
+ * Colloquial genre name -> the alternate spelling libraries commonly tag
+ * with instead. Verified against the live instance: /Genres lists BOTH
+ * "Sci-Fi" and "Science Fiction" as distinct registered tags, and the movies
+ * actually on hand use "Science Fiction" — "Sci-Fi" alone returns zero
+ * results even though it is a real genre in this library, just not the one
+ * applied to any movie. Only covers pairs actually seen mismatching; not a
+ * general fuzzy matcher.
+ */
+const GENRE_SYNONYMS: Record<string, string> = {
+  "sci-fi": "Science Fiction",
+  "scifi": "Science Fiction",
+  "sci fi": "Science Fiction",
+  "science fiction": "Sci-Fi",
+};
+
 export class EmbyAdapter {
   private config: EmbyConfig;
   private baseUrl: string;
@@ -122,7 +150,7 @@ export class EmbyAdapter {
     const start = Date.now();
     try {
       const items = await this.fetchList<EmbyItem>(
-        "/Items?IncludeItemTypes=Movie&SortBy=DateCreated&SortOrder=Descending&Recursive=true&Limit=20&ImageTypes=Primary"
+        `/Items?IncludeItemTypes=Movie&SortBy=DateCreated&SortOrder=Descending&Recursive=true&Limit=20&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();
@@ -141,6 +169,8 @@ export class EmbyAdapter {
           premiered: item.PremiereDate,
           genres: item.Genres,
           studios: item.Studios,
+          rating: item.CommunityRating,
+          overview: item.Overview,
         },
       }));
 
@@ -183,31 +213,54 @@ export class EmbyAdapter {
   }
 
   /**
-   * Query: Movies in a genre, already in the library.
+   * Query: Movies and/or TV series in a genre, already in the library.
    * Returns VisualData for ArtworkWall — the "what's available now" half of a
-   * content-discovery answer (paired with Radarr's wanted-by-genre for "what
-   * you could download"). Genres filter is case-insensitive server-side.
+   * content-discovery answer (paired with Radarr/Sonarr's wanted-by-genre for
+   * "what you could download"). Genres filter is case-insensitive server-side.
+   * mediaType narrows to just movies or just series; omitted searches both,
+   * same as querySearch already did — there is no reason genre discovery
+   * should see only half the library when title search sees all of it.
    */
-  async queryByGenre(genre: string): Promise<VisualQueryResult> {
+  async queryByGenre(genre: string, mediaType?: "movie" | "series"): Promise<VisualQueryResult> {
     const start = Date.now();
-    const label = genre ? `${genre} Movies` : "Movies";
+    const kind = mediaType === "movie" ? "Movies" : mediaType === "series" ? "Shows" : "Titles";
+    const label = genre ? `${genre} ${kind}` : kind;
+    const includeTypes = mediaType === "movie" ? "Movie" : mediaType === "series" ? "Series" : "Movie,Series";
+    const itemsUrl = (g: string) =>
+      `/Items?IncludeItemTypes=${includeTypes}&Genres=${encodeURIComponent(g)}&Recursive=true&Limit=24&SortBy=CommunityRating&SortOrder=Descending&ImageTypes=Primary&Fields=${ITEM_FIELDS}`;
     try {
-      const items = await this.fetchList<EmbyItem>(
-        `/Items?IncludeItemTypes=Movie&Genres=${encodeURIComponent(genre)}&Recursive=true&Limit=24&SortBy=CommunityRating&SortOrder=Descending&ImageTypes=Primary`
-      );
+      let items = await this.fetchList<EmbyItem>(itemsUrl(genre));
+
+      // Emby libraries tag inconsistently — "Science Fiction" and "Sci-Fi" can
+      // both be registered genres, applied to different items, and the model
+      // (or the person asking) has no way to know which one this library
+      // actually used. An empty result on a colloquial genre name reads as
+      // "nothing here" when it may just be the wrong spelling of a real tag,
+      // so retry once against a known synonym before accepting zero.
+      if (items.length === 0 && genre) {
+        const alt = GENRE_SYNONYMS[genre.toLowerCase()];
+        if (alt) items = await this.fetchList<EmbyItem>(itemsUrl(alt));
+      }
 
       const now = new Date().toISOString();
 
       const visualItems: Item[] = items.map((item) => ({
         id: item.Id,
         label: item.Name,
-        subtitle: item.ProductionYear?.toString(),
+        subtitle: [item.Type, item.ProductionYear?.toString()].filter(Boolean).join(" · "),
         image: proxyImage("emby", item.ImageTags?.Primary
           ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
           : undefined),
         value: item.CommunityRating,
         state: "healthy",
-        meta: { type: "Movie", premiered: item.PremiereDate, genres: item.Genres, studios: item.Studios },
+        meta: {
+          type: item.Type,
+          premiered: item.PremiereDate,
+          genres: item.Genres,
+          studios: item.Studios,
+          rating: item.CommunityRating,
+          overview: item.Overview,
+        },
       }));
 
       const data: VisualData = {
@@ -215,7 +268,7 @@ export class EmbyAdapter {
         subtitle: `${items.length} in your library`,
         state: items.length > 0 ? "healthy" : "empty",
         items: visualItems,
-        metrics: [{ label: "Available", value: items.length, unit: "movies" }],
+        metrics: [{ label: "Available", value: items.length, unit: "titles" }],
         updatedAt: now,
       };
 
@@ -242,7 +295,7 @@ export class EmbyAdapter {
     const label = term ? `"${term}"` : "Search";
     try {
       const items = await this.fetchList<EmbyItem>(
-        `/Items?SearchTerm=${encodeURIComponent(term)}&IncludeItemTypes=Movie,Series&Recursive=true&Limit=24&ImageTypes=Primary`
+        `/Items?SearchTerm=${encodeURIComponent(term)}&IncludeItemTypes=Movie,Series&Recursive=true&Limit=24&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();
@@ -256,7 +309,13 @@ export class EmbyAdapter {
           : undefined),
         value: item.CommunityRating,
         state: "healthy",
-        meta: { type: item.Type, premiered: item.PremiereDate, genres: item.Genres },
+        meta: {
+          type: item.Type,
+          premiered: item.PremiereDate,
+          genres: item.Genres,
+          rating: item.CommunityRating,
+          overview: item.Overview,
+        },
       }));
 
       const data: VisualData = {
@@ -294,7 +353,7 @@ export class EmbyAdapter {
       }
 
       const items = await this.fetchList<EmbyItem>(
-        `/Users/${this.config.userId}/Items/Resume?Limit=10&ImageTypes=Primary`
+        `/Users/${this.config.userId}/Items/Resume?Limit=10&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();
@@ -542,7 +601,7 @@ export class EmbyAdapter {
     const start = Date.now();
     try {
       const items = await this.fetchList<EmbyItem>(
-        "/Items?IncludeItemTypes=Series&SortBy=SortName&Recursive=true&Limit=30&ImageTypes=Primary"
+        `/Items?IncludeItemTypes=Series&SortBy=SortName&Recursive=true&Limit=30&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();
@@ -604,7 +663,7 @@ export class EmbyAdapter {
     const start = Date.now();
     try {
       const items = await this.fetchList<EmbyItem>(
-        "/Items?IncludeItemTypes=MusicAlbum&SortBy=SortName&Recursive=true&Limit=30&ImageTypes=Primary"
+        `/Items?IncludeItemTypes=MusicAlbum&SortBy=SortName&Recursive=true&Limit=30&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();

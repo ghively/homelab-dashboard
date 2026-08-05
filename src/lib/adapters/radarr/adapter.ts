@@ -128,6 +128,7 @@ export class RadarrAdapter {
           hasFile: m.hasFile,
           studio: m.studio,
           certification: m.certification,
+          rating: m.ratings?.value,
         },
       }));
 
@@ -195,6 +196,10 @@ export class RadarrAdapter {
           inCinemas: item.inCinemas,
           physicalRelease: item.physicalRelease,
           digitalRelease: item.digitalRelease,
+          genres: item.movie?.genres,
+          overview: item.movie?.overview,
+          rating: item.movie?.ratings?.value,
+          studio: item.movie?.studio,
         },
       }));
 
@@ -259,6 +264,8 @@ export class RadarrAdapter {
           movieId: item.movieId,
           genres: item.movie?.genres,
           overview: item.movie?.overview,
+          rating: item.movie?.ratings?.value,
+          studio: item.movie?.studio,
           inCinemas: item.inCinemas,
           physicalRelease: item.physicalRelease,
           digitalRelease: item.digitalRelease,

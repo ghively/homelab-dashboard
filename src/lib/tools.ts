@@ -41,6 +41,11 @@ const inputSchema = {
       type: "string",
       description: "Optional free-text search term, for views that support it (e.g. emby \"search\", romm \"roms\")",
     },
+    mediaType: {
+      type: "string",
+      enum: ["movie", "series"],
+      description: "Optional content-type narrowing for emby's \"by-genre\" view — omit to search both movies and TV series",
+    },
   },
 } as const;
 
