@@ -41,6 +41,29 @@ export type RommPlatformItem = z.infer<typeof RommPlatformSchema>;
  * `name` is nullable: an unidentified ROM has no matched metadata, so the
  * filesystem name (`fs_name`) is the only thing guaranteed to exist.
  */
+/**
+ * IGDB-sourced metadata RomM attaches per rom (SimpleRomSchema.igdb_metadata
+ * in the real API) — genres and two real critic/audience-style scores
+ * (0-100 scale, IGDB's own aggregation), not fabricated. Verified against
+ * the live instance's own /openapi.json (ROMM_API_KEY wasn't available yet
+ * to hit /api/roms directly, but the schema is exposed unauthenticated).
+ * Both rating fields come back as strings, not numbers.
+ */
+export const RommIgdbMetadataSchema = z.object({
+  genres: z.array(z.string()).optional(),
+  total_rating: z.string().nullable().optional(),
+  aggregated_rating: z.string().nullable().optional(),
+  youtube_video_id: z.string().nullable().optional(),
+});
+export type RommIgdbMetadata = z.infer<typeof RommIgdbMetadataSchema>;
+
+/** RomM's own metadata aggregation (metadatum in the real API) — a fallback when igdb_metadata is absent. */
+export const RommMetadatumSchema = z.object({
+  genres: z.array(z.string()).optional(),
+  average_rating: z.number().nullable().optional(),
+});
+export type RommMetadatum = z.infer<typeof RommMetadatumSchema>;
+
 export const RommRomSchema = z.object({
   id: z.number(),
   name: z.string().nullable().optional(),
@@ -63,6 +86,11 @@ export const RommRomSchema = z.object({
   sha1_hash: z.string().nullable().optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
+  // Real trailer + real genre/rating data — sitting on the rom record itself,
+  // no separate lookup or new API key needed beyond ROMM_API_KEY.
+  youtube_video_id: z.string().nullable().optional(),
+  igdb_metadata: RommIgdbMetadataSchema.nullable().optional(),
+  metadatum: RommMetadatumSchema.optional(),
 });
 export type RommRom = z.infer<typeof RommRomSchema>;
 

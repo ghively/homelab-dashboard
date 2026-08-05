@@ -46,6 +46,8 @@ export const EmbyItemSchema = z.object({
       PlayedPercentage: z.number().optional(),
       UnplayedItemCount: z.number().optional(),
       PlaybackPositionTicks: z.number().optional(),
+      IsFavorite: z.boolean().optional(),
+      PlayCount: z.number().optional(),
     })
     .optional(),
   RunTimeTicks: z.number().optional(),
@@ -53,6 +55,10 @@ export const EmbyItemSchema = z.object({
   Studios: z.array(z.string()).optional(),
   // Returned for Audio / MusicAlbum items. Consumed by queryAlbums().
   AlbumArtist: z.string().optional(),
+  // Verified live: populated with real YouTube trailer links when Emby's
+  // metadata provider found one (not every item has one — an empty array is
+  // a real miss, not a bug). First entry is what's rendered.
+  RemoteTrailers: z.array(z.object({ Url: z.string() })).optional(),
 });
 export type EmbyItem = z.infer<typeof EmbyItemSchema>;
 

@@ -26,8 +26,36 @@ import type {
   RadarrCalendarItem,
   RadarrSystemStatus,
   RadarrDiskSpace,
+  RadarrLookupResult,
 } from "./types";
 import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
+
+/**
+ * Radarr's `ratings` is keyed per provider (tmdb/imdb/rottenTomatoes/…), not
+ * a flat {votes, value} — verified against the live instance. Prefer tmdb
+ * (Radarr's own primary metadata source) and fall back to whatever else is
+ * present, rather than showing nothing because tmdb specifically is unrated.
+ */
+function bestRating(ratings: RadarrMovie["ratings"]): number | undefined {
+  if (!ratings) return undefined;
+  return ratings.tmdb?.value ?? Object.values(ratings).find((r) => r?.value != null)?.value;
+}
+
+/** youTubeTrailerId -> a real playable link, when Radarr's metadata has one. */
+function trailerUrl(id: string | undefined): string | undefined {
+  return id ? `https://www.youtube.com/watch?v=${id}` : undefined;
+}
+
+/**
+ * Where new movies land and at what quality — verified live against this
+ * instance: /api/v3/rootfolder returns exactly one accessible path, and
+ * qualityProfileId 7 is what every existing movie in the library actually
+ * uses (529 of 533). Not user-configurable from the model (no UI here to
+ * pick a profile) — this mirrors "the one root folder / the profile everyone
+ * else already uses", not a guess.
+ */
+const DEFAULT_ROOT_FOLDER = "/volume2/Media/Movies";
+const DEFAULT_QUALITY_PROFILE_ID = 7;
 
 /**
  * Radarr adapter configuration.
@@ -75,6 +103,30 @@ export class RadarrAdapter {
     const res = await fetchWithTimeout(url, { headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
     if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
     return (await res.json()) as T;
+  }
+
+  /**
+   * POST with a JSON body — used by mutations (e.g. /api/v3/command to
+   * trigger a search). Radarr's command endpoint returns a command status
+   * object; callers that only care about "did the request succeed" can
+   * ignore the body.
+   */
+  private async post<T>(endpoint: string, body: unknown): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const res = await fetchWithTimeout(
+      url,
+      { method: "POST", headers: { ...this.getHeaders(), "Content-Type": "application/json" }, body: JSON.stringify(body) },
+      ADAPTER_TIMEOUT_MS,
+    );
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+    return (await res.json()) as T;
+  }
+
+  /** DELETE with no body — used by mutations (e.g. removing a queue item). */
+  private async del(endpoint: string): Promise<void> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const res = await fetchWithTimeout(url, { method: "DELETE", headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
   }
 
   /**
@@ -128,7 +180,8 @@ export class RadarrAdapter {
           hasFile: m.hasFile,
           studio: m.studio,
           certification: m.certification,
-          rating: m.ratings?.value,
+          rating: bestRating(m.ratings),
+          trailerUrl: trailerUrl(m.youTubeTrailerId),
         },
       }));
 
@@ -186,20 +239,21 @@ export class RadarrAdapter {
 
       const visualItems: Item[] = wanted.map((item) => ({
         id: item.id.toString(),
-        label: item.movie?.title || "Unknown Movie",
-        subtitle: item.movie?.year?.toString(),
-        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
+        label: item.title,
+        subtitle: item.year?.toString(),
+        image: proxyImage("radarr", item.images?.find((img) => img.coverType === "poster")?.url),
         state: "critical",
         group: item.digitalRelease || item.physicalRelease || "Unknown",
         meta: {
-          movieId: item.movieId,
+          movieId: item.id,
           inCinemas: item.inCinemas,
           physicalRelease: item.physicalRelease,
           digitalRelease: item.digitalRelease,
-          genres: item.movie?.genres,
-          overview: item.movie?.overview,
-          rating: item.movie?.ratings?.value,
-          studio: item.movie?.studio,
+          genres: item.genres,
+          overview: item.overview,
+          rating: bestRating(item.ratings),
+          studio: item.studio,
+          trailerUrl: trailerUrl(item.youTubeTrailerId),
         },
       }));
 
@@ -237,17 +291,24 @@ export class RadarrAdapter {
    * automatically once found; this does not discover titles Radarr has never
    * heard of (that needs a movie lookup against TMDB, a separate capability).
    * Filtered client-side: /api/v3/wanted/missing has no genre query param, but
-   * `movie.genres` is already present on every record it returns.
+   * `genres` is already present on every record it returns (it IS a full
+   * movie record, not a wrapper around one — see RadarrWantedItemSchema).
    */
-  async queryWantedByGenre(genre: string): Promise<VisualQueryResult> {
+  async queryWantedByGenre(genreInput: string): Promise<VisualQueryResult> {
     const start = Date.now();
-    const label = genre ? `${genre} — Could Download` : "Could Download";
+    const label = genreInput ? `${genreInput} — Could Download` : "Could Download";
+    // Comma-separated = ALL must match (a compound ask like "horror
+    // comedy" -> "Horror,Comedy") — see Emby's queryByGenre for why this
+    // needs to be AND, not OR: a single combined genre string like "Horror
+    // Comedy" is not a real tag anywhere, so it always matched nothing.
+    const requiredGenres = genreInput.split(",").map((g) => g.trim().toLowerCase()).filter(Boolean);
     try {
       const response = await this.fetch<{ page: number; pageSize: number; totalRecords: number; records: RadarrWantedItem[] }>("/api/v3/wanted/missing?pageSize=200");
-      const wanted = genre
-        ? response.records.filter((item) =>
-            item.movie?.genres?.some((g) => g.toLowerCase() === genre.toLowerCase()),
-          )
+      const wanted = requiredGenres.length
+        ? response.records.filter((item) => {
+            const itemGenres = (item.genres ?? []).map((g) => g.toLowerCase());
+            return requiredGenres.every((r) => itemGenres.includes(r));
+          })
         : response.records;
 
       const now = new Date().toISOString();
@@ -256,19 +317,20 @@ export class RadarrAdapter {
       // could grab), not an alert about missing library content.
       const visualItems: Item[] = wanted.slice(0, 24).map((item) => ({
         id: item.id.toString(),
-        label: item.movie?.title || "Unknown Movie",
-        subtitle: item.movie?.year?.toString(),
-        image: proxyImage("radarr", item.movie?.images?.find((img) => img.coverType === "poster")?.url),
+        label: item.title,
+        subtitle: item.year?.toString(),
+        image: proxyImage("radarr", item.images?.find((img) => img.coverType === "poster")?.url),
         state: "warning",
         meta: {
-          movieId: item.movieId,
-          genres: item.movie?.genres,
-          overview: item.movie?.overview,
-          rating: item.movie?.ratings?.value,
-          studio: item.movie?.studio,
+          movieId: item.id,
+          genres: item.genres,
+          overview: item.overview,
+          rating: bestRating(item.ratings),
+          studio: item.studio,
           inCinemas: item.inCinemas,
           physicalRelease: item.physicalRelease,
           digitalRelease: item.digitalRelease,
+          trailerUrl: trailerUrl(item.youTubeTrailerId),
         },
       }));
 
@@ -500,6 +562,120 @@ export class RadarrAdapter {
       };
     } catch (err) {
       return this.errorResult("Disk Space", err, start);
+    }
+  }
+
+  /**
+   * Query: title lookup against Radarr's own metadata source (TMDB) — for a
+   * movie Radarr may have never heard of, the "could I add this" half of a
+   * download conversation. Distinct from queryWantedByGenre, which only
+   * covers movies Radarr already tracks. Capped to 8 — this is meant to back
+   * a handful of MediaTiles, not another full browse wall.
+   */
+  async lookupMovie(term: string): Promise<VisualQueryResult> {
+    const start = Date.now();
+    const label = term ? `"${term}" — Lookup` : "Movie Lookup";
+    try {
+      const results = await this.fetch<RadarrLookupResult[]>(`/api/v3/movie/lookup?term=${encodeURIComponent(term)}`);
+      const now = new Date().toISOString();
+
+      const visualItems: Item[] = results.slice(0, 8).map((r) => ({
+        id: r.tmdbId.toString(),
+        label: r.title,
+        subtitle: r.year?.toString(),
+        // remotePoster is an absolute TMDB CDN URL — not proxied, it needs no
+        // auth and doesn't live behind Radarr's own host the way an already-
+        // added movie's images[].url does.
+        image: r.remotePoster,
+        state: "healthy",
+        meta: {
+          tmdbId: r.tmdbId,
+          year: r.year,
+          overview: r.overview,
+          genres: r.genres,
+          runtime: r.runtime,
+          studio: r.studio,
+          certification: r.certification,
+          rating: bestRating(r.ratings),
+          trailerUrl: trailerUrl(r.youTubeTrailerId),
+        },
+      }));
+
+      const data: VisualData = {
+        title: label,
+        subtitle: `${results.length} match${results.length === 1 ? "" : "es"}`,
+        state: results.length > 0 ? "healthy" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Matches", value: results.length, unit: "" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Radarr:${this.baseUrl}/api/v3/movie/lookup?term=${encodeURIComponent(term)}`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult(label, err, start);
+    }
+  }
+
+  /**
+   * Mutation: add a movie Radarr doesn't track yet, and start searching for
+   * it — the real "download this" action, not just re-searching something
+   * already monitored (that's searchMovie()). Re-looks-up by tmdbId (rather
+   * than trusting a client-supplied metadata blob) so the object Radarr gets
+   * back is always its own canonical shape, then adds the two fields only
+   * the add call needs: which quality profile and which root folder.
+   */
+  async addMovie(tmdbId: number, title: string, year: number): Promise<{ success: boolean; message: string }> {
+    try {
+      const match = await this.fetch<RadarrLookupResult>(`/api/v3/movie/lookup/tmdb?tmdbId=${tmdbId}`);
+      await this.post("/api/v3/movie", {
+        ...match,
+        qualityProfileId: DEFAULT_QUALITY_PROFILE_ID,
+        rootFolderPath: DEFAULT_ROOT_FOLDER,
+        monitored: true,
+        addOptions: { searchForMovie: true },
+      });
+      return { success: true, message: `Added "${title}" (${year}) and started searching.` };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not add "${title}": ${c.message}` };
+    }
+  }
+
+  /**
+   * Mutation: trigger a search for one movie (e.g. a wanted/missing item).
+   * Idempotent and fully safe — it only asks Radarr's indexers to look again,
+   * it does not grab or download anything on its own authority.
+   */
+  async searchMovie(movieId: number): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.post("/api/v3/command", { name: "MoviesSearch", movieIds: [movieId] });
+      return { success: true, message: `Search triggered for movie ${movieId}.` };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not trigger search: ${c.message}` };
+    }
+  }
+
+  /**
+   * Mutation: remove a stuck/unwanted item from the download queue.
+   * Reversible in the sense that the movie stays monitored and searchable
+   * again — this does not un-monitor or delete the movie itself.
+   */
+  async removeQueueItem(queueId: number): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.del(`/api/v3/queue/${queueId}?removeFromClient=true&blocklist=false`);
+      return { success: true, message: `Removed queue item ${queueId}.` };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not remove queue item: ${c.message}` };
     }
   }
 

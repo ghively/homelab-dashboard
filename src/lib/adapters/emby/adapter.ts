@@ -24,6 +24,7 @@ import type {
   EmbyLibrary,
   EmbySession,
   EmbyServerInfo,
+  EmbyUser,
 } from "./types";
 import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout } from "@/lib/adapter-http";
 
@@ -49,7 +50,17 @@ export interface EmbyConfig {
  * back with 4 fields, the other with the genres/overview/rating/year actually
  * available in the library.
  */
-const ITEM_FIELDS = "Genres,Overview,CommunityRating,ProductionYear,Studios,PremiereDate";
+const ITEM_FIELDS = "Genres,Overview,CommunityRating,ProductionYear,Studios,PremiereDate,RunTimeTicks,RemoteTrailers";
+
+/** RunTimeTicks is 100-nanosecond units (the .NET/Windows tick). */
+function runtimeMinutes(ticks: number | undefined): number | undefined {
+  return ticks ? Math.round(ticks / 600_000_000) : undefined;
+}
+
+/** First real trailer link Emby's metadata provider found — undefined is a real miss, not every item has one. */
+function trailerUrl(item: EmbyItem): string | undefined {
+  return item.RemoteTrailers?.[0]?.Url;
+}
 
 /**
  * Colloquial genre name -> the alternate spelling libraries commonly tag
@@ -71,11 +82,65 @@ export class EmbyAdapter {
   private config: EmbyConfig;
   private baseUrl: string;
   private apiKey: string
+  private resolvedUserId?: string;
 
   constructor(config: EmbyConfig) {
     this.config = config;
     this.baseUrl = config.baseUrl.replace(/\/$/, "");
     this.apiKey = config.apiKey;
+  }
+
+  /**
+   * The user ID mutations act on behalf of. EMBY_USER_ID is optional in
+   * config — most homelab Emby instances have exactly one real (admin) user,
+   * so falling back to "the only user on the server" needs zero setup for
+   * the common case, rather than requiring an env var nobody's told to set.
+   * Fails closed (throws, naming the fix) rather than guessing among several
+   * users — silently acting as the wrong person's watched-history is worse
+   * than an honest "set EMBY_USER_ID" error.
+   */
+  private async resolveUserId(): Promise<string> {
+    if (this.config.userId) return this.config.userId;
+    if (this.resolvedUserId) return this.resolvedUserId;
+    const users = await this.fetchList<EmbyUser>("/Users");
+    if (users.length === 1) {
+      this.resolvedUserId = users[0].Id;
+      return this.resolvedUserId;
+    }
+    throw new Error(
+      users.length === 0
+        ? "No Emby users found."
+        : `${users.length} Emby users found — set EMBY_USER_ID to disambiguate.`,
+    );
+  }
+
+  /**
+   * Non-throwing resolveUserId(), for read paths. Mutations fail closed on
+   * an ambiguous user (acting on the wrong person's watch history is a real
+   * mistake); a read degrading to non-personalized results because it
+   * couldn't resolve one user is not the same class of problem, so it
+   * should not refuse to answer — it should just skip the personalization
+   * and say so, which is what callers of this do with a null result.
+   */
+  private async tryResolveUserId(): Promise<string | null> {
+    try {
+      return await this.resolveUserId();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Base path for an /Items-style query — user-scoped (real UserData:
+   * Played/IsFavorite/PlayCount, and Filters=IsUnplayed becomes usable) when
+   * a user can be resolved, the generic endpoint otherwise. Verified live:
+   * the generic /Items endpoint never returns UserData at all, regardless of
+   * API key — personalization genuinely requires the user-scoped path, not
+   * just an extra field request.
+   */
+  private async itemsBase(): Promise<{ base: string; userId: string | null }> {
+    const userId = await this.tryResolveUserId();
+    return { base: userId ? `/Users/${userId}/Items` : "/Items", userId };
   }
 
   /**
@@ -119,6 +184,20 @@ export class EmbyAdapter {
     return (await res.json()) as T;
   }
 
+  /** POST with no body — used by mutations (e.g. marking an item played). */
+  private async post(endpoint: string): Promise<void> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const res = await fetchWithTimeout(url, { method: "POST", headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+  }
+
+  /** DELETE with no body — used by mutations (e.g. marking an item unplayed). */
+  private async del(endpoint: string): Promise<void> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const res = await fetchWithTimeout(url, { method: "DELETE", headers: this.getHeaders() }, ADAPTER_TIMEOUT_MS);
+    if (!res.ok) throw new AdapterHttpError(url, res.status, res.statusText);
+  }
+
   /**
    * Health check - fetch server info.
    */
@@ -149,8 +228,9 @@ export class EmbyAdapter {
   async queryRecentlyAddedMovies(): Promise<VisualQueryResult> {
     const start = Date.now();
     try {
+      const { base } = await this.itemsBase();
       const items = await this.fetchList<EmbyItem>(
-        `/Items?IncludeItemTypes=Movie&SortBy=DateCreated&SortOrder=Descending&Recursive=true&Limit=20&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
+        `${base}?IncludeItemTypes=Movie&SortBy=DateCreated&SortOrder=Descending&Recursive=true&Limit=20&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();
@@ -171,6 +251,10 @@ export class EmbyAdapter {
           studios: item.Studios,
           rating: item.CommunityRating,
           overview: item.Overview,
+          watched: item.UserData?.Played,
+          favorite: item.UserData?.IsFavorite,
+          runtimeMinutes: runtimeMinutes(item.RunTimeTicks),
+          trailerUrl: trailerUrl(item),
         },
       }));
 
@@ -220,16 +304,36 @@ export class EmbyAdapter {
    * mediaType narrows to just movies or just series; omitted searches both,
    * same as querySearch already did — there is no reason genre discovery
    * should see only half the library when title search sees all of it.
+   *
+   * `genre` accepts a comma-separated list for a compound ask ("horror
+   * comedy" -> "Horror,Comedy"). Emby's own Genres= filter is OR (matches
+   * ANY listed genre) — there is no server-side AND. A compound ask sent
+   * straight through returned zero results for a real conversational
+   * refinement ("show me something more lighthearted" -> "Horror Comedy" as
+   * a single literal genre string, which does not exist as a tag) even
+   * though the library has real horror-comedies tagged with both genres
+   * separately. So: fetch candidates on the first genre alone (a wider net
+   * when more genres must ALL match, since the AND-narrowing happens after
+   * the fetch, not before it), then require every other listed genre be
+   * present in the item's own Genres array before it counts.
    */
-  async queryByGenre(genre: string, mediaType?: "movie" | "series"): Promise<VisualQueryResult> {
+  async queryByGenre(genreInput: string, mediaType?: "movie" | "series", unwatched?: boolean): Promise<VisualQueryResult> {
     const start = Date.now();
+    const genres = genreInput.split(",").map((g) => g.trim()).filter(Boolean);
+    const [primary, ...alsoRequired] = genres;
     const kind = mediaType === "movie" ? "Movies" : mediaType === "series" ? "Shows" : "Titles";
-    const label = genre ? `${genre} ${kind}` : kind;
+    const label = genreInput ? `${genreInput} ${kind}` : kind;
     const includeTypes = mediaType === "movie" ? "Movie" : mediaType === "series" ? "Series" : "Movie,Series";
+    const fetchLimit = alsoRequired.length > 0 ? 200 : 24;
+    const { base, userId } = await this.itemsBase();
+    // Filters=IsUnplayed only means anything on the user-scoped endpoint —
+    // there is no user context to check "unplayed by whom" against on the
+    // generic one, so it is only appended when a user actually resolved.
+    const canFilterUnwatched = unwatched && userId;
     const itemsUrl = (g: string) =>
-      `/Items?IncludeItemTypes=${includeTypes}&Genres=${encodeURIComponent(g)}&Recursive=true&Limit=24&SortBy=CommunityRating&SortOrder=Descending&ImageTypes=Primary&Fields=${ITEM_FIELDS}`;
+      `${base}?IncludeItemTypes=${includeTypes}&Genres=${encodeURIComponent(g)}&Recursive=true&Limit=${fetchLimit}&SortBy=CommunityRating&SortOrder=Descending&ImageTypes=Primary&Fields=${ITEM_FIELDS}${canFilterUnwatched ? "&Filters=IsUnplayed" : ""}`;
     try {
-      let items = await this.fetchList<EmbyItem>(itemsUrl(genre));
+      let items = await this.fetchList<EmbyItem>(itemsUrl(primary ?? ""));
 
       // Emby libraries tag inconsistently — "Science Fiction" and "Sci-Fi" can
       // both be registered genres, applied to different items, and the model
@@ -237,9 +341,19 @@ export class EmbyAdapter {
       // actually used. An empty result on a colloquial genre name reads as
       // "nothing here" when it may just be the wrong spelling of a real tag,
       // so retry once against a known synonym before accepting zero.
-      if (items.length === 0 && genre) {
-        const alt = GENRE_SYNONYMS[genre.toLowerCase()];
+      if (items.length === 0 && primary) {
+        const alt = GENRE_SYNONYMS[primary.toLowerCase()];
         if (alt) items = await this.fetchList<EmbyItem>(itemsUrl(alt));
+      }
+
+      if (alsoRequired.length > 0) {
+        const requiredLower = alsoRequired.map((g) => g.toLowerCase());
+        items = items
+          .filter((item) => {
+            const itemGenres = (item.Genres ?? []).map((g) => g.toLowerCase());
+            return requiredLower.every((r) => itemGenres.includes(r));
+          })
+          .slice(0, 24);
       }
 
       const now = new Date().toISOString();
@@ -260,6 +374,10 @@ export class EmbyAdapter {
           studios: item.Studios,
           rating: item.CommunityRating,
           overview: item.Overview,
+          watched: item.UserData?.Played,
+          favorite: item.UserData?.IsFavorite,
+          runtimeMinutes: runtimeMinutes(item.RunTimeTicks),
+          trailerUrl: trailerUrl(item),
         },
       }));
 
@@ -268,6 +386,12 @@ export class EmbyAdapter {
         subtitle: `${items.length} in your library`,
         state: items.length > 0 ? "healthy" : "empty",
         items: visualItems,
+        // unwatched was asked for but couldn't be honored (ambiguous user) —
+        // say so rather than silently returning a broader, unfiltered list
+        // while the caller still thinks it asked for unwatched-only.
+        ...(unwatched && !userId
+          ? { summary: `Showing all ${label.toLowerCase()}, not just unwatched — Emby has multiple users and no EMBY_USER_ID is set, so per-user watch history isn't available.` }
+          : {}),
         metrics: [{ label: "Available", value: items.length, unit: "titles" }],
         updatedAt: now,
       };
@@ -276,7 +400,7 @@ export class EmbyAdapter {
         data,
         freshness: {
           timestamp: now,
-          source: `Emby:${this.baseUrl}/Items?Genres=${encodeURIComponent(genre)}`,
+          source: `Emby:${this.baseUrl}/Items?Genres=${encodeURIComponent(genreInput)}`,
           state: "healthy",
           cacheAgeMs: Date.now() - start,
         },
@@ -294,8 +418,9 @@ export class EmbyAdapter {
     const start = Date.now();
     const label = term ? `"${term}"` : "Search";
     try {
+      const { base } = await this.itemsBase();
       const items = await this.fetchList<EmbyItem>(
-        `/Items?SearchTerm=${encodeURIComponent(term)}&IncludeItemTypes=Movie,Series&Recursive=true&Limit=24&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
+        `${base}?SearchTerm=${encodeURIComponent(term)}&IncludeItemTypes=Movie,Series&Recursive=true&Limit=24&ImageTypes=Primary&Fields=${ITEM_FIELDS}`
       );
 
       const now = new Date().toISOString();
@@ -315,6 +440,10 @@ export class EmbyAdapter {
           genres: item.Genres,
           rating: item.CommunityRating,
           overview: item.Overview,
+          watched: item.UserData?.Played,
+          favorite: item.UserData?.IsFavorite,
+          runtimeMinutes: runtimeMinutes(item.RunTimeTicks),
+          trailerUrl: trailerUrl(item),
         },
       }));
 
@@ -332,6 +461,79 @@ export class EmbyAdapter {
         freshness: {
           timestamp: now,
           source: `Emby:${this.baseUrl}/Items?SearchTerm=${encodeURIComponent(term)}`,
+          state: "healthy",
+          cacheAgeMs: Date.now() - start,
+        },
+      };
+    } catch (err) {
+      return this.errorResult(label, err, start);
+    }
+  }
+
+  /**
+   * Query: titles similar to one already-known item — the "something like
+   * that one" / "more like this" half of a real recommendation flow, not
+   * just a genre filter. Verified live against the real API: the bare
+   * /Items/{id}/Similar endpoint (no userId) 500s outright — "Object
+   * reference not set" — it is not a graceful empty result, it is a real
+   * server error, so userId is required here, not just nice-to-have.
+   * /Users/{id}/Items/{itemId}/Similar (userId as a path segment) also
+   * 404s; the only working shape is /Items/{itemId}/Similar?userId=.
+   */
+  async querySimilar(itemId: string): Promise<VisualQueryResult> {
+    const start = Date.now();
+    const label = "Similar Titles";
+    const userId = await this.tryResolveUserId();
+    if (!userId) {
+      return this.errorResult(
+        label,
+        new Error("Similar-title recommendations need a resolved Emby user — set EMBY_USER_ID."),
+        start,
+      );
+    }
+    try {
+      const items = await this.fetchList<EmbyItem>(
+        `/Items/${encodeURIComponent(itemId)}/Similar?userId=${userId}&Limit=24&Fields=${ITEM_FIELDS}`
+      );
+
+      const now = new Date().toISOString();
+
+      const visualItems: Item[] = items.map((item) => ({
+        id: item.Id,
+        label: item.Name,
+        subtitle: [item.Type, item.ProductionYear?.toString()].filter(Boolean).join(" · "),
+        image: proxyImage("emby", item.ImageTags?.Primary
+          ? `${this.baseUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}`
+          : undefined),
+        value: item.CommunityRating,
+        state: "healthy",
+        meta: {
+          type: item.Type,
+          premiered: item.PremiereDate,
+          genres: item.Genres,
+          rating: item.CommunityRating,
+          overview: item.Overview,
+          watched: item.UserData?.Played,
+          favorite: item.UserData?.IsFavorite,
+          runtimeMinutes: runtimeMinutes(item.RunTimeTicks),
+          trailerUrl: trailerUrl(item),
+        },
+      }));
+
+      const data: VisualData = {
+        title: label,
+        subtitle: `${items.length} titles like this one`,
+        state: items.length > 0 ? "healthy" : "empty",
+        items: visualItems,
+        metrics: [{ label: "Similar", value: items.length, unit: "titles" }],
+        updatedAt: now,
+      };
+
+      return {
+        data,
+        freshness: {
+          timestamp: now,
+          source: `Emby:${this.baseUrl}/Items/${itemId}/Similar`,
           state: "healthy",
           cacheAgeMs: Date.now() - start,
         },
@@ -702,6 +904,23 @@ export class EmbyAdapter {
       };
     } catch (err) {
       return this.errorResult("Music Albums", err, start);
+    }
+  }
+
+  /**
+   * Mutation: mark an item watched/unwatched. Fully reversible either
+   * direction — toggling it back undoes it exactly.
+   */
+  async setWatched(itemId: string, watched: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+      const userId = await this.resolveUserId();
+      const endpoint = `/Users/${userId}/PlayedItems/${itemId}`;
+      if (watched) await this.post(endpoint);
+      else await this.del(endpoint);
+      return { success: true, message: watched ? "Marked watched." : "Marked unwatched." };
+    } catch (err) {
+      const c = classifyError(err);
+      return { success: false, message: `Could not update watched status: ${c.message}` };
     }
   }
 
