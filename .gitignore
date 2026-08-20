@@ -21,6 +21,11 @@ out/
 *.swp
 *.swo
 
+# Local agent/editor state
+.claude/
+.omc/
+claude-omc-config/
+
 # OS
 .DS_Store
 Thumbs.db
