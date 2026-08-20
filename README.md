@@ -14,7 +14,7 @@ renderer draws it), Next.js 16, React 19, TypeScript and Tailwind 4.
 Production build under a **systemd user unit**, not `npm run dev`:
 
 ```
-http://100.92.162.32:4180        # gh-ai, over the tailnet
+http://<your-tailnet-ip>:4180        # over the tailnet
 ```
 
 The unit is `~/.config/systemd/user/homelab-dashboard.service`
@@ -110,8 +110,8 @@ Copy `src/adapters/ops/prometheus-adapter.ts` for the canonical shape.
 
 Copy `.env.example` to `.env` and fill in what you have. Every `.env*` file is
 gitignored except `.env.example` — **never commit real credentials.** Secrets
-live in 1Password (vault "Gregory") and `~/.hermes/.env`; regenerate rather
-than commit.
+live in a password manager and a local env file outside the repo; regenerate
+rather than commit.
 
 ## Development
 
