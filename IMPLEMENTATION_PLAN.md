@@ -244,7 +244,7 @@ export function getServiceConfig(service: string): ServiceConfig | null {
 Add to `.env.example`:
 ```
 # Emby
-EMBY_URL=http://gh-media:8096
+EMBY_URL=http://your-emby-host:8096
 EMBY_API_KEY=
 EMBY_USER_ID=
 ```
@@ -828,7 +828,7 @@ tagSchemaId(MetricSchema, "Metric");
 
 # APPENDIX C — Definition of done
 
-Verified by driving the running app against the real LiteLLM proxy on gh-arm.
+Verified by driving the running app against the real LiteLLM proxy.
 
 - [x] **No panel ever displays a fabricated number.** All 30 registered adapters
       render `offline`/`critical`/`empty` against dead hosts with zero numeric
@@ -858,111 +858,45 @@ Verified by driving the running app against the real LiteLLM proxy on gh-arm.
 
 ### Live-service validation
 
-Three adapters have now been run against the real services and returned correct
-data:
+Adapters were run against the real, running homelab services (not just the
+dead-host/offline code paths) to confirm they parse real API responses
+correctly — dead-host testing alone could not have caught this class of bug.
 
-Credentials come from 1Password (vault "Gregory"); Hermes holds a service
-account token at `OP_SERVICE_ACCOUNT_TOKEN` in `~/.hermes/.env`.
+Representative defects found only by hitting live services, since fixed:
 
-**11 of 30 adapters now return live data.** The authoritative endpoint map is
-the "Infrastructure Endpoints Reference" item in 1Password.
+- **SABnzbd's queue response uses `queue.slots`, not `queue.jobs`.** The
+  adapter called `.map()` on the wrong field, so the panel rendered `offline`
+  even with a valid key. The schema also required numbers where SABnzbd sends
+  numeric values as strings (e.g. `"0.00"`).
+- **Emby's list endpoints return `{Items: [...], TotalRecordCount}`, not a
+  bare array** — only `/Sessions` is bare. The adapter typed them as arrays
+  and called `.map()` on the envelope, so every Emby panel rendered `offline`
+  with a valid token. Library item counts now come from a `Limit=0` query per
+  library rather than trusting a folder-listing field that carries none.
+- **Syncthing's version lives at `/rest/system/version`**, not on
+  `/rest/system/status` where the adapter originally read it.
+- **Some services listen on a non-default port** in real deployments (e.g. a
+  Radarr instance running on something other than the library default) —
+  adapters should not assume upstream defaults are load-bearing.
+- **The mock `synology-dsm` fixture this replaced was wrong in every
+  particular** it claimed (volume count, disk count, capacity) — a reminder
+  that "a module exists" is not evidence that it works.
+- **Watchtower was coded against an API that does not exist.** The
+  `watchtower-*` adapters originally queried `/v1/containers`; Watchtower has
+  no such endpoint (its HTTP API is a token-gated `POST /v1/update` plus an
+  optional `/v1/metrics`). They now query the Docker Engine API
+  (`GET /containers/json?all=1`) instead, gated on a read-only socket-proxy
+  being configured.
 
-| adapter | result |
-|---|---|
-| `emby` | 3 libraries — 523 movies, 26,392 TV items, 61 collections |
-| `hermes-dashboard` | UP, 200, 15 ms |
-| `hermes-gateway` / `hermes-workspace` | reachable, 404 at root (probe-only adapters) |
-| `sonarr` | 260 shows — 68 continuing, 192 ended, 190 monitored |
-| `radarr` | 533 movies — 523 released, 8 announced |
-| `sabnzbd` | v5.0.4, queue idle |
-| `syncthing` | v2.1.2, 2 folders, 1,674 files, 965 GB. **Both folders report `state: error` from Syncthing itself**, and all 3 configured devices are disconnected. |
-| `comfyui` | 1 device, NVIDIA RTX 3060, 9.2 GB / 12.5 GB VRAM, queue empty |
-| `litellm` | 22 models — **6 endpoints unhealthy** (visible only with the admin key) |
-| `synology-dsm` | 2 volumes, 13 disks, 35.3 TB / 49.8 TB used. Correctly reported `warning`: `volume_2` is full (15.3/15.3 TB) and DSM flags it `attention`. Real drive models and per-disk temperatures. |
+At this point in Phase 6, 16 of the 30 then-registered adapters were
+confirmed live against real services; the rest were blocked by environment
+specifics (missing credentials, LAN-only services unreachable from a remote
+deployment, a service not yet exposing the expected port) rather than by
+adapter code. The exact hosts, ports, credentials, and data-volume figures
+observed during that verification pass are intentionally not published
+here — see `.env.example` for what each adapter needs to go live, and
+`AGENTS.md` for the current live/fixture count.
 
-Live contact found three defects that dead-host testing could never have:
-
-- **SABnzbd read `queue.jobs`; the API returns `queue.slots`.** `.map()` threw
-  on every call, so the panel rendered `offline` even with a valid key. The
-  schema also required numbers where SABnzbd sends strings (`"0.00"`).
-- **Emby list endpoints return `{Items: [...], TotalRecordCount}`, not a bare
-  array** — only `/Sessions` is bare. The adapter typed them as arrays and
-  called `.map()` on the envelope, so every Emby panel rendered `offline` with
-  a valid token. `/Library/MediaFolders` also carries no item counts, so every
-  library showed 0; counts now come from a `Limit=0` query per library.
-- **Syncthing read `version` off `/rest/system/status`.** That document has no
-  such field — it lives at `/rest/system/version`, so the panel always said
-  "unknown".
-- **Radarr listens on 8310**, not the 7878 default.
-
-For contrast, the mock `synology-dsm` this replaced claimed 3 volumes, 8 disks
-and 32 TB. It was wrong in every particular — which is the case for treating
-"a module exists" as evidence that it works.
-
-**Watchtower was coded against an API that does not exist.** The three
-`watchtower-*` adapters queried `/v1/containers`; Watchtower has no such
-endpoint (its HTTP API is a token-gated `POST /v1/update` plus optional
-`/v1/metrics`), verified by probing the live hosts — every path 404s. They now
-query the Docker Engine API (`GET /containers/json?all=1`), which is the actual
-source of container inventory. No Docker API is currently exposed on those
-hosts, so they report `NOT CONFIGURED` until a read-only socket-proxy exists.
-
-### Complete adapter status (verified 2026-08-02)
-
-**16 of 30 adapters are configured and return `source: "live"`.** The other 14
-are blocked by the environment, not by the code — each reason is recorded below
-so nobody re-investigates them.
-
-| adapter | endpoint | live result |
-|---|---|---|
-| `emby` | gh-media:8096 | 523 movies, 26,392 TV items, 61 collections |
-| `sonarr` | gh-storage:8989 | 260 shows — 68 continuing, 192 ended |
-| `radarr` | gh-storage:**8310** | 533 movies — 523 released, 8 announced |
-| `sabnzbd` | gh-storage:8080 | v5.0.4, queue idle (renders `empty`, correctly) |
-| `tdarr` | gh-nvidia:**8265** | v2.84.01, node "kind-koi", 0/6 workers, 246 h up |
-| `spoolman` | gh-media:**8090** | reachable, inventory genuinely empty |
-| `syncthing` | gh-storage:8384 | v2.1.2, 2 folders, 1,674 files, 965 GB |
-| `synology-dsm` | gh-storage:5000 | 2 volumes, 13 disks, 35.3/49.8 TB |
-| `comfyui` | gh-nvidia:8188 | RTX 3060, 9.2/12.5 GB VRAM |
-| `litellm` | gh-arm:4000 | 22 models, 6 endpoints unhealthy |
-| `wazuh-indexer` | **https**://gh-arm:9200 | green, 18 indices, 70,731 docs |
-| `wazuh-dashboard` | **https**://gh-arm:443 | Dashboards 2.19.5, 64 plugins |
-| `cloudflare-dns` | api.cloudflare.com | 32 records on example.com |
-| `hermes-gateway` | gh-ai:**8642** | reachable |
-| `hermes-dashboard` | gh-ai:**9119** | UP, 200, 15 ms |
-| `hermes-workspace` | gh-ai:**3000** | reachable |
-
-Bold ports are corrections — the defaults named the wrong port or host.
-
-### The 14 that cannot go live, and why
-
-| adapter | blocker |
-|---|---|
-| `pihole`, `unifi` | LAN-only (192.168.0.x). **Not routable over the tailnet at all** — a VPS-hosted dashboard cannot reach them. |
-| `searxng` | binds to 127.0.0.1 on gh-ai by design. |
-| `ollama` | port 11434 closed on gh-nvidia (that host runs Grafana :3000, SynapseNAS :7777, ComfyUI, Tdarr). |
-| `romm` | not deployed on any reachable host. gh-nvidia:3001 is Open WebUI, not RomM, despite a 1Password key existing. |
-| `caddy` | admin API (2019) not listening on any host — localhost-bound. |
-| `garage-s3` | no Garage admin endpoint found anywhere. |
-| `wazuh-manager` | uses a **separate credential set**; the indexer/dashboard pair returns "Invalid credentials" from `/security/user/authenticate`. |
-| `watchtower-vps/-media/-storage` | need a read-only Docker socket-proxy; 2375/2376 are correctly closed. |
-| `hermes-api-server`, `hermes-mcp-bridge` | ports not documented in the endpoint reference. |
-| `fail2ban` | needs a sidecar exposing `/status`; fail2ban has no native HTTP API. |
-| `valkey`, `smb-nfs`, `iot-vlan`, `omniroute` | no HTTP API reachable from this process — they declare `NOT IMPLEMENTED` rather than fabricate. |
-
-Credentials come from 1Password (vault "Gregory") via the service account token
-in `~/.hermes/.env`. **The Emby key there has a trailing newline** — untrimmed,
-every request fails.
-
-### What is still NOT verified
-
-- **27 of 30 adapters have not touched a live service.** `emby`, `sonarr`,
-  `sabnzbd` and `syncthing` are confirmed reachable and only need an API key.
-  `ollama`, `radarr`, `tdarr` and `caddy` are not listening anywhere on the
-  tailnet. The rest need credentials.
-- **Drill-down click-through was not exercised.** VisualTable/Kanban rows are
-  declared clickable and the components render; actually clicking one needs a
-  browser session, which was not available.
-- **Rendering was verified server-side**, not in a real browser. That is
-  stricter in one way (it executes the real Renderer and library) and weaker in
-  another (no user interaction, no CSS paint).
+Two things this pass did not exercise: drill-down click-through (needs a
+browser session) and CSS paint (rendering was verified server-side, which
+runs the real Renderer and library but performs no browser paint).
