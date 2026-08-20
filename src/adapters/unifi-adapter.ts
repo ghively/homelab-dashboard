@@ -39,7 +39,7 @@ export class UnifiAdapter implements DataAdapter {
   private csrfToken: string | null = null;
   private cookieHeader: string | null = null;
 
-  constructor(baseUrl: string = process.env.UNIFI_BASE_URL || "https://192.168.0.1", username: string = process.env.UNIFI_USERNAME || "admin", password: string = process.env.UNIFI_PASSWORD || "") {
+  constructor(baseUrl: string = process.env.UNIFI_BASE_URL || "https://192.0.2.1", username: string = process.env.UNIFI_USERNAME || "admin", password: string = process.env.UNIFI_PASSWORD || "") {
     this.baseUrl = baseUrl;
     this.username = username;
     this.password = password;

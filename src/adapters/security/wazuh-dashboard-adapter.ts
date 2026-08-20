@@ -1,5 +1,5 @@
 // Wazuh Dashboard adapter — security visualization, threat intelligence, compliance.
-// Host: gh-arm (Tailscale 100.65.126.126)
+// Host: your-arm-host (Tailscale 203.0.113.11)
 // API: REST over HTTPS (default 443, proxied through Nginx)
 
 import type { DataAdapter } from "../adapter-base";
@@ -10,7 +10,7 @@ import { insecureTls, envFlag } from "../tls";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_DASHBOARD_URL =
-  process.env.WAZUH_DASHBOARD_URL || "https://100.65.126.126";
+  process.env.WAZUH_DASHBOARD_URL || "https://203.0.113.11";
 
 function makeFreshness(source: string): FreshnessInfo {
   return {

@@ -1,5 +1,5 @@
 // Caddy adapter — reverse proxy routes, TLS certs, upstream health.
-// Host: gh-vps (Tailscale 100.92.162.32)
+// Host: your-vps-host (Tailscale 203.0.113.10)
 // API: Admin API (default 2019)
 
 import type { DataAdapter } from "../adapter-base";
@@ -9,7 +9,7 @@ import { getFixtureForState } from "../fixtures";
 import { ADAPTER_TIMEOUT_MS, AdapterHttpError, failureResult, makeFreshness } from "@/lib/adapter-http";
 
 const CADDY_ADMIN_URL =
-  process.env.CADDY_ADMIN_URL || "http://100.92.162.32:2019";
+  process.env.CADDY_ADMIN_URL || "http://203.0.113.10:2019";
 
 class CaddyAdapter implements DataAdapter {
   readonly name = "caddy";

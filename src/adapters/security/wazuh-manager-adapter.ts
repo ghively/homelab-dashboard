@@ -1,5 +1,5 @@
 // Wazuh Manager adapter — agent status from the manager REST API.
-// Host: gh-arm (Tailscale 100.65.126.126)
+// Host: your-arm-host (Tailscale 203.0.113.11)
 // API: REST over HTTPS (default 55000)
 //
 // Two corrections over the previous version:
@@ -28,7 +28,7 @@ import {
 import { insecureTls, envFlag } from "../tls";
 
 const WAZUH_MANAGER_URL =
-  process.env.WAZUH_MANAGER_URL || "https://100.65.126.126:55000";
+  process.env.WAZUH_MANAGER_URL || "https://203.0.113.11:55000";
 
 // The manager presents the same internal-CA cert as the indexer/dashboard, so
 // it honours the same opt-in flag.

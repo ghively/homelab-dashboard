@@ -20,7 +20,7 @@ import type { DataAdapter } from "@/adapters/adapter-base";
  * sabnzbd, romm, tdarr) are already wired in adapter-runtime.
  *
  * Deliberately NOT registered:
- *   disc-ripper — no ripping service exists on the fleet (no listener on gh-media
+ *   disc-ripper — no ripping service exists on the fleet (no listener on your-media-host
  *                 for any ARM/ripper UI). It is a phantom inventory entry and
  *                 falls through to a labelled fixture; recommend removing it.
  */

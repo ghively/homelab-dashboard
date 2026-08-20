@@ -7,7 +7,7 @@
  * live in one place.
  *
  * The no-token case is the interesting one. Home Assistant is running at
- * gh-media:8123 and answers /api/ with 401; the long-lived token that Hermes
+ * your-media-host:8123 and answers /api/ with 401; the long-lived token that Hermes
  * used is recorded as expired. Returning "not configured" there would be a
  * lie — the service is up and we proved it. probeUnauthorized() makes the call
  * anyway and reports what the server actually said, so the panel reads

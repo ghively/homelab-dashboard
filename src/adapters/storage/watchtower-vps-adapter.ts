@@ -1,9 +1,9 @@
 // watchtower-vps adapter — Docker container fleet.
 //
-// The adapter name says "vps" and its default host was 100.92.162.32, but there
-// is no gh-vps node on this tailnet — that address is gh-ai. The name is kept
+// The adapter name says "vps" and its default host was 203.0.113.10, but there
+// is no your-vps-host node on this tailnet — that address is your-ai-host. The name is kept
 // because it exists in WORLDS and renaming it would drop the tool spec; the
-// labels below say gh-ai, which is what the address actually is.
+// labels below say your-ai-host, which is what the address actually is.
 //
 // NOTE ON THE DATA SOURCE. This previously queried Watchtower at
 // `/v1/containers`. That endpoint does not exist. Watchtower's HTTP API is only
@@ -47,7 +47,7 @@ interface DockerContainer {
 
 class WatchtowerVpsAdapter implements DataAdapter {
   readonly name = "watchtower-vps";
-  readonly description = "Docker container fleet on gh-ai — running state and images.";
+  readonly description = "Docker container fleet on your-ai-host — running state and images.";
   readonly category = "ops" as const;
 
   async health(): Promise<FreshnessInfo> {
@@ -69,7 +69,7 @@ class WatchtowerVpsAdapter implements DataAdapter {
 
     if (!WATCHTOWER_VPS_URL) {
       return {
-        title: "Docker — gh-ai",
+        title: "Docker — your-ai-host",
         subtitle: "Endpoint not configured",
         state: "empty",
         freshness: makeFreshness(),
@@ -117,7 +117,7 @@ class WatchtowerVpsAdapter implements DataAdapter {
       }));
 
       return {
-        title: "Docker — gh-ai",
+        title: "Docker — your-ai-host",
         subtitle: `${running.length}/${containers.length} running`,
         state: unhealthy.length > 0 ? "critical" : stopped.length > 0 ? "warning" : "healthy",
         freshness: makeFreshness(),
@@ -127,7 +127,7 @@ class WatchtowerVpsAdapter implements DataAdapter {
       };
     } catch {
       return {
-        title: "Docker — gh-ai",
+        title: "Docker — your-ai-host",
         subtitle: "Docker API unreachable",
         state: "offline",
         freshness: makeFreshness(),

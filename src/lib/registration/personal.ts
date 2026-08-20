@@ -10,10 +10,10 @@
  * labelled fixture rather than probing a hardcoded default host and rendering
  * a misleading `offline`.
  *
- * GROUND TRUTH FOR THIS WORLD (probed 2026-08-02 from gh-ai)
+ * GROUND TRUTH FOR THIS WORLD (probed 2026-08-02 from your-ai-host)
  * ----------------------------------------------------------
  * Registered and reading live data:
- *   spoolman-personal SPOOLMAN_URL — gh-media:8090, Spoolman 0.23.1. Same
+ *   spoolman-personal SPOOLMAN_URL — your-media-host:8090, Spoolman 0.23.1. Same
  *                                    service as the storage world's `spoolman`
  *                                    panel under a second name, framed around
  *                                    filament on hand rather than service
@@ -21,7 +21,7 @@
  *                                    which the panel reports as `empty`.
  *
  * Registered but expected to render `denied` until a credential is supplied:
- *   scenes   HOME_ASSISTANT_URL — Home Assistant is up at gh-media:8123 and
+ *   scenes   HOME_ASSISTANT_URL — Home Assistant is up at your-media-host:8123 and
  *                                 answers /api/ with 401. Scenes are an HA
  *                                 entity domain, so this needs the same
  *                                 HOME_ASSISTANT_TOKEN the home world needs.

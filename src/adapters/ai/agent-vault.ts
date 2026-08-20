@@ -1,6 +1,6 @@
 // Agent Vault adapter — the document wiki Hermes stores structured entities in.
 //
-// Real service: a FastAPI app (uvicorn) bound to 127.0.0.1:7778 on gh-ai,
+// Real service: a FastAPI app (uvicorn) bound to 127.0.0.1:7778 on your-ai-host,
 // self-described by /openapi.json as "Agent Vault API" v0.2.0.
 //
 //   GET /api/health    open, liveness only  -> {"ok": true}

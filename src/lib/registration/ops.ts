@@ -13,7 +13,7 @@
  * GROUND TRUTH, 2026-08-02 — what was probed and what it proved.
  *
  *   alertmanager  Real: prom/alertmanager v0.28.1 runs as `monitoring-alertmanager`
- *                 on gh-arm. Its published port is 127.0.0.1:9093, so it is
+ *                 on your-arm-host. Its published port is 127.0.0.1:9093, so it is
  *                 unreachable from this host. Registered anyway: with
  *                 ALERTMANAGER_URL set to the true address the panel renders
  *                 `offline — Connection refused`, which names a real host to fix.
@@ -25,7 +25,7 @@
  *   alloy         Real and reachable: Grafana Alloy v1.18.0 on THIS host,
  *                 127.0.0.1:12345 (loopback-bound, which is fine — the
  *                 dashboard runs on the same host). Registered live.
- *                 gh-arm also runs an Alloy (v1.7.4) but likewise on loopback
+ *                 your-arm-host also runs an Alloy (v1.7.4) but likewise on loopback
  *                 only, so it is not reachable and not represented here.
  *
  *   docker        No Engine API over TCP anywhere on the fleet (2375 closed on
@@ -37,7 +37,7 @@
  *   systemd       NOT REGISTERED. There is no queryable surface. node_exporter's
  *                 systemd collector is disabled on every exporter in
  *                 NODE_EXPORTER_URLS (`grep -c '^node_systemd' /metrics` = 0 on
- *                 gh-ai, gh-arm, gh-media, gh-git), Prometheus holds zero
+ *                 your-ai-host, your-arm-host, your-media-host, your-git-host), Prometheus holds zero
  *                 metrics matching /systemd/, and Loki's label set is
  *                 filename/host/job/service_name with no unit label. Any
  *                 systemd adapter would have to invent its numbers. Leave it as
@@ -48,11 +48,11 @@
  *                 (see the note atop watchtower-vps-adapter.ts), so those three
  *                 adapters actually want a Docker Engine API endpoint, which
  *                 does not exist on this fleet:
- *                   vps/gh-ai   containrrr/watchtower, cmd
+ *                   vps/your-ai-host   containrrr/watchtower, cmd
  *                               `--schedule --cleanup --label-enable`; no
  *                               --http-api-*, no port bindings, no API token.
- *                   gh-media    identical: no port bindings, no token.
- *                   gh-storage  is a Synology (GH-Storage); `docker` is not
+ *                   your-media-host    identical: no port bindings, no token.
+ *                   your-storage-host  is a Synology; `docker` is not
  *                               installed and no watchtower exists.
  *                 Setting the env vars would point them at nothing. Left
  *                 unregistered on purpose.

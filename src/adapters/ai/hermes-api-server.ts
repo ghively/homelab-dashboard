@@ -2,7 +2,7 @@
 //
 // Replaces the reachability-only probe in src/adapters/hermes/hermes-api-server.ts
 // with the actual served inventory. Verified against hermes-agent 0.19.1 on
-// gh-ai:
+// your-ai-host:
 //
 //   GET /health     open  -> {"status":"ok","platform":"hermes-agent","version":"0.19.1"}
 //   GET /v1/models  needs Authorization: Bearer <API_SERVER_KEY>

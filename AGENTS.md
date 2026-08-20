@@ -28,7 +28,7 @@ The 17 remaining fixtures are **phantom or unreachable**, each verified: honcho
 (decommissioned), cognee, opencode, outline, disc-ripper, obsidian, garage-s3,
 systemd, the 3 watchtowers (Watchtower has no container-listing API), spotify
 (OAuth, no token), fail2ban (no HTTP surface), and pihole/unifi/iot-vlan
-(LAN-only, not routable from the gh-ai VPS). These are candidates for removal
+(LAN-only, not routable from the VPS). These are candidates for removal
 from `WORLDS`. Several `denied` panels flip to live once a credential is set —
 see `.env.example` for which var each needs.
 

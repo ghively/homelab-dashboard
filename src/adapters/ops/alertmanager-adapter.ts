@@ -11,11 +11,11 @@
 // budget so a slow one degrades the panel rather than taking it down.
 //
 // DEPLOYMENT NOTE (2026-08-02). On this fleet Alertmanager v0.28.1 runs as the
-// `monitoring-alertmanager` container on gh-arm, but its port binding is
+// `monitoring-alertmanager` container on your-arm-host, but its port binding is
 // 127.0.0.1:9093 — loopback only. Nothing on the tailnet can reach it, so with
-// ALERTMANAGER_URL=http://gh-arm:9093 this panel renders `offline` with
+// ALERTMANAGER_URL=http://your-arm-host:9093 this panel renders `offline` with
 // "Connection refused". That is the accurate report: the service exists, it is
-// running, and it is not reachable. The fix is on gh-arm (bind the published
+// running, and it is not reachable. The fix is on your-arm-host (bind the published
 // port to the tailscale address instead of 127.0.0.1), not here. The parsing
 // below was verified against the real instance over an SSH port-forward.
 

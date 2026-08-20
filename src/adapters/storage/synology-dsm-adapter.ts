@@ -1,5 +1,5 @@
 // Synology DSM adapter — volumes, disks, SMART health, storage pools.
-// Host: gh-storage (Synology DS1817+, LAN 192.168.0.133, Tailscale 100.88.40.87)
+// Host: your-storage-host (Synology DS1817+, LAN 192.0.2.133, Tailscale 203.0.113.13)
 // API: DSM Web API — SYNO.API.Auth (login) then SYNO.Storage.CGI.Storage (load_info)
 //
 // The previous version of this file fetched nothing and returned a hardcoded
@@ -14,7 +14,7 @@ import { getFixtureState } from "../registry";
 import { getFixtureForState } from "../fixtures";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
-const SYNOLOGY_URL = process.env.SYNOLOGY_URL || "http://100.88.40.87:5000";
+const SYNOLOGY_URL = process.env.SYNOLOGY_URL || "http://203.0.113.13:5000";
 // SYNOLOGY_USERNAME is accepted as well as SYNOLOGY_USER — both spellings are
 // in circulation and silently reading neither is a painful way to fail.
 const SYNOLOGY_USER = process.env.SYNOLOGY_USER || process.env.SYNOLOGY_USERNAME || "";

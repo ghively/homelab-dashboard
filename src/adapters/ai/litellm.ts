@@ -1,5 +1,5 @@
 // LiteLLM adapter — model registry and endpoint health.
-// Host: gh-arm (192.168.0.156 or Tailscale 100.65.126.126)
+// Host: your-arm-host (192.0.2.156 or Tailscale 203.0.113.11)
 // API: GET /v1/models (OpenAI-compatible), GET /health (per-endpoint status)
 
 import type { DataAdapter } from "../adapter-base";
@@ -8,7 +8,7 @@ import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
-const LITELLM_URL = process.env.LITELLM_URL || "http://gh-arm:4000";
+const LITELLM_URL = process.env.LITELLM_URL || "http://your-arm-host:4000";
 const LITELLM_API_KEY = process.env.LITELLM_API_KEY || "";
 
 interface LiteLLMModelEntry {

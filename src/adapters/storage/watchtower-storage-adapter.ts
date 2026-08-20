@@ -1,4 +1,4 @@
-// watchtower-storage adapter — Docker container fleet for gh-storage.
+// watchtower-storage adapter — Docker container fleet for your-storage-host.
 //
 // NOTE ON THE DATA SOURCE. This previously queried Watchtower at
 // `/v1/containers`. That endpoint does not exist. Watchtower's HTTP API is only
@@ -42,7 +42,7 @@ interface DockerContainer {
 
 class WatchtowerStorageAdapter implements DataAdapter {
   readonly name = "watchtower-storage";
-  readonly description = "Docker container fleet on gh-storage — running state and images.";
+  readonly description = "Docker container fleet on your-storage-host — running state and images.";
   readonly category = "ops" as const;
 
   async health(): Promise<FreshnessInfo> {
@@ -64,7 +64,7 @@ class WatchtowerStorageAdapter implements DataAdapter {
 
     if (!WATCHTOWER_STORAGE_URL) {
       return {
-        title: "Docker — gh-storage",
+        title: "Docker — your-storage-host",
         subtitle: "Endpoint not configured",
         state: "empty",
         freshness: makeFreshness(),
@@ -112,7 +112,7 @@ class WatchtowerStorageAdapter implements DataAdapter {
       }));
 
       return {
-        title: "Docker — gh-storage",
+        title: "Docker — your-storage-host",
         subtitle: `${running.length}/${containers.length} running`,
         state: unhealthy.length > 0 ? "critical" : stopped.length > 0 ? "warning" : "healthy",
         freshness: makeFreshness(),
@@ -122,7 +122,7 @@ class WatchtowerStorageAdapter implements DataAdapter {
       };
     } catch {
       return {
-        title: "Docker — gh-storage",
+        title: "Docker — your-storage-host",
         subtitle: "Docker API unreachable",
         state: "offline",
         freshness: makeFreshness(),

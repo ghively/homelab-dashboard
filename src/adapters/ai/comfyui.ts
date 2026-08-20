@@ -1,5 +1,5 @@
 // ComfyUI adapter — queue depth, VRAM, recent generations.
-// Host: gh-nvidia (192.168.0.10 or Tailscale)
+// Host: your-gpu-host (192.0.2.10 or Tailscale)
 // API: GET /system_stats (devices/VRAM), GET /queue (running + pending)
 
 import type { DataAdapter } from "../adapter-base";
@@ -8,7 +8,7 @@ import { getFixtureForState } from "../fixtures";
 import type { FreshnessInfo, Item, Metric, VisualQueryResult } from "../types";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
-const COMFYUI_URL = process.env.COMFYUI_URL || "http://gh-nvidia:8188";
+const COMFYUI_URL = process.env.COMFYUI_URL || "http://your-gpu-host:8188";
 
 interface ComfyDevice {
   name?: string;
@@ -40,7 +40,7 @@ function formatBytes(bytes: number): string {
 
 class ComfyUIAdapter implements DataAdapter {
   readonly name = "comfyui";
-  readonly description = "Diffusion workflow executor on gh-nvidia.";
+  readonly description = "Diffusion workflow executor on your-gpu-host.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {

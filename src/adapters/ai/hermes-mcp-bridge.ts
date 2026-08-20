@@ -3,7 +3,7 @@
 // Replaces the /health probe in src/adapters/hermes/hermes-mcp-bridge.ts,
 // which reported HTTP 404 as a warning because this service has no /health
 // route at all. What it actually exposes (verified against the running
-// process on gh-ai, uvicorn bound to 127.0.0.1:8766):
+// process on your-ai-host, uvicorn bound to 127.0.0.1:8766):
 //
 //   GET  /.well-known/oauth-protected-resource/mcp   open. Real payload:
 //        {"resource": "...", "authorization_servers": [...],

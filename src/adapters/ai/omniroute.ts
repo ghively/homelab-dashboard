@@ -1,4 +1,4 @@
-// OmniRoute adapter — AI gateway on gh-arm.
+// OmniRoute adapter — AI gateway on your-arm-host.
 //
 // OmniRoute publishes two HTTP surfaces on separate ports:
 //   :20128  MANAGEMENT — the Next.js dashboard + /api/* JSON routes. Every
@@ -45,7 +45,7 @@ function authHeaders(): Record<string, string> {
 
 class OmniRouteAdapter implements DataAdapter {
   readonly name = "omniroute";
-  readonly description = "OmniRoute — multi-provider AI gateway on gh-arm.";
+  readonly description = "OmniRoute — multi-provider AI gateway on your-arm-host.";
   readonly category = "ai" as const;
 
   async health(): Promise<FreshnessInfo> {

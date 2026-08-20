@@ -27,13 +27,14 @@ import { homelabComponents } from "@/visual/components";
 const OUT = ".design-export";
 
 /* ── Sample data ───────────────────────────────────────────────
-   Real values from the live fleet wherever possible, so the cards show the
-   dashboard as it actually looks rather than lorem. */
+   Representative values shaped like the real fleet's data, so the cards
+   show the dashboard as it actually looks rather than lorem — but not the
+   fleet's actual numbers. */
 
 const metrics = [
-  { label: "Shows", value: 260, state: "healthy" },
-  { label: "Continuing", value: 68, state: "healthy" },
-  { label: "Ended", value: 192, state: "healthy" },
+  { label: "Shows", value: 240, state: "healthy" },
+  { label: "Continuing", value: 90, state: "healthy" },
+  { label: "Ended", value: 150, state: "healthy" },
   { label: "Disk Used", value: 71, unit: "%", state: "warning" },
 ];
 
@@ -57,31 +58,31 @@ const series = [
 
 const events = [
   { id: "e1", at: "09:12", title: "volume_2 reached 100%", detail: "DSM flagged attention", state: "warning" },
-  { id: "e2", at: "08:40", title: "Sonarr imported 3 episodes", detail: "gh-storage", state: "healthy" },
-  { id: "e3", at: "07:55", title: "LiteLLM endpoint unhealthy", detail: "6 of 22 models", state: "critical" },
+  { id: "e2", at: "08:40", title: "Sonarr imported 3 episodes", detail: "your-storage-host", state: "healthy" },
+  { id: "e3", at: "07:55", title: "LiteLLM endpoint unhealthy", detail: "3 of 18 models", state: "critical" },
 ];
 
 const nodes = [
-  { id: "gh-ai", label: "gh-ai", x: 0.1, y: 0.5, state: "healthy" },
+  { id: "ai-host", label: "your-ai-host", x: 0.1, y: 0.5, state: "healthy" },
   { id: "caddy", label: "caddy", x: 0.45, y: 0.5, state: "healthy" },
   { id: "emby", label: "emby", x: 0.8, y: 0.25, state: "healthy" },
   { id: "syn", label: "synology", x: 0.8, y: 0.75, state: "warning" },
 ];
 
 const edges = [
-  { source: "gh-ai", target: "caddy", value: 4 },
+  { source: "ai-host", target: "caddy", value: 4 },
   { source: "caddy", target: "emby", value: 3 },
   { source: "caddy", target: "syn", value: 2 },
 ];
 
-const base = { title: "Sonarr", subtitle: "260 shows tracked", state: "healthy" as const };
+const base = { title: "Sonarr", subtitle: "240 shows tracked", state: "healthy" as const };
 
 /** Props per component. Anything absent renders its own no-data state, which is
  *  itself worth seeing on a card. */
 const PROPS: Record<string, Record<string, unknown>> = {
   MetricStrip: { ...base, metrics },
-  Gauge: { title: "Volume 2", subtitle: "gh-storage", value: 100, max: 100, unit: "%", state: "critical", thresholds: { warning: 75, critical: 90 } },
-  Donut: { ...base, title: "Library split", segments: [{ label: "TV", value: 26392 }, { label: "Movies", value: 523 }, { label: "Collections", value: 61 }] },
+  Gauge: { title: "Volume 2", subtitle: "your-storage-host", value: 100, max: 100, unit: "%", state: "critical", thresholds: { warning: 75, critical: 90 } },
+  Donut: { ...base, title: "Library split", segments: [{ label: "TV", value: 12000 }, { label: "Movies", value: 1800 }, { label: "Collections", value: 60 }] },
   LineChart: { ...base, title: "NAS capacity", series },
   MultiLine: { ...base, title: "Fleet load", series: [series[0], { name: "CPU", unit: "%", points: series[0].points.map((p) => ({ x: p.x, y: p.y * 0.6 })) }] },
   BarRank: { ...base, title: "Largest libraries", items },
@@ -106,7 +107,7 @@ const PROPS: Record<string, Record<string, unknown>> = {
   MarkdownReader: { ...base, title: "Runbook", markdown: "## Synology\n\n`volume_2` is full. DSM reports **attention**.\n\n- Free space or expand the pool\n- Re-check SMART on the Seagate drives" },
   KnowledgeGraph: { ...base, title: "Adapter map", nodes, edges },
   Backlinks: { ...base, title: "Referenced by", items: items.slice(0, 3) },
-  DetailPanel: { ...base, title: "volume_2", metrics: metrics.slice(0, 3), summary: "15.3 TB of 15.3 TB used. DSM status: attention." },
+  DetailPanel: { ...base, title: "volume_2", metrics: metrics.slice(0, 3), summary: "9.8 TB of 10 TB used. DSM status: attention." },
   Callout: { title: "Disk full", state: "critical", summary: "volume_2 has no free space. DSM has flagged it for attention.", metrics: metrics.slice(0, 2) },
   EmptyState: { title: "RomM", state: "empty", summary: "Service not configured — showing sample data." },
   RoomBoard: { ...base, title: "Home", items: items.slice(0, 3) },

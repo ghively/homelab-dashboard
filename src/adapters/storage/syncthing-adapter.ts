@@ -1,5 +1,5 @@
 // Syncthing adapter — folder sync status, device connections, transfer rates.
-// Host: gh-storage (Synology DS1817+, Tailscale 100.88.40.87)
+// Host: your-storage-host (Synology DS1817+, Tailscale 203.0.113.13)
 // API: REST (default 8384, X-API-Key auth)
 
 import type { DataAdapter } from "../adapter-base";
@@ -9,7 +9,7 @@ import { getFixtureForState } from "../fixtures";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const SYNCTHING_BASE_URL =
-  process.env.SYNCTHING_URL || "http://100.88.40.87:8384";
+  process.env.SYNCTHING_URL || "http://203.0.113.13:8384";
 const SYNECTHING_API_KEY = process.env.SYNCTHING_API_KEY || "";
 
 interface FolderStatus {

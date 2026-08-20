@@ -1,5 +1,5 @@
 // Wazuh Dashboard adapter — OpenSearch Dashboards frontend for Wazuh SIEM.
-// Host: gh-vps (Tailscale: 100.92.162.32)
+// Host: your-vps-host (Tailscale: 203.0.113.10)
 // URL: https://wazuh.example.com (443)
 import type { DataAdapter, HealthCheck } from "./adapter-base";
 import { getFixtureForState } from "./fixtures";

@@ -10,7 +10,7 @@
  * labelled fixture rather than probing a hardcoded default host and rendering
  * a misleading `offline`.
  *
- * GROUND TRUTH FOR THIS WORLD (probed 2026-08-02 from gh-ai)
+ * GROUND TRUTH FOR THIS WORLD (probed 2026-08-02 from your-ai-host)
  * ----------------------------------------------------------
  * This world has no services in it. There is no wiki server, no Obsidian sync
  * endpoint and no graph database anywhere on the fleet. What does exist is a

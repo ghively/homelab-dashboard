@@ -24,7 +24,7 @@ const MAX_FILES = 5000;
 const WALK_DEADLINE_MS = 2500;
 
 export interface WikiDoc {
-  /** Path relative to the corpus root, e.g. "entities/gh-vps.md". */
+  /** Path relative to the corpus root, e.g. "entities/your-vps-host.md". */
   rel: string;
   /** Top-level directory, or "(root)" for files directly in the corpus root. */
   section: string;

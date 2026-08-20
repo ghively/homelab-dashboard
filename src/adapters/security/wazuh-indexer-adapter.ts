@@ -1,5 +1,5 @@
 // Wazuh Indexer adapter — log search, alert analytics, data retention.
-// Host: gh-arm (Tailscale 100.65.126.126)
+// Host: your-arm-host (Tailscale 203.0.113.11)
 // API: OpenSearch REST (default 9200)
 
 import type { DataAdapter } from "../adapter-base";
@@ -10,7 +10,7 @@ import { insecureTls, envFlag } from "../tls";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const WAZUH_INDEXER_URL =
-  process.env.WAZUH_INDEXER_URL || "https://100.65.126.126:9200";
+  process.env.WAZUH_INDEXER_URL || "https://203.0.113.11:9200";
 
 // Wazuh Indexer is OpenSearch behind HTTPS with basic auth and, by default, a
 // self-signed certificate. Without credentials every request 401s; without the

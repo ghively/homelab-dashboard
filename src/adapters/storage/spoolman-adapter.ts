@@ -1,5 +1,5 @@
 // Spoolman adapter — 3D printing filament inventory and usage tracking.
-// Host: gh-media (Tailscale 100.116.139.100)
+// Host: your-media-host (Tailscale 203.0.113.14)
 // API: REST (default 7912)
 
 import type { DataAdapter } from "../adapter-base";
@@ -9,7 +9,7 @@ import { getFixtureForState } from "../fixtures";
 import { ADAPTER_TIMEOUT_MS } from "@/lib/adapter-http";
 
 const SPOOLMAN_URL =
-  process.env.SPOOLMAN_URL || "http://100.116.139.100:7912";
+  process.env.SPOOLMAN_URL || "http://203.0.113.14:7912";
 
 function makeFreshness(source: string): FreshnessInfo {
   return {

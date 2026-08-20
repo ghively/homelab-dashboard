@@ -149,9 +149,9 @@ export function DashboardShell({
           >
             <span aria-hidden="true">☰</span>
           </button>
-          <span className="dash-waybar-host">gh-ai</span>
+          <span className="dash-waybar-host">your-ai-host</span>
           <span className="dash-waybar-prompt">
-            <span className="p">gene@gh-ai:~$</span> dashboard --live{" "}
+            <span className="p">user@your-ai-host:~$</span> dashboard --live{" "}
             <span className="dash-cursor" aria-hidden="true">▊</span>
           </span>
           <span className="dash-waybar-clock">{clock}</span>

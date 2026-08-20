@@ -1,14 +1,14 @@
 // GPU adapter — real NVIDIA device telemetry.
 //
 // There is no DCGM / nvidia_gpu_exporter reachable on the fleet (no GPU job in
-// Prometheus, ports 9400/9835 closed on gh-nvidia over the tailnet). The one
+// Prometheus, ports 9400/9835 closed on your-gpu-host over the tailnet). The one
 // HTTP surface that reports genuine CUDA device state is ComfyUI's
 // /system_stats endpoint, which calls torch.cuda.mem_get_info() — so the device
 // name and the device-wide VRAM total/free are real measurements, not a
 // process-local guess.
 //
 // Every displayed value here comes from that fetch. Point GPU_STATS_URL at a
-// ComfyUI instance (gh-nvidia :8188). Absent → labelled fixture, never a probe
+// ComfyUI instance (your-gpu-host :8188). Absent → labelled fixture, never a probe
 // of a hardcoded host.
 
 import type { DataAdapter } from "../adapter-base";

@@ -1,4 +1,4 @@
-// watchtower-media adapter — Docker container fleet for gh-media.
+// watchtower-media adapter — Docker container fleet for your-media-host.
 //
 // NOTE ON THE DATA SOURCE. This previously queried Watchtower at
 // `/v1/containers`. That endpoint does not exist. Watchtower's HTTP API is only
@@ -42,7 +42,7 @@ interface DockerContainer {
 
 class WatchtowerMediaAdapter implements DataAdapter {
   readonly name = "watchtower-media";
-  readonly description = "Docker container fleet on gh-media — running state and images.";
+  readonly description = "Docker container fleet on your-media-host — running state and images.";
   readonly category = "ops" as const;
 
   async health(): Promise<FreshnessInfo> {
@@ -64,7 +64,7 @@ class WatchtowerMediaAdapter implements DataAdapter {
 
     if (!WATCHTOWER_MEDIA_URL) {
       return {
-        title: "Docker — gh-media",
+        title: "Docker — your-media-host",
         subtitle: "Endpoint not configured",
         state: "empty",
         freshness: makeFreshness(),
@@ -112,7 +112,7 @@ class WatchtowerMediaAdapter implements DataAdapter {
       }));
 
       return {
-        title: "Docker — gh-media",
+        title: "Docker — your-media-host",
         subtitle: `${running.length}/${containers.length} running`,
         state: unhealthy.length > 0 ? "critical" : stopped.length > 0 ? "warning" : "healthy",
         freshness: makeFreshness(),
@@ -122,7 +122,7 @@ class WatchtowerMediaAdapter implements DataAdapter {
       };
     } catch {
       return {
-        title: "Docker — gh-media",
+        title: "Docker — your-media-host",
         subtitle: "Docker API unreachable",
         state: "offline",
         freshness: makeFreshness(),

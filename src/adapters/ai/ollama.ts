@@ -5,7 +5,7 @@
 // Rewritten to go through adapter-http. The previous version used bare
 // AbortSignal.timeout and collapsed every failure into "API unreachable",
 // which hid the difference that matters: on this fleet Ollama IS running on
-// gh-nvidia (systemd unit active) but bound to 127.0.0.1:11434, so the
+// your-gpu-host (systemd unit active) but bound to 127.0.0.1:11434, so the
 // dashboard host gets ECONNREFUSED. "Connection refused — service not
 // listening" points at that; "unreachable" does not.
 

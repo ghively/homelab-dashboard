@@ -2,7 +2,7 @@
 //
 // Configured as a comma-separated list of `label=url` pairs in
 // NODE_EXPORTER_URLS, e.g.
-//   gh-ai=http://100.92.162.32:9100,gh-arm=http://gh-arm:9100
+//   your-ai-host=http://203.0.113.10:9100,your-arm-host=http://your-arm-host:9100
 // A bare url is accepted too; the hostname becomes the label.
 //
 // Hosts are probed in parallel on the fan-out budget, and a host that does not

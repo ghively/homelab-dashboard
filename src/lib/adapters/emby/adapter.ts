@@ -32,7 +32,7 @@ import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout }
  * Emby adapter configuration.
  */
 export interface EmbyConfig {
-  baseUrl: string; // e.g., http://gh-media:8096
+  baseUrl: string; // e.g., http://your-media-host:8096
   apiKey: string; // From your credential store
   userId?: string; // Optional, for user-specific queries
 }
@@ -160,7 +160,7 @@ export class EmbyAdapter {
    * NOT a bare array — only /Sessions is a bare array. The adapter typed these
    * as arrays and called .map() on the envelope, which threw, so every Emby
    * panel rendered offline even with a valid token. Verified live against the
-   * gh-media instance.
+   * your-media-host instance.
    */
   private async fetchList<T>(endpoint: string): Promise<T[]> {
     const body = await this.fetch<T[] | { Items?: T[] }>(endpoint);

@@ -10,26 +10,26 @@
  * labelled fixture rather than probing a hardcoded default host and rendering
  * a misleading `offline`.
  *
- * GROUND TRUTH FOR THIS WORLD (probed 2026-08-02 from gh-ai)
+ * GROUND TRUTH FOR THIS WORLD (probed 2026-08-02 from your-ai-host)
  * ----------------------------------------------------------
  * Registered and reading live data:
- *   node-red      gh-media:1880  — /settings, /flows, /diagnostics all anonymous
- *   wyoming       gh-media:10201/10300/10400 — Wyoming `describe` over TCP
+ *   node-red      your-media-host:1880  — /settings, /flows, /diagnostics all anonymous
+ *   wyoming       your-media-host:10201/10300/10400 — Wyoming `describe` over TCP
  *   stalwart-mail 127.0.0.1:8080 — /healthz/*, /jmap/session, OAuth metadata
- *   roundcube     gh-arm:8000    — login page availability (no read API exists)
- *   vikunja       gh-arm:3456    — /info anonymous, projects+tasks with a token
+ *   roundcube     your-arm-host:8000    — login page availability (no read API exists)
+ *   vikunja       your-arm-host:3456    — /info anonymous, projects+tasks with a token
  *   telegram      Bot API        — getMe + getWebhookInfo
  *
  * Registered but expected to render `denied` until a credential is supplied:
- *   home-assistant gh-media:8123 — up, /api/ answers 401; the long-lived token
+ *   home-assistant your-media-host:8123 — up, /api/ answers 401; the long-lived token
  *                                  Hermes held is recorded as expired
- *   mqtt           gh-media:1883 — up, MQTT CONNACK return code 5 (not
+ *   mqtt           your-media-host:1883 — up, MQTT CONNACK return code 5 (not
  *                                  authorized) for an anonymous CONNECT
  *
  * NOT registered:
  *   outline — no Outline instance exists on this fleet. Every candidate port
- *   was probed (3000 on gh-ai is the Buzz relay, on gh-arm it redirects to the
- *   Wazuh dashboard, on gh-nvidia it is Grafana) and nothing serves Outline.
+ *   was probed (3000 on your-ai-host is the Buzz relay, on your-arm-host it redirects to the
+ *   Wazuh dashboard, on your-gpu-host it is Grafana) and nothing serves Outline.
  *   Its panel stays a labelled fixture, and the honest fix is to drop it from
  *   the world inventory rather than to invent an adapter for it.
  */

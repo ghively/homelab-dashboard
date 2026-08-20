@@ -4,6 +4,6 @@ services:
     ports: ["3000:3000"]
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://gh-arm:4000/v1}
-      OPENAI_MODEL: ${OPENAI_MODEL:-deepseek-v4-pro}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://your-litellm-host:4000/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-your-model-name}
     restart: unless-stopped

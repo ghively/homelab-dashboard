@@ -29,7 +29,7 @@ import onepanel from "@/adapters/onepanel-adapter";
  *   pihole, unifi   — LAN-only (192.168.x); unreachable from this VPS host.
  *   iot-vlan        — no service; would require the (unreachable) UniFi controller.
  *   garage-s3       — no Garage cluster deployed on the fleet.
- *   smb-nfs         — no reachable share-metrics source (gh-storage exporter filtered).
+ *   smb-nfs         — no reachable share-metrics source (your-storage-host exporter filtered).
  * These fall through to labelled fixtures rather than a misleading live panel.
  */
 export function register(registry: Map<string, DataAdapter>): void {

@@ -22,7 +22,7 @@ export class PiHoleAdapter implements DataAdapter {
   private baseUrl: string;
   private apiKey: string;
 
-  constructor(baseUrl: string = process.env.PIHOLE_BASE_URL || "http://192.168.0.50", apiKey: string = process.env.PIHOLE_API_KEY || "") {
+  constructor(baseUrl: string = process.env.PIHOLE_BASE_URL || "http://192.0.2.50", apiKey: string = process.env.PIHOLE_API_KEY || "") {
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
   }

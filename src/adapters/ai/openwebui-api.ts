@@ -1,7 +1,7 @@
 // Open WebUI — API surface view.
 //
 // `openwebui-api` and `openwebui-vector` are two views of the one Open WebUI
-// container (gh-ai, published on :3001). This module covers the service/API
+// container (your-ai-host, published on :3001). This module covers the service/API
 // side; the RAG side lives in openwebui-vector.ts.
 //
 // What answers anonymously (verified against 0.9.5):

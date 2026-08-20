@@ -10,19 +10,19 @@
  * labelled fixture rather than probing a hardcoded default host and rendering
  * a misleading `offline`.
  *
- * Ground truth for this world, established by probing gh-ai, gh-arm and
- * gh-nvidia on 2026-08-02:
+ * Ground truth for this world, established by probing your-ai-host, your-arm-host and
+ * your-gpu-host on 2026-08-02:
  *
  *   REGISTERED — a real service answers and the adapter reads it
- *     omniroute          gh-arm :20128 (management) + :20129 (OpenAI API).
+ *     omniroute          your-arm-host :20128 (management) + :20129 (OpenAI API).
  *                        Up; every route needs the OmniRoute Manage Key.
- *     ollama             gh-nvidia, systemd unit active but bound to
+ *     ollama             your-gpu-host, systemd unit active but bound to
  *                        127.0.0.1:11434 — refused from here. Renders offline.
- *     openwebui-api      gh-ai :3001, /api/config + /health/db are anonymous.
+ *     openwebui-api      your-ai-host :3001, /api/config + /health/db are anonymous.
  *     openwebui-vector   same container; all retrieval routes need a token.
- *     agent-vault        gh-ai 127.0.0.1:7778, FastAPI "Agent Vault API" 0.2.0.
- *     hermes-api-server  gh-ai :8642, hermes-agent 0.19.1.
- *     hermes-mcp-bridge  gh-ai 127.0.0.1:8766, `hermes-mcp serve`, OAuth-gated.
+ *     agent-vault        your-ai-host 127.0.0.1:7778, FastAPI "Agent Vault API" 0.2.0.
+ *     hermes-api-server  your-ai-host :8642, hermes-agent 0.19.1.
+ *     hermes-mcp-bridge  your-ai-host 127.0.0.1:8766, `hermes-mcp serve`, OAuth-gated.
  *
  *   NOT REGISTERED — no service exists behind the name, so a live adapter
  *   would be a fabrication. These keep serving a labelled fixture and should
