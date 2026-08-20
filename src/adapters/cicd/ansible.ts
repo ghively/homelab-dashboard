@@ -1,7 +1,7 @@
 /**
  * Ansible Adapter — Pipeline status, drift detection, role inventory
  *
- * Host: gh-ai (via GitLab CI for homelab-ansible)
+ * Host: your-ai-host (via GitLab CI for homelab-ansible)
  * GitLab project uses Ansible for infrastructure automation
  * Auth: GitLab PAT for pipeline queries
  */
@@ -50,14 +50,14 @@ interface GitLabFile {
 export class AnsibleAdapter implements ServiceAdapter {
   readonly name = "ansible";
   readonly serviceName = "Ansible (homelab-ansible)";
-  readonly host = "gh-ai";
+  readonly host = "your-ai-host";
 
   private client: HttpClient;
   private ansibleProjectId: number | null = null;
 
   constructor() {
     const token = credentials.get({
-      item: "Gitlab PAT Gregory",
+      item: "Gitlab PAT",
       envVar: "GITLAB_TOKEN",
     });
 

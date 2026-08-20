@@ -33,7 +33,7 @@ import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout }
  */
 export interface EmbyConfig {
   baseUrl: string; // e.g., http://gh-media:8096
-  apiKey: string; // From 1Password vault "Gregory"
+  apiKey: string; // From your credential store
   userId?: string; // Optional, for user-specific queries
 }
 

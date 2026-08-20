@@ -62,7 +62,7 @@ const DEFAULT_QUALITY_PROFILE_ID = 7;
  */
 export interface RadarrConfig {
   baseUrl: string; // e.g., http://localhost:7878
-  apiKey: string; // From 1Password vault "Gregory"
+  apiKey: string; // From your credential store
 }
 
 /**

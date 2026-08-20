@@ -29,7 +29,7 @@ import { ADAPTER_TIMEOUT_MS, AdapterHttpError, classifyError, fetchWithTimeout }
  */
 export interface SabnzbdConfig {
   baseUrl: string; // e.g., http://localhost:8080
-  apiKey: string; // From 1Password vault "Gregory"
+  apiKey: string; // From your credential store
 }
 
 /**

@@ -1,8 +1,8 @@
 # Syncing with the Cyber-Noir design system
 
-The design system lives in the **"Gene Hively Cyber-Noir Design System"**
-project on claude.ai/design (`projectId 019e0132-19e7-72f9-a565-996e00f955fd`).
-It is the source of truth for colour, type, spacing, radius, glow and motion.
+The design system lives in the **"Cyber-Noir Design System"** project on
+claude.ai/design (`projectId <your-project-id>`). It is the source of truth
+for colour, type, spacing, radius, glow and motion.
 
 ## What is mirrored, and what is translated
 

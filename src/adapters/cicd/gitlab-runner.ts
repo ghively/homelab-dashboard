@@ -1,8 +1,8 @@
 /**
- * GitLab Runner Adapter (gh-git) — Jobs, capacity, version
+ * GitLab Runner Adapter (your-git-host) — Jobs, capacity, version
  *
- * Host: gh-git (Tailscale: vmi1825965.contaboserver.net)
- * Runners: gh-git-runner (id=8), gh-git-ansible-native (id=11)
+ * Host: your-git-host
+ * Runners: git-runner (id=1), ansible-native (id=2)
  * GitLab API: https://git.example.com/api/v4
  */
 import { HttpClient } from "../base-client";
@@ -36,14 +36,14 @@ interface GitLabRunnerDetail {
 
 export class GitLabRunnerAdapter implements ServiceAdapter {
   readonly name = "gitlab-runner";
-  readonly serviceName = "GitLab Runner (gh-git)";
-  readonly host = "gh-git";
+  readonly serviceName = "GitLab Runner (your-git-host)";
+  readonly host = "your-git-host";
 
   private client: HttpClient;
 
   constructor() {
     const token = credentials.get({
-      item: "Gitlab PAT Gregory",
+      item: "Gitlab PAT",
       envVar: "GITLAB_TOKEN",
     });
 
@@ -103,7 +103,7 @@ export class GitLabRunnerAdapter implements ServiceAdapter {
     const onlineRunners = runners.filter((r) => r.status === "online");
 
     return {
-      title: "GitLab Runner Fleet (gh-git)",
+      title: "GitLab Runner Fleet (your-git-host)",
       subtitle: `${activeRunners.length}/${runners.length} active`,
       state: onlineRunners.length < activeRunners.length ? "warning" : "healthy",
       freshness: {
@@ -211,7 +211,7 @@ export class GitLabRunnerAdapter implements ServiceAdapter {
   private errorResult(now: string, error: unknown): VisualQueryResult {
     const message = error instanceof Error ? error.message : "Unknown error";
     return {
-      title: "GitLab Runner (gh-git)",
+      title: "GitLab Runner (your-git-host)",
       subtitle: "Query failed",
       state: "offline",
       freshness: {

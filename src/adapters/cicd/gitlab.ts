@@ -1,9 +1,9 @@
 /**
  * GitLab CE Adapter — Pipelines, MRs, Runners, Repos
  *
- * Host: gh-git (Tailscale: vmi1825965.contaboserver.net)
+ * Host: your-git-host
  * API: https://git.example.com/api/v4
- * Auth: PAT from 1Password "Gitlab PAT Gregory"
+ * Auth: PAT from 1Password "Gitlab PAT"
  */
 import { HttpClient } from "../base-client";
 import { ServiceAdapter, FreshnessInfo, VisualQueryResult } from "../types";
@@ -59,14 +59,14 @@ interface GitLabRunner {
 export class GitLabAdapter implements ServiceAdapter {
   readonly name = "gitlab";
   readonly serviceName = "GitLab CE";
-  readonly host = "gh-git";
+  readonly host = "your-git-host";
 
   private client: HttpClient;
   private versionCache: { version: string; fetchedAt: number } | null = null;
 
   constructor() {
     const token = credentials.get({
-      item: "Gitlab PAT Gregory",
+      item: "Gitlab PAT",
       envVar: "GITLAB_TOKEN",
     });
 

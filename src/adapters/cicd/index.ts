@@ -23,19 +23,19 @@ interface GitLabRunner {
 }
 
 /**
- * GitLab Runner on gh-ai (Tailscale: 100.92.162.32)
- * Named "hermes-vps-runner" in GitLab, currently deregistered
+ * GitLab Runner on your-ai-host
+ * Named with a recognizable prefix in GitLab, currently deregistered
  */
 class GitLabRunnerAIAdapter implements ServiceAdapter {
   readonly name = "gitlab-runner-ai";
-  readonly serviceName = "GitLab Runner (gh-ai)";
-  readonly host = "gh-ai";
+  readonly serviceName = "GitLab Runner (your-ai-host)";
+  readonly host = "your-ai-host";
 
   private client: HttpClient;
 
   constructor() {
     const token = credentials.get({
-      item: "Gitlab PAT Gregory",
+      item: "Gitlab PAT",
       envVar: "GITLAB_TOKEN",
     });
 
@@ -69,15 +69,15 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
     try {
       const { data: runners } = await this.client.get<GitLabRunner[]>("/runners");
 
-      // Filter for gh-ai runner (deregistered, but track for cleanup)
-      const aiRunner = runners.find((r) => r.description?.includes("hermes-vps"));
+      // Filter for your-ai-host runner (deregistered, but track for cleanup)
+      const aiRunner = runners.find((r) => r.description?.includes("your-runner-prefix"));
 
       const state: VisualQueryResult["state"] = aiRunner
         ? (aiRunner.status === "online" ? "healthy" : "warning")
         : "offline";
 
       return {
-        title: "GitLab Runner (gh-ai)",
+        title: "GitLab Runner (your-ai-host)",
         subtitle: aiRunner ? "Registered" : "Deregistered",
         state,
         freshness: {
@@ -102,7 +102,7 @@ class GitLabRunnerAIAdapter implements ServiceAdapter {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return {
-        title: "GitLab Runner (gh-ai)",
+        title: "GitLab Runner (your-ai-host)",
         subtitle: "Query failed",
         state: "offline",
         freshness: {

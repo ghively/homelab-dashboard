@@ -12,7 +12,7 @@ import { CredentialEntry } from "./types";
 export class CredentialResolver {
   private vault: string;
 
-  constructor(vault: string = "Gregory") {
+  constructor(vault: string = "Homelab") {
     this.vault = vault;
   }
 
@@ -87,4 +87,4 @@ export class CredentialResolver {
 }
 
 // Singleton instance for the application
-export const credentials = new CredentialResolver("Gregory");
+export const credentials = new CredentialResolver("Homelab");

@@ -1,7 +1,7 @@
 /**
  * GitHub Actions Runner Adapter — Jobs, labels, version
  *
- * Host: gh-arm (Tailscale reachable)
+ * Host: your-arm-host (Tailscale reachable)
  * Uses GitHub API for self-hosted runners
  * Auth: GitHub PAT from 1Password
  */
@@ -10,7 +10,7 @@ import { ServiceAdapter, FreshnessInfo, VisualQueryResult } from "../types";
 import { credentials } from "../onepassword";
 
 const GITHUB_API_URL = process.env.GITHUB_API_URL || "https://api.github.com";
-const GITHUB_OWNER = process.env.GITHUB_OWNER || "ghively";
+const GITHUB_OWNER = process.env.GITHUB_OWNER || "your-github-username";
 
 interface GitHubRunner {
   id: number;
@@ -35,7 +35,7 @@ interface GitHubWorkflowRun {
 export class GitHubActionsAdapter implements ServiceAdapter {
   readonly name = "github-actions";
   readonly serviceName = "GitHub Actions Runner";
-  readonly host = "gh-arm";
+  readonly host = "your-arm-host";
 
   private client: HttpClient;
 
@@ -104,7 +104,7 @@ export class GitHubActionsAdapter implements ServiceAdapter {
 
     return {
       title: "GitHub Actions Runner",
-      subtitle: `gh-arm · ${GITHUB_OWNER}`,
+      subtitle: `your-arm-host · ${GITHUB_OWNER}`,
       state: onlineRunners.length === 0 ? "offline" : "healthy",
       freshness: {
         adapter: this.name,

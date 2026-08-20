@@ -46,7 +46,7 @@ const DEFAULT_LANGUAGE_PROFILE_ID = 1;
  */
 export interface SonarrConfig {
   baseUrl: string; // e.g., http://localhost:8989
-  apiKey: string; // From 1Password vault "Gregory"
+  apiKey: string; // From your credential store
 }
 
 /**
